@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e1b4b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#glow)"/>
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="none" stroke="url(#grad)" stroke-width="12" opacity="0.8"/>
+  <text x="256" y="310" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="190" font-weight="900" fill="url(#grad)" text-anchor="middle" letter-spacing="-8">GI</text>
+  <circle cx="390" cy="130" r="28" fill="#10b981" />
+  <path d="M380 130 L388 138 L402 124" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

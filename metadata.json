@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix StreamSync-1ero",
+  "description": "Plataforma minimalista de cuentas y suscripciones de streaming con pasarela de pago manual y base de datos en Google Sheets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
