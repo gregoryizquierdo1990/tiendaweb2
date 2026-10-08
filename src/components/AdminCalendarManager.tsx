@@ -471,7 +471,7 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
       dominio: DOMAIN_OFFICIAL
     });
 
-    const cleanPhone = item.order.customerPhone.replace(/\D/g, '');
+    const cleanPhone = (item.order?.customerPhone || '').replace(/\D/g, '');
     const phoneWithCountry = cleanPhone.startsWith('58') ? cleanPhone : `58${cleanPhone.replace(/^0/, '')}`;
     const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');

@@ -78,7 +78,6 @@ import {
   INITIAL_SUPPLIER_PURCHASES
 } from './data/defaultCatalog';
 
-import { AdminErrorBoundary } from './components/AdminErrorBoundary';
 import {
   initAuth,
   googleSignIn,
@@ -1688,8 +1687,7 @@ export default function App() {
           path="/admin/*"
           element={
             adminSession ? (
-              <AdminErrorBoundary>
-                <AdminReconciliationModal
+              <AdminReconciliationModal
                 orders={orders}
                 walletTopups={walletTopups}
                 customerUsers={customerUsers}
@@ -1819,9 +1817,7 @@ export default function App() {
                 expenses={expenses}
                 onAddExpense={handleAddExpense}
                 onUpdateExpense={handleUpdateExpense}
-                onDeleteExpense={handleDeleteExpense}
               />
-            </AdminErrorBoundary>
             ) : (
               <AdminLoginPage
                 onSuccess={handleAdminLoginSuccess}
