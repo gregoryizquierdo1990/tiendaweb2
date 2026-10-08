@@ -462,6 +462,7 @@ export function initRealtimeFirestoreSync() {
     console.warn('Notice listening to products snapshot:', err);
   });
   activeUnsubscribers.push(unsubProducts);
+  console.log('Firestore products listener initialized.');
 
   // 5. Payment Methods Listener
   const unsubMethods = onSnapshot(collection(db, 'payment_methods'), (snapshot) => {

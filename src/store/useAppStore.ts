@@ -27,12 +27,14 @@ import {
 
 const syncProductsList = (oldList: Product[], newList: Product[]) => {
   if (isSyncingFromFirestore) return;
+  
   newList.forEach(p => {
     const oldP = oldList.find(o => o.id === p.id);
     if (!oldP || JSON.stringify(oldP) !== JSON.stringify(p)) {
       syncProductToFirestore(p);
     }
   });
+  
   oldList.forEach(o => {
     if (!newList.some(n => n.id === o.id)) {
       deleteProductFromFirestore(o.id);
