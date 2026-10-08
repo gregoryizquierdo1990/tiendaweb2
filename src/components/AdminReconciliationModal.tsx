@@ -2121,7 +2121,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
                     onSubmit={async (e) => {
                       e.preventDefault();
                       if (!newUserName.trim() || !newUserPhone.trim()) return;
-                      const cleanPhone = newUserPhone.replace(/\D/g, '');
+                      const cleanPhone = (newUserPhone || '').replace(/\D/g, '');
                       const finalEmail = newUserEmail.trim()
                         ? newUserEmail.trim().toLowerCase()
                         : `${cleanPhone || 'usuario' + Math.floor(1000 + Math.random() * 9000)}@cliente.gregoryizquierdo.xyz`;

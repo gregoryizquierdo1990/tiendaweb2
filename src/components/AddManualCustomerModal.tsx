@@ -40,7 +40,7 @@ export const AddManualCustomerModal: React.FC<AddManualCustomerModalProps> = ({
     // Auto-generate safe email if empty
     const sanitizedEmail = email.trim()
       ? email.trim().toLowerCase()
-      : `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '.')}.${Math.floor(100 + Math.random() * 900)}@cliente.local`;
+      : `${(cleanName || '').toLowerCase().replace(/[^a-z0-9]/g, '.')}.${Math.floor(100 + Math.random() * 900)}@cliente.local`;
 
     const nowIso = new Date().toISOString();
     const newCustomer: CustomerUser = {
