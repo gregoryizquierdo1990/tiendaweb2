@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para la integración de Firebase Firestore para lograr sincronización bidireccional en tiempo real de productos, pedidos, clientes y configuraciones entre todos los dispositivos y la web publicada gregoryizquierdo.xyz.",
-  "updatedAt":  "2026-10-08T16:11:41.829077993Z",
+  "summary":  "Plan de implementación para la autenticación de usuarios con Firebase Auth (correo/contraseña y Google Sign-in), creación automática de documentos en Firestore en la colección (users) con rol por defecto (cliente), y panel administrativo protegido por código maestro para que solo el administrador pueda ascender usuarios a (vendedor).",
+  "updatedAt":  "2026-10-08T17:25:23.631930763Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

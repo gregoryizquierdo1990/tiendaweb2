@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
-import { X, User, Mail, Lock, Phone, ArrowRight, ShieldCheck, Sparkles, AlertCircle } from 'lucide-react';
+import { X, User, Mail, Lock, Phone, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 import { CustomerUser } from '../types';
-import { logAuditEvent } from '../services/auditLogger';
+import { 
+  registerWithEmailPassword, 
+  loginWithEmailPassword, 
+  loginWithGooglePopup 
+} from '../services/firebaseAuthService';
 
 interface CustomerAuthModalProps {
   onClose: () => void;
   onLoginSuccess: (user: CustomerUser) => void;
-  onRegister: (newUser: Omit<CustomerUser, 'id' | 'grpayBalance' | 'createdAt'>) => Promise<CustomerUser>;
+  onRegister?: (newUser: Omit<CustomerUser, 'id' | 'grpayBalance' | 'createdAt'>) => Promise<CustomerUser>;
   existingUsers: CustomerUser[];
 }
 
 export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   onClose,
   onLoginSuccess,
-  onRegister,
   existingUsers
 }) => {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -21,10 +24,29 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<'cliente' | 'vendedor'>('cliente');
-  const [sellerCode, setSellerCode] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    setErrorMessage(null);
+    setIsGoogleLoading(true);
+    try {
+      const user = await loginWithGooglePopup();
+      onLoginSuccess(user);
+      onClose();
+    } catch (err: any) {
+      console.warn('Google Sign-In Error:', err);
+      const code = err?.code || '';
+      if (code === 'auth/popup-closed-by-user') {
+        setErrorMessage('Inicio de sesión con Google cancelado.');
+      } else {
+        setErrorMessage(err?.message || 'Error al conectar con Google. Intenta con correo y contraseña.');
+      }
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,8 +61,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         setErrorMessage('Ingresa tu número de WhatsApp / Teléfono');
         return;
       }
-      if (email.trim() && !email.includes('@')) {
-        setErrorMessage('Ingresa un correo electrónico válido o déjalo en blanco si no posees');
+      if (!email.trim() || !email.includes('@')) {
+        setErrorMessage('Ingresa un correo electrónico válido para tu cuenta');
         return;
       }
       if (!password || password.length < 6) {
@@ -48,93 +70,76 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         return;
       }
 
-      const cleanPhone = phone.replace(/\D/g, '');
-      const finalEmail = email.trim()
-        ? email.trim().toLowerCase()
-        : `${cleanPhone || 'cliente' + Math.floor(1000 + Math.random() * 9000)}@cliente.gregoryizquierdo.xyz`;
-
-      // Check if email or phone already registered
-      const exists = existingUsers.some(
-        (u) =>
-          u.email.toLowerCase() === finalEmail ||
-          (cleanPhone.length >= 7 && u.phone.replace(/\D/g, '') === cleanPhone)
-      );
-      if (exists) {
-        setErrorMessage('Este teléfono o correo ya está registrado. Por favor inicia sesión.');
+      try {
+        setIsLoading(true);
+        // Firebase Auth registration - Default role 'cliente' assigned automatically in Firestore 'users'
+        const registeredUser = await registerWithEmailPassword(
+          email.trim(),
+          password,
+          name.trim(),
+          phone.trim()
+        );
+        onLoginSuccess(registeredUser);
+        onClose();
+      } catch (err: any) {
+        console.warn('Registration Error:', err);
+        const code = err?.code || '';
+        if (code === 'auth/email-already-in-use') {
+          setErrorMessage('Este correo ya está registrado en Firebase. Por favor inicia sesión.');
+        } else if (code === 'auth/weak-password') {
+          setErrorMessage('La contraseña es muy débil. Usa al menos 6 caracteres.');
+        } else if (code === 'auth/invalid-email') {
+          setErrorMessage('El formato de correo no es válido.');
+        } else {
+          setErrorMessage(err?.message || 'Error al registrar la cuenta en Firebase Auth.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Login with Email and Password
+      if (!email.trim() || !password) {
+        setErrorMessage('Ingresa tu correo electrónico y contraseña');
         return;
       }
 
       try {
         setIsLoading(true);
-        const createdUser = await onRegister({
-          name: name.trim(),
-          email: finalEmail,
-          password,
-          phone: phone.trim(),
-          role,
-          sellerCode: role === 'vendedor' ? (sellerCode.trim() || `VEND-${Math.floor(100 + Math.random() * 900)}`) : undefined
-        });
-        logAuditEvent({
-          actor: createdUser.name,
-          actorRole: createdUser.role === 'vendedor' ? 'seller' : 'customer',
-          actorEmail: createdUser.email,
-          actorPhone: createdUser.phone,
-          action: 'REGISTRO_USUARIO',
-          description: `Nuevo usuario registrado como ${(createdUser.role || 'cliente').toUpperCase()}. WhatsApp: ${createdUser.phone}`,
-          severity: 'success'
-        });
-        onLoginSuccess(createdUser);
+        const cleanEmail = email.trim();
+        // If user typed a phone number, attempt match in existing users or append domain
+        const emailToLogin = cleanEmail.includes('@') 
+          ? cleanEmail 
+          : `${cleanEmail.replace(/\D/g, '')}@cliente.gregoryizquierdo.xyz`;
+
+        const loggedUser = await loginWithEmailPassword(emailToLogin, password);
+        onLoginSuccess(loggedUser);
         onClose();
       } catch (err: any) {
-        setErrorMessage(err.message || 'Error al registrar usuario');
+        console.warn('Login Error:', err);
+        // Fallback check against existing local users if Firebase login fails
+        const cleanInput = email.trim().toLowerCase();
+        const foundLocal = existingUsers.find(
+          (u) => (u.email.toLowerCase() === cleanInput || u.phone.trim() === email.trim()) &&
+                 (u.password ? u.password === password : true)
+        );
+
+        if (foundLocal) {
+          onLoginSuccess(foundLocal);
+          onClose();
+          return;
+        }
+
+        const code = err?.code || '';
+        if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+          setErrorMessage('Correo o contraseña incorrectos. Verifica tus datos o regístrate.');
+        } else {
+          setErrorMessage(err?.message || 'Error al iniciar sesión con Firebase Auth.');
+        }
       } finally {
         setIsLoading(false);
       }
-    } else {
-      // Login by Email or Phone
-      if (!email.trim() || !password) {
-        setErrorMessage('Ingresa tu teléfono o correo y contraseña');
-        return;
-      }
-
-      const cleanInput = email.trim().toLowerCase();
-      const cleanPhoneInput = email.replace(/\D/g, '');
-
-      const found = existingUsers.find(
-        (u) =>
-          (u.email.toLowerCase() === cleanInput ||
-           (cleanPhoneInput.length >= 7 && u.phone.replace(/\D/g, '') === cleanPhoneInput) ||
-           u.phone.trim() === email.trim()) &&
-          (u.password ? u.password === password : true)
-      );
-
-      if (!found) {
-        logAuditEvent({
-          actor: email.trim(),
-          actorRole: 'system',
-          action: 'ERROR_AUTENTICACION',
-          description: `Intento fallido de inicio de sesión para el identificador: ${email.trim()}`,
-          severity: 'error'
-        });
-        setErrorMessage('Teléfono/correo o contraseña incorrectos. Si no tienes cuenta, regístrate.');
-        return;
-      }
-
-      logAuditEvent({
-        actor: found.name,
-        actorRole: found.role === 'vendedor' ? 'seller' : 'customer',
-        actorEmail: found.email,
-        actorPhone: found.phone,
-        action: 'INICIO_SESION',
-        description: `Inicio de sesión exitoso como ${(found.role || 'cliente').toUpperCase()}.`,
-        severity: 'info'
-      });
-
-      onLoginSuccess(found);
-      onClose();
     }
   };
-
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
@@ -147,12 +152,12 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
-                {isRegisterMode ? 'Crear Cuenta de Cliente' : 'Área de Clientes'}
+                {isRegisterMode ? 'Crear Cuenta' : 'Área de Clientes'}
               </h2>
               <p className="text-xs text-slate-500">
                 {isRegisterMode
-                  ? 'Gestiona tus suscripciones y tu wallet Zeny'
-                  : 'Ingresa para ver tus compras y saldo ZenyPoints'}
+                  ? 'Registro oficial con Firebase Auth (Rol: Cliente)'
+                  : 'Ingresa para gestionar tus suscripciones y compras'}
               </p>
             </div>
           </div>
@@ -167,10 +172,50 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
         {/* Content */}
         <div className="p-6 sm:p-7">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Quick Google Sign-In Button */}
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={isGoogleLoading || isLoading}
+            className="w-full py-2.5 px-4 rounded-xl border border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm shadow-xs transition flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+          >
+            {isGoogleLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+            ) : (
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
+              </svg>
+            )}
+            <span>Continuar con Google</span>
+          </button>
+
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200"></div>
+            </div>
+            <div className="relative flex justify-center text-[11px] uppercase">
+              <span className="bg-white px-3 text-slate-400 font-bold tracking-wider">o con tu correo</span>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-3.5">
             {isRegisterMode && (
               <>
-
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Nombre y Apellido *
@@ -182,7 +227,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Ej. Juan Mendoza"
+                      placeholder="Ej. Carlos Silva"
                       className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
@@ -199,51 +244,30 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                       required
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+58 414 000 0000"
+                      placeholder="+58 412 000 0000"
                       className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Correo Electrónico <span className="text-slate-400 font-normal">(Opcional)</span>
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="tucorreo@ejemplo.com (Opcional)"
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    No es obligatorio para registrarte. Solo si deseas recibir respaldos por email.
-                  </p>
                 </div>
               </>
             )}
 
-            {!isRegisterMode && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Correo Electrónico o WhatsApp / Teléfono *
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="tucorreo@ejemplo.com o +58 414..."
-                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Correo Electrónico *
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tucorreo@ejemplo.com"
+                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
               </div>
-            )}
+            </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -256,7 +280,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Mínimo 6 caracteres"
                   className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
@@ -271,11 +295,17 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm shadow-xs transition flex items-center justify-center gap-2 cursor-pointer mt-2"
+              disabled={isLoading || isGoogleLoading}
+              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm shadow-xs transition flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
             >
-              <span>{isRegisterMode ? 'Crear mi Cuenta' : 'Iniciar Sesión'}</span>
-              <ArrowRight className="w-4 h-4" />
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <span>{isRegisterMode ? 'Crear Cuenta (Cliente)' : 'Iniciar Sesión'}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
 
@@ -306,12 +336,11 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   }}
                   className="font-bold text-indigo-600 hover:underline cursor-pointer"
                 >
-                  Regístrate gratis
+                  Regístrate como cliente
                 </button>
               </span>
             )}
           </div>
-
         </div>
       </div>
     </div>

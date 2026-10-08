@@ -17,11 +17,20 @@ import {
   Lock,
   Sparkles,
   CheckCircle2,
-  Trash2
+  Trash2,
+  KeyRound,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
-import { CustomerUser, FranchiseTenant } from '../types';
+import { CustomerUser, FranchiseTenant, UserRole } from '../types';
 import { logAuditEvent } from '../services/auditLogger';
 import { useAppStore } from '../store/useAppStore';
+import { 
+  updateUserRoleByAdmin, 
+  claimInitialAdminRole, 
+  isMasterCodeValid, 
+  ADMIN_MASTER_CODE 
+} from '../services/firebaseAuthService';
 
 export interface AdminUserData {
   id: string;
@@ -125,7 +134,7 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
     parentFranchiseName?: string;
     status?: string;
     isSuspended?: boolean;
-    role?: 'cliente' | 'vendedor';
+    role?: UserRole;
   } | null>(null);
 
   // Sub-franchises across franchises
@@ -147,6 +156,94 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
     }
     return [];
   });
+
+  // Estados para Cambio de Rol Protegido por Administrador (Cliente <-> Vendedor)
+  const [roleChangeTarget, setRoleChangeTarget] = useState<{
+    user: CustomerUser;
+    targetRole: 'cliente' | 'vendedor';
+  } | null>(null);
+  const [roleMasterCode, setRoleMasterCode] = useState('');
+  const [roleChangeError, setRoleChangeError] = useState<string | null>(null);
+  const [isSubmittingRoleChange, setIsSubmittingRoleChange] = useState(false);
+
+  // Estados para Aprovisionar / Confirmar Rol Administrador Inicial
+  const [isAdminClaimOpen, setIsAdminClaimOpen] = useState(false);
+  const [adminClaimCode, setAdminClaimCode] = useState('');
+  const [adminClaimError, setAdminClaimError] = useState<string | null>(null);
+  const [isSubmittingAdminClaim, setIsSubmittingAdminClaim] = useState(false);
+
+  const handleConfirmRoleChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!roleChangeTarget) return;
+    setRoleChangeError(null);
+
+    if (!isMasterCodeValid(roleMasterCode)) {
+      setRoleChangeError('Código maestro de administrador inválido. Autorización denegada.');
+      return;
+    }
+
+    try {
+      setIsSubmittingRoleChange(true);
+      await updateUserRoleByAdmin(
+        roleChangeTarget.user.id,
+        roleChangeTarget.targetRole,
+        roleMasterCode,
+        adminProfile.name
+      );
+
+      // Actualizar estado local inmediatamente
+      const updated = customers.map((c) =>
+        c.id === roleChangeTarget.user.id
+          ? { ...c, role: roleChangeTarget.targetRole }
+          : c
+      );
+      setStoreCustomers(updated);
+
+      setSuccessNotice(
+        `¡Rol de ${roleChangeTarget.user.name} actualizado exitosamente a ${roleChangeTarget.targetRole.toUpperCase()} en Firestore y el panel!`
+      );
+      setRoleChangeTarget(null);
+      setRoleMasterCode('');
+      setTimeout(() => setSuccessNotice(null), 4500);
+    } catch (err: any) {
+      console.error('Error changing user role in Firestore:', err);
+      setRoleChangeError(err?.message || 'Error al actualizar rol en Firestore.');
+    } finally {
+      setIsSubmittingRoleChange(false);
+    }
+  };
+
+  const handleClaimAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminClaimError(null);
+
+    if (!isMasterCodeValid(adminClaimCode)) {
+      setAdminClaimError('Código maestro inválido. Autorización denegada.');
+      return;
+    }
+
+    try {
+      setIsSubmittingAdminClaim(true);
+      await claimInitialAdminRole(
+        adminProfile.id,
+        adminClaimCode,
+        adminProfile.email,
+        adminProfile.name
+      );
+
+      setSuccessNotice(
+        `¡Rol de Administrador inicial aprovisionado con éxito en Firestore ('users' y 'admins') para ${adminProfile.email}!`
+      );
+      setIsAdminClaimOpen(false);
+      setAdminClaimCode('');
+      setTimeout(() => setSuccessNotice(null), 5000);
+    } catch (err: any) {
+      console.error('Error claiming admin role in Firestore:', err);
+      setAdminClaimError(err?.message || 'Error al aprovisionar rol de administrador en Firestore.');
+    } finally {
+      setIsSubmittingAdminClaim(false);
+    }
+  };
 
   const handleSaveAdminProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -328,6 +425,19 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAdminClaimOpen(true);
+                  setAdminClaimCode('');
+                  setAdminClaimError(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>Asignar Rol Admin Inicial</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -634,15 +744,27 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
               .map((cust) => {
                 const isSeller = cust.role === 'vendedor';
                 return (
-                  <div key={cust.id} className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <strong className="text-white text-xs font-bold">{cust.name}</strong>
+                  <div key={cust.id} className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <strong className="text-white text-xs font-bold truncate">{cust.name}</strong>
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          isSeller ? 'bg-amber-500/20 text-amber-300' : 'bg-blue-500/20 text-blue-300'
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 flex items-center gap-1 ${
+                          isSeller 
+                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                            : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                         }`}
                       >
-                        {isSeller ? 'Vendedor / Revendedor' : 'Cliente'}
+                        {isSeller ? (
+                          <>
+                            <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+                            <span>Vendedor</span>
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck className="w-2.5 h-2.5 text-blue-400" />
+                            <span>Cliente</span>
+                          </>
+                        )}
                       </span>
                     </div>
 
@@ -694,6 +816,38 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
                         className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition cursor-pointer"
                       >
                         Clave
+                      </button>
+                    </div>
+
+                    {/* Botón de Gestión de Rol (Solo Administrador con Código Maestro) */}
+                    <div className="pt-2 border-t border-slate-800/80">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRoleChangeTarget({
+                            user: cust,
+                            targetRole: isSeller ? 'cliente' : 'vendedor'
+                          });
+                          setRoleMasterCode('');
+                          setRoleChangeError(null);
+                        }}
+                        className={`w-full py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
+                          isSeller
+                            ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30'
+                            : 'bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30'
+                        }`}
+                      >
+                        {isSeller ? (
+                          <>
+                            <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Degradar a Cliente</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                            <span>Promover a Vendedor</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -940,6 +1094,199 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Guardar Ficha</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL: CAMBIO DE ROL AUTORIZADO POR ADMINISTRADOR (CLIENTE <-> VENDEDOR) */}
+      {roleChangeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Gestión de Rol de Usuario
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Autorización exclusiva de Administrador
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRoleChangeTarget(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* User Target Card */}
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">{roleChangeTarget.user.name}</span>
+                <span className="text-[10px] font-mono text-slate-400">{roleChangeTarget.user.phone || roleChangeTarget.user.email}</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-slate-400">Rol actual:</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300">
+                  {roleChangeTarget.user.role === 'vendedor' ? 'Vendedor' : 'Cliente'}
+                </span>
+                <span className="text-indigo-400">➔</span>
+                <span className="text-slate-400">Nuevo rol:</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  roleChangeTarget.targetRole === 'vendedor'
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                }`}>
+                  {roleChangeTarget.targetRole === 'vendedor' ? 'Vendedor' : 'Cliente'}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-2">
+              <Lock className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                Para proteger la plataforma, solo el usuario con rol de Administrador puede asignar o revocar el rol de <strong>Vendedor</strong> en Firestore.
+              </span>
+            </div>
+
+            <form onSubmit={handleConfirmRoleChange} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <KeyRound className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Código Maestro de Administrador *</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={roleMasterCode}
+                  onChange={(e) => setRoleMasterCode(e.target.value)}
+                  placeholder="Ingresa el código maestro de administrador..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-indigo-500 font-mono tracking-wider"
+                />
+              </div>
+
+              {roleChangeError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{roleChangeError}</span>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setRoleChangeTarget(null)}
+                  disabled={isSubmittingRoleChange}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingRoleChange || !roleMasterCode}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50 shadow-md shadow-purple-600/20"
+                >
+                  {isSubmittingRoleChange ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                  )}
+                  <span>Confirmar y Sincronizar en Firestore</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: APROVISIONAR / CONFIRMAR ROL DE ADMINISTRADOR INICIAL EN FIRESTORE */}
+      {isAdminClaimOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Aprovisionar Administrador Inicial
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Registro de rol maestro en Firestore (/users)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAdminClaimOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5 text-xs">
+              <div className="text-slate-400 font-medium">Cuenta a configurar:</div>
+              <div className="text-white font-bold">{adminProfile.name}</div>
+              <div className="text-emerald-300 font-mono text-[11px]">{adminProfile.email}</div>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Ingresa el código maestro de seguridad para registrar el documento del administrador en la colección <code>users</code> de Firestore con <code>role: 'admin'</code>. Esto otorga los permisos necesarios para la gestión completa de vendedores.
+            </p>
+
+            <form onSubmit={handleClaimAdmin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <KeyRound className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Código Maestro de Administrador *</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={adminClaimCode}
+                  onChange={(e) => setAdminClaimCode(e.target.value)}
+                  placeholder="Ingresa el código maestro..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-emerald-500 font-mono tracking-wider"
+                />
+              </div>
+
+              {adminClaimError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{adminClaimError}</span>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAdminClaimOpen(false)}
+                  disabled={isSubmittingAdminClaim}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingAdminClaim || !adminClaimCode}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50 shadow-md shadow-emerald-600/20"
+                >
+                  {isSubmittingAdminClaim ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  )}
+                  <span>Aprovisionar Rol Admin</span>
                 </button>
               </div>
             </form>

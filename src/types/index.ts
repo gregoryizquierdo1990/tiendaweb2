@@ -190,7 +190,7 @@ export interface Order {
   };
 }
 
-export type UserRole = 'cliente' | 'vendedor';
+export type UserRole = 'cliente' | 'vendedor' | 'administrador' | 'admin';
 
 export interface CustomerUser {
   id: string;

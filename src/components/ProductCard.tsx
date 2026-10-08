@@ -18,16 +18,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   customerUser,
   onSelectProduct
 }) => {
-  const availableDurations = Object.keys(product.prices) as PlanDuration[];
-  const initialDuration = product.prices[product.defaultDuration]
+  const availableDurations = Object.keys(product.prices || {}) as PlanDuration[];
+  const initialDuration = product.prices && product.prices[product.defaultDuration]
     ? product.defaultDuration
     : (availableDurations[0] || '1 mes');
 
   const [selectedDuration, setSelectedDuration] = useState<PlanDuration>(initialDuration);
 
   // Fallback if selected duration not in prices
-  const safeDuration = product.prices[selectedDuration] ? selectedDuration : (availableDurations[0] || '1 mes');
-  const basePriceUsd = product.prices[safeDuration]?.USD || 3.0;
+  const safeDuration = (product.prices && product.prices[selectedDuration]) ? selectedDuration : (availableDurations[0] || '1 mes');
+  const basePriceUsd = (product.prices && product.prices[safeDuration]) ? product.prices[safeDuration].USD : 3.0;
 
   // Calculate discount for product or customer
   const { finalPrice: finalPriceUsd, discountPercent, savings } = calculateDiscountedPrice(
@@ -176,7 +176,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
       {/* Features checklist */}
       <ul className="space-y-2 mb-6 text-xs text-slate-600">
-        {product.features.slice(0, 4).map((feat, i) => (
+        {(product.features || []).slice(0, 4).map((feat, i) => (
           <li key={i} className="flex items-start gap-2">
             <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
             <span className="leading-tight">{feat}</span>

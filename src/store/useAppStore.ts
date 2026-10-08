@@ -152,8 +152,23 @@ interface AppState {
   faqItems: FaqItem[];
   bcvRate: number;
   supabaseSchemaError: string | null;
+
+  // Global Firestore Connection & Sync State
+  firestoreStatus: 'initializing' | 'connected' | 'reconnecting' | 'offline' | 'error';
+  isCloudSyncing: boolean;
+  pendingSyncCount: number;
+  lastSyncTimestamp: string | null;
+  connectionError: string | null;
+  firestoreLatencyMs: number | null;
+  hasCriticalLatency: boolean;
   
   // Actions
+  setFirestoreStatus: (status: 'initializing' | 'connected' | 'reconnecting' | 'offline' | 'error') => void;
+  setIsCloudSyncing: (isSyncing: boolean) => void;
+  setPendingSyncCount: (count: number) => void;
+  setLastSyncTimestamp: (ts: string | null) => void;
+  setConnectionError: (err: string | null) => void;
+  setFirestoreLatency: (ms: number | null) => void;
   setSupabaseSchemaError: (error: string | null) => void;
   setBankBalances: (balances: Record<string, { balanceUsd: number; balanceBs: number }>) => void;
   setAccountsReceivable: (cxc: any[]) => void;
@@ -197,9 +212,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   accountsPayable: load('maxter_accounts_payable', []),
   purchases: load<SupplierPurchase[]>('streamsync_purchases_v2', []),
   accountingEntries: [],
-  products: load<Product[]>('streamsync_products_v2', INITIAL_PRODUCTS),
+  products: load<Product[]>('streamsync_products_v2', []),
   orders: load<Order[]>('streamsync_orders_v2', []),
-  customers: load<CustomerUser[]>('streamsync_customers_v2', INITIAL_CUSTOMERS),
+  customers: load<CustomerUser[]>('streamsync_customers_v2', []),
   activeCustomer: load<CustomerUser | null>('streamsync_current_customer_v2', null),
   walletTopups: load<WalletTopup[]>('streamsync_topups_v2', []),
   incidents: load<IncidentReport[]>('streamsync_incidents_v2', []),
@@ -218,6 +233,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   bcvRate: load<number>('streamsync_bcv_rate_v2', 36.85),
   supabaseSchemaError: null,
   setSupabaseSchemaError: (supabaseSchemaError) => set({ supabaseSchemaError }),
+  firestoreStatus: 'initializing',
+  isCloudSyncing: false,
+  pendingSyncCount: 0,
+  lastSyncTimestamp: null,
+  connectionError: null,
+  firestoreLatencyMs: null,
+  hasCriticalLatency: false,
+  setFirestoreStatus: (firestoreStatus) => set({ firestoreStatus }),
+  setIsCloudSyncing: (isCloudSyncing) => set({ isCloudSyncing }),
+  setPendingSyncCount: (pendingSyncCount) => set({ pendingSyncCount }),
+  setLastSyncTimestamp: (lastSyncTimestamp) => set({ lastSyncTimestamp }),
+  setConnectionError: (connectionError) => set({ connectionError }),
+  setFirestoreLatency: (firestoreLatencyMs) => set({ 
+    firestoreLatencyMs, 
+    hasCriticalLatency: typeof firestoreLatencyMs === 'number' && firestoreLatencyMs > 3000 
+  }),
   branding: load<AppBrandingConfig>('streamsync_branding_v1', {
       projectName: 'Gregory Izquierdo Streaming',
       rif: '',
@@ -447,3 +478,10 @@ export const usePurchases = () => useAppStore((state) => state.purchases);
 export const useGeminiPanelOpen = () => useAppStore((state) => state.isGeminiPanelOpen);
 export const useToggleGeminiPanel = () => useAppStore((state) => state.toggleGeminiPanel);
 export const useSupabaseSchemaError = () => useAppStore((state) => state.supabaseSchemaError);
+export const useFirestoreStatus = () => useAppStore((state) => state.firestoreStatus);
+export const useIsCloudSyncing = () => useAppStore((state) => state.isCloudSyncing);
+export const usePendingSyncCount = () => useAppStore((state) => state.pendingSyncCount);
+export const useLastSyncTimestamp = () => useAppStore((state) => state.lastSyncTimestamp);
+export const useConnectionError = () => useAppStore((state) => state.connectionError);
+export const useFirestoreLatencyMs = () => useAppStore((state) => state.firestoreLatencyMs);
+export const useHasCriticalLatency = () => useAppStore((state) => state.hasCriticalLatency);

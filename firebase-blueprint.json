@@ -112,9 +112,28 @@
         "heroTitle": { "type": "string" }
       },
       "required": ["projectName"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Cuenta de usuario autenticado con Firebase Auth y rol asignado",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["cliente", "vendedor", "admin"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
     }
   },
   "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Cuentas de usuario registradas con rol por defecto cliente o promovidas a vendedor por admin"
+    },
     "products/{productId}": {
       "schema": { "$ref": "#/entities/Product" },
       "description": "Catalogo de productos streaming"

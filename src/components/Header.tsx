@@ -13,6 +13,13 @@ import {
 } from 'lucide-react';
 import { CurrencyCode, SheetsConnectionState, CustomerUser } from '../types';
 import { formatGrpay } from '../utils/formatters';
+import { 
+  useFirestoreStatus, 
+  useIsCloudSyncing, 
+  usePendingSyncCount, 
+  useConnectionError 
+} from '../store/useAppStore';
+import { validateFirestoreConnection } from '../services/firestoreService';
 
 interface HeaderProps {
   currency: CurrencyCode;
@@ -62,6 +69,10 @@ export const Header: React.FC<HeaderProps> = ({
       ];
 
   const [activeMsgIdx, setActiveMsgIdx] = React.useState(0);
+  const firestoreStatus = useFirestoreStatus();
+  const isCloudSyncing = useIsCloudSyncing();
+  const pendingSyncCount = usePendingSyncCount();
+  const connectionError = useConnectionError();
 
   React.useEffect(() => {
     if (!isBannerEnabled || messages.length <= 1) return;
@@ -160,6 +171,66 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             </div>
             <span className="hidden xl:inline text-slate-500 text-xs">•</span>
+          </div>
+
+          {/* Discreet Realtime Firestore Cloud Status Indicator */}
+          <div className="flex items-center gap-2 pl-1 sm:pl-2">
+            {firestoreStatus === 'connected' && (
+              <div 
+                className="flex items-center gap-1.5 text-slate-400 hover:text-slate-200 transition text-xs select-none"
+                title={isCloudSyncing ? "Sincronizando cambios con Firestore..." : "Base de datos en la nube conectada"}
+              >
+                <span className="relative flex h-2 w-2">
+                  {isCloudSyncing ? (
+                    <span className="animate-spin rounded-full h-2 w-2 border-t-2 border-indigo-400"></span>
+                  ) : (
+                    <>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </>
+                  )}
+                </span>
+                <span className="text-[11px] font-medium text-slate-400 hidden sm:inline">
+                  {isCloudSyncing ? 'Sincronizando...' : 'Nube activa'}
+                </span>
+              </div>
+            )}
+
+            {firestoreStatus === 'reconnecting' && (
+              <div className="flex items-center gap-1.5 text-amber-400 text-xs">
+                <RefreshCw className="w-2.5 h-2.5 animate-spin text-amber-400" />
+                <span className="text-[11px] font-medium hidden sm:inline">Conectando...</span>
+              </div>
+            )}
+
+            {firestoreStatus === 'offline' && (
+              <button
+                type="button"
+                onClick={() => validateFirestoreConnection()}
+                title="Modo local activo. Clic para verificar conexión"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-medium hover:bg-amber-500/20 transition cursor-pointer"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                <span>Modo local</span>
+                {pendingSyncCount > 0 && (
+                  <span className="bg-amber-400/20 px-1 rounded text-[10px] text-amber-200 font-mono">
+                    {pendingSyncCount} en cola
+                  </span>
+                )}
+              </button>
+            )}
+
+            {firestoreStatus === 'error' && (
+              <button
+                type="button"
+                onClick={() => validateFirestoreConnection()}
+                title={connectionError || "Reintentar conexión con Firestore"}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px] font-medium hover:bg-rose-500/20 transition cursor-pointer"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                <span>Reconectar</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 text-slate-300 ml-auto">

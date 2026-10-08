@@ -67,6 +67,16 @@ import { AdminSidebar } from './AdminSidebar';
 import { AdminCategoryManager } from './AdminCategoryManager';
 import { getAccessToken } from '../services/googleAuth';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
+import { 
+  useFirestoreLatencyMs, 
+  useHasCriticalLatency, 
+  useFirestoreStatus, 
+  useConnectionError 
+} from '../store/useAppStore';
+import { 
+  measureFirestoreLatency, 
+  validateFirestoreConnection 
+} from '../services/firestoreService';
 import {
   DOMAIN_OFFICIAL,
   DEFAULT_MESSAGE_TEMPLATES,
@@ -536,6 +546,22 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
     | 'marketing'
     | 'footer_config'
   >('reconciliation');
+
+  // Global Firestore Monitoring & Latency States
+  const firestoreLatencyMs = useFirestoreLatencyMs();
+  const hasCriticalLatency = useHasCriticalLatency();
+  const firestoreStatus = useFirestoreStatus();
+  const connectionError = useConnectionError();
+  const [isMeasuringLatency, setIsMeasuringLatency] = useState(false);
+
+  const handleManualMeasureLatency = async () => {
+    setIsMeasuringLatency(true);
+    try {
+      await measureFirestoreLatency();
+    } finally {
+      setIsMeasuringLatency(false);
+    }
+  };
 
   // Supabase Database Explorer States
   const [selectedSupabaseTable, setSelectedSupabaseTable] = useState<string>('categories');
@@ -1093,14 +1119,32 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Cloud Sync Status Indicator */}
+            {/* Cloud Firestore Telemetry & Latency Status Indicator */}
             <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all shadow-sm ${
-              isCloudSyncing 
-                ? 'bg-amber-950/40 border-amber-500/40 text-amber-300' 
+              hasCriticalLatency 
+                ? 'bg-amber-950/40 border-amber-500/50 text-amber-300' 
+                : firestoreStatus === 'offline' || firestoreStatus === 'error'
+                ? 'bg-rose-950/40 border-rose-500/50 text-rose-300'
+                : isCloudSyncing || isMeasuringLatency
+                ? 'bg-indigo-950/40 border-indigo-500/40 text-indigo-300' 
                 : 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
             }`}>
-              <span className={`w-2 h-2 rounded-full shrink-0 ${isCloudSyncing ? 'bg-amber-400 animate-spin' : 'bg-emerald-400 animate-pulse'}`} />
-              <span>{isCloudSyncing ? 'Sincronizando Nube...' : 'Servidor Nube Activo'}</span>
+              <span className={`w-2 h-2 rounded-full shrink-0 ${
+                isCloudSyncing || isMeasuringLatency ? 'bg-indigo-400 animate-spin' :
+                hasCriticalLatency ? 'bg-amber-400 animate-pulse' :
+                firestoreStatus === 'offline' || firestoreStatus === 'error' ? 'bg-rose-400' :
+                'bg-emerald-400 animate-pulse'
+              }`} />
+              <div className="flex items-center gap-1.5">
+                <span>{isCloudSyncing || isMeasuringLatency ? 'Sincronizando...' : 'Firestore'}</span>
+                {typeof firestoreLatencyMs === 'number' && (
+                  <span className={`text-[11px] px-1.5 py-0.2 rounded font-mono ${
+                    hasCriticalLatency ? 'bg-amber-400/20 text-amber-200 font-black' : 'text-slate-400 font-semibold'
+                  }`}>
+                    {firestoreLatencyMs}ms
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="hidden lg:flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-emerald-500/30 text-xs font-mono">
@@ -1157,6 +1201,64 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
             }}
           />
           <div className="flex-1 overflow-y-auto bg-slate-100">
+
+            {/* Critical Latency Warning for Administrator */}
+            {hasCriticalLatency && typeof firestoreLatencyMs === 'number' && (
+              <div className="bg-amber-500/10 border-b border-amber-500/30 px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 animate-fadeIn">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-1.5 rounded-lg bg-amber-500/20 text-amber-700 shrink-0">
+                    <AlertTriangle className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <h5 className="font-extrabold text-amber-950 uppercase tracking-wide text-[11px] flex items-center gap-1.5">
+                      <span>⚠️ Alerta de Latencia Crítica en Base de Datos</span>
+                      <span className="px-1.5 py-0.2 rounded bg-amber-200 text-amber-900 font-mono text-[10px]">
+                        {(firestoreLatencyMs / 1000).toFixed(2)}s
+                      </span>
+                    </h5>
+                    <p className="text-[11px] text-amber-800">
+                      El tiempo de respuesta supera el umbral crítico de 3 segundos ({firestoreLatencyMs}ms). Las operaciones podrían tardar más de lo habitual en reflejarse.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleManualMeasureLatency}
+                  disabled={isMeasuringLatency}
+                  className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition cursor-pointer shrink-0 flex items-center gap-1.5 self-start sm:self-auto"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isMeasuringLatency ? 'animate-spin' : ''}`} />
+                  <span>Re-medir Latencia</span>
+                </button>
+              </div>
+            )}
+
+            {/* Critical Disconnection Warning for Administrator */}
+            {(firestoreStatus === 'offline' || firestoreStatus === 'error') && (
+              <div className="bg-rose-500/10 border-b border-rose-500/30 px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-rose-900 animate-fadeIn">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-1.5 rounded-lg bg-rose-500/20 text-rose-700 shrink-0">
+                    <AlertCircle className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <h5 className="font-extrabold text-rose-950 uppercase tracking-wide text-[11px] flex items-center gap-1.5">
+                      <span>❌ Desconexión de Base de Datos Cloud</span>
+                    </h5>
+                    <p className="text-[11px] text-rose-800">
+                      {connectionError || 'No se pudo contactar el servidor de Firestore'}. Las operaciones se están guardando localmente en la cola de contingencia.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => validateFirestoreConnection()}
+                  className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition cursor-pointer shrink-0 flex items-center gap-1.5 self-start sm:self-auto"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Probar Conexión</span>
+                </button>
+              </div>
+            )}
 
             {/* Global critical supplier prepayment balance alerts */}
             {/* Global critical supplier prepayment balance alerts with Team Personal Notification Dispatcher */}
