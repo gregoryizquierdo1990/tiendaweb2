@@ -196,19 +196,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         referenceNumber: payWithGrpay ? `Zeny-AUTO-${orderId}` : referenceNumber.trim(),
         status: payWithGrpay ? 'confirmed' : 'pending_reconciliation',
         paidWithGrpay: payWithGrpay,
-        credentials: payWithGrpay
-          ? {
-              accountUser: customerEmail.trim(),
-              accountPass: 'Peliculas2026*',
-              profileName: `Perfil 1 (${customerName.split(' ')[0]})`,
-              pin: Math.floor(1000 + Math.random() * 9000).toString(),
-              startDate,
-              expirationDate,
-              instructions: 'Tu cuenta ha sido activada automáticamente con tu saldo Zeny.'
-            }
-          : undefined,
         syncedToSheets: false
       };
+
+      if (payWithGrpay) {
+        newOrder.credentials = {
+          accountUser: customerEmail.trim(),
+          accountPass: 'Peliculas2026*',
+          profileName: `Perfil 1 (${customerName.split(' ')[0]})`,
+          pin: Math.floor(1000 + Math.random() * 9000).toString(),
+          startDate,
+          expirationDate,
+          instructions: 'Tu cuenta ha sido activada automáticamente con tu saldo Zeny.'
+        };
+      }
 
       if (receiptPreview) newOrder.receiptImage = receiptPreview;
       if (customerNotes.trim()) newOrder.customerNotes = customerNotes.trim();
