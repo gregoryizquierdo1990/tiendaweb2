@@ -23,8 +23,8 @@ export const InvoiceViewer: React.FC = () => {
       invoice = {
         id: matchingOrder.id,
         orderId: matchingOrder.id,
-        invoiceNumber: `FAC-2026-${matchingOrder.id.replace(/\D/g, '').slice(-4) || '1001'}`,
-        controlNumber: `00-${matchingOrder.id.replace(/\D/g, '').slice(-6) || '200101'}`,
+        invoiceNumber: `FAC-2026-${(matchingOrder.id || '').replace(/\D/g, '').slice(-4) || '1001'}`,
+        controlNumber: `00-${(matchingOrder.id || '').replace(/\D/g, '').slice(-6) || '200101'}`,
         issueDate: matchingOrder.createdAt || new Date().toISOString(),
         customerName: matchingOrder.customerName || 'Cliente General',
         customerDocId: 'V-18.999.000',
