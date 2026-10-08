@@ -654,7 +654,7 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
                       <span>📦 Control de Existencia & Inventario</span>
                     </h4>
                     <p className="text-[10px] text-slate-500 mt-0.5">
-                      Sincroniza automáticamente el stock con los perfiles libres de las Cuentas Madre de Supabase o fíjalo de manera manual.
+                      Sincroniza automáticamente el stock con los perfiles libres de las Cuentas Madre o fíjalo de manera manual.
                     </p>
                   </div>
                 </div>

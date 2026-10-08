@@ -81,7 +81,6 @@ export const MENU_STRUCTURE: MenuCategoryDef[] = [
     description: 'Bases de datos, nube, integraciones y dominio',
     items: [
       { id: 'integrations', label: 'Catálogo de Integraciones', icon: Layers, color: 'text-purple-400' },
-      { id: 'sheets', label: 'Base de Datos Supabase', icon: Layers, color: 'text-sky-400' },
       { id: 'domain', label: 'Dominio Oficial', icon: Globe, color: 'text-emerald-400' },
       { id: 'faq', label: 'Preguntas Frecuentes', icon: HelpCircle, color: 'text-slate-400' },
     ]

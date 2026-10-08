@@ -251,17 +251,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const products = typeof val === 'function' ? (val as any)(state.products) : val;
       localStorage.setItem('streamsync_products_v2', JSON.stringify(products));
-      if (isSupabaseConfigured) {
-        const changed = products.filter((p: any) => {
-          const prev = state.products.find((prevP: any) => prevP.id === p.id);
-          return !prev || JSON.stringify(prev) !== JSON.stringify(p);
-        });
-        if (changed.length > 0) {
-          Promise.all(changed.map((p: any) => 
-            upsertWithRetry('products', mapStoreProductToDb(p))
-          )).catch(err => console.warn('Supabase products write notice:', err));
-        }
-      }
       return { products };
     });
   },
@@ -276,17 +265,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const customers = typeof val === 'function' ? (val as any)(state.customers) : val;
       localStorage.setItem('streamsync_customers_v2', JSON.stringify(customers));
-      if (isSupabaseConfigured) {
-        const changed = customers.filter((c: any) => {
-          const prev = state.customers.find((prevC: any) => prevC.id === c.id);
-          return !prev || JSON.stringify(prev) !== JSON.stringify(c);
-        });
-        if (changed.length > 0) {
-          Promise.all(changed.map((c: any) => 
-            upsertWithRetry('customers', mapStoreCustomerToDb(c))
-          )).catch(err => console.warn('Supabase customers write notice:', err));
-        }
-      }
       return { customers };
     });
   },
@@ -301,17 +279,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const walletTopups = typeof val === 'function' ? (val as any)(state.walletTopups) : val;
       localStorage.setItem('streamsync_topups_v2', JSON.stringify(walletTopups));
-      if (isSupabaseConfigured) {
-        const changed = walletTopups.filter((w: any) => {
-          const prev = state.walletTopups.find((prevW: any) => prevW.id === w.id);
-          return !prev || JSON.stringify(prev) !== JSON.stringify(w);
-        });
-        if (changed.length > 0) {
-          Promise.all(changed.map((w: any) => 
-            upsertWithRetry('wallet_topups', mapStoreWalletTopupToDb(w))
-          )).catch(err => console.warn('Supabase wallet topups write notice:', err));
-        }
-      }
       return { walletTopups };
     });
   },
@@ -326,17 +293,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const franchises = typeof val === 'function' ? (val as any)(state.franchises) : val;
       localStorage.setItem('streamsync_franchises_v1', JSON.stringify(franchises));
-      if (isSupabaseConfigured) {
-        const changed = franchises.filter((f: any) => {
-          const prev = state.franchises.find((prevF: any) => prevF.id === f.id);
-          return !prev || JSON.stringify(prev) !== JSON.stringify(f);
-        });
-        if (changed.length > 0) {
-          Promise.all(changed.map((f: any) => 
-            upsertWithRetry('franchises', mapStoreFranchiseToDb(f))
-          )).catch(err => console.warn('Supabase franchises write notice:', err));
-        }
-      }
       return { franchises };
     });
   },
@@ -351,17 +307,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const paymentMethods = typeof val === 'function' ? (val as any)(state.paymentMethods) : val;
       localStorage.setItem('streamsync_methods_v2', JSON.stringify(paymentMethods));
-      if (isSupabaseConfigured) {
-        const changed = paymentMethods.filter((p: any) => {
-          const prev = state.paymentMethods.find((prevP: any) => prevP.id === p.id);
-          return !prev || JSON.stringify(prev) !== JSON.stringify(p);
-        });
-        if (changed.length > 0) {
-          Promise.all(changed.map((p: any) => 
-            upsertWithRetry('payment_methods', mapStorePaymentMethodToDb(p))
-          )).catch(err => console.warn('Supabase payment methods write notice:', err));
-        }
-      }
       return { paymentMethods };
     });
   },
@@ -376,17 +321,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const faqItems = typeof val === 'function' ? (val as any)(state.faqItems) : val;
       localStorage.setItem('streamsync_faq_v1', JSON.stringify(faqItems));
-      if (isSupabaseConfigured) {
-        const changed = faqItems.filter((f: any) => {
-          const prev = state.faqItems.find((prevF: any) => prevF.id === f.id);
-          return !prev || JSON.stringify(prev) !== JSON.stringify(f);
-        });
-        if (changed.length > 0) {
-          Promise.all(changed.map((f: any) => 
-            upsertWithRetry('faq_items', mapStoreFaqToDb(f))
-          )).catch(err => console.warn('Supabase faq items write notice:', err));
-        }
-      }
       return { faqItems };
     });
   },

@@ -183,6 +183,81 @@ export default function App() {
   const [isCustomerAuthOpen, setIsCustomerAuthOpen] = useState(false);
   const [isCustomerPortalOpen, setIsCustomerPortalOpen] = useState(false);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
+  const [isDbLoaded, setIsDbLoaded] = useState(false);
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+
+  // 1. Fetch initial state on boot from Express server-side DB
+  useEffect(() => {
+    const fetchCloudDb = async () => {
+      try {
+        const res = await fetch('/api/db');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Object.keys(data).length > 0) {
+            if (data.products) setProducts(data.products);
+            if (data.branding) setBranding(data.branding);
+            if (data.paymentMethods) setPaymentMethods(data.paymentMethods);
+            if (data.orders) setOrders(data.orders);
+            if (data.customers) setCustomerUsers(data.customers);
+            if (data.walletTopups) setWalletTopups(data.walletTopups);
+            if (data.incidents) setIncidents(data.incidents);
+            if (data.faqItems) setFaqItems(data.faqItems);
+            if (data.bcvRate) setBcvRate(data.bcvRate);
+          }
+        }
+      } catch (err) {
+        console.warn('Notice loading database from server:', err);
+      } finally {
+        setIsDbLoaded(true);
+      }
+    };
+    fetchCloudDb();
+  }, []);
+
+  // 2. Automatically save state back to cloud when it changes (after initial load has finished)
+  useEffect(() => {
+    if (!isDbLoaded) return;
+    
+    const saveCloudDb = async () => {
+      setIsCloudSyncing(true);
+      try {
+        await fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            products,
+            branding,
+            paymentMethods,
+            orders,
+            customers: customerUsers,
+            walletTopups,
+            incidents,
+            faqItems,
+            bcvRate
+          })
+        });
+      } catch (err) {
+        console.warn('Notice saving database to server:', err);
+      } finally {
+        setIsCloudSyncing(false);
+      }
+    };
+
+    // Debounce saving to cloud by 1 second to prevent spamming server on fast consecutive edits
+    const timer = setTimeout(saveCloudDb, 1000);
+    return () => clearTimeout(timer);
+  }, [
+    isDbLoaded,
+    products,
+    branding,
+    paymentMethods,
+    orders,
+    customerUsers,
+    walletTopups,
+    incidents,
+    faqItems,
+    bcvRate
+  ]);
 
   // Escuchar navegación del navegador (atrás/adelante o cambios de URL directa)
   useEffect(() => {
@@ -2299,6 +2374,8 @@ export default function App() {
                 onSyncWithSheets={handleSyncWithSheets}
                 onSyncDatabaseWithSupabase={syncDatabaseWithSupabase}
                 supabaseSchemaError={supabaseSchemaError}
+                onOpenSheetsModal={() => setIsSheetsModalOpen(true)}
+                isCloudSyncing={isCloudSyncing}
                 onSyncCustomersToSheet={handleSyncCustomersToSheet}
                 onSyncReportsToSheet={handleSyncReportsToSheet}
                 onSyncIncidentsToSheet={handleSyncIncidentsToSheet}
@@ -2757,6 +2834,8 @@ export default function App() {
           onSyncWithSheets={handleSyncWithSheets}
           onSyncDatabaseWithSupabase={syncDatabaseWithSupabase}
           supabaseSchemaError={supabaseSchemaError}
+          onOpenSheetsModal={() => setIsSheetsModalOpen(true)}
+          isCloudSyncing={isCloudSyncing}
           onSyncCustomersToSheet={handleSyncCustomersToSheet}
           onSyncReportsToSheet={handleSyncReportsToSheet}
           onSyncIncidentsToSheet={handleSyncIncidentsToSheet}

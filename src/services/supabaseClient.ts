@@ -1,44 +1,11 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
 
-// Retrieve credentials dynamically from localStorage or fall back to environment variables
-const getSupabaseCredentials = () => {
-  let url = '';
-  let key = '';
-
-  try {
-    url = localStorage.getItem('CUSTOM_SUPABASE_URL') || '';
-    key = localStorage.getItem('CUSTOM_SUPABASE_ANON_KEY') || '';
-  } catch (e) {
-    console.warn('Could not read custom Supabase credentials from localStorage:', e);
-  }
-
-  if (!url) {
-    url = import.meta.env.VITE_SUPABASE_URL || 'https://qsuizzbwgogtmenjofhy.supabase.co';
-  }
-  if (!key) {
-    key = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzdWl6emJ3Z29ndG1lbmpvZmh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzODk3MDcsImV4cCI6MjEwNjk2NTcwN30.J863Aks8lTpKfFpa71dZMZvizgGj5V31J2SptdYuRoU';
-  }
-
-  // Trim rest suffixes
-  if (url.endsWith('/rest/v1/')) {
-    url = url.slice(0, -9);
-  } else if (url.endsWith('/rest/v1')) {
-    url = url.slice(0, -8);
-  }
-
-  return { url, key };
-};
-
-const credentials = getSupabaseCredentials();
-
-export const supabaseUrl = credentials.url;
-export const supabaseAnonKey = credentials.key;
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const supabaseUrl = '';
+export const supabaseAnonKey = '';
+export const isSupabaseConfigured = false;
 
 /**
- * Constructor de consultas encadenables para entornos de producción donde
- * Supabase no está configurado en las variables de entorno de Vercel.
- * Evita que la aplicación lance excepciones no capturadas al importar módulos.
+ * Fallback dummy query builder for when Supabase is disabled.
  */
 function createFallbackBuilder() {
   const handler: any = {
@@ -67,7 +34,7 @@ const fallbackClient: any = {
   auth: {
     getUser: async () => ({ data: { user: null }, error: null }),
     getSession: async () => ({ data: { session: null }, error: null }),
-    signInWithPassword: async () => ({ data: null, error: new Error('Supabase no configurado') }),
+    signInWithPassword: async () => ({ data: null, error: new Error('Supabase desactivado') }),
     signOut: async () => ({ error: null }),
     onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
   },
@@ -77,6 +44,4 @@ const fallbackClient: any = {
   })
 };
 
-export const supabase: SupabaseClient = isSupabaseConfigured
-  ? createClient(supabaseUrl!, supabaseAnonKey!)
-  : (fallbackClient as SupabaseClient);
+export const supabase: SupabaseClient = fallbackClient as SupabaseClient;

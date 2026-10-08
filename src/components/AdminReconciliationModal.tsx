@@ -424,6 +424,8 @@ interface AdminReconciliationModalProps {
   onDeletePaymentMethod?: (methodId: string) => void;
   onSyncDatabaseWithSupabase?: () => Promise<void>;
   supabaseSchemaError?: string | null;
+  onOpenSheetsModal?: () => void;
+  isCloudSyncing?: boolean;
 }
 
 export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> = ({
@@ -444,6 +446,8 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
   onSyncWithSheets,
   onSyncDatabaseWithSupabase,
   supabaseSchemaError,
+  onOpenSheetsModal,
+  isCloudSyncing,
   onSyncCustomersToSheet,
   onSyncReportsToSheet,
   onSyncIncidentsToSheet,
@@ -518,7 +522,6 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
     | 'categories'
     | 'methods'
     | 'bcv'
-    | 'sheets'
     | 'faq'
     | 'purchases_finance'
     | 'bitacora'
@@ -624,11 +627,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
     }
   };
 
-  React.useEffect(() => {
-    if (activeTab === 'sheets') {
-      fetchSupabaseRecords(selectedSupabaseTable);
-    }
-  }, [activeTab, selectedSupabaseTable]);
+  // Supabase connection tab auto-fetch removed
 
   const [localMapping, setLocalMapping] = useState<ActionTemplateMapping>(actionMapping || DEFAULT_ACTION_MAPPING);
   const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('pending_reconciliation');
@@ -1094,6 +1093,16 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Cloud Sync Status Indicator */}
+            <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all shadow-sm ${
+              isCloudSyncing 
+                ? 'bg-amber-950/40 border-amber-500/40 text-amber-300' 
+                : 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+            }`}>
+              <span className={`w-2 h-2 rounded-full shrink-0 ${isCloudSyncing ? 'bg-amber-400 animate-spin' : 'bg-emerald-400 animate-pulse'}`} />
+              <span>{isCloudSyncing ? 'Sincronizando Nube...' : 'Servidor Nube Activo'}</span>
+            </div>
+
             <div className="hidden lg:flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-emerald-500/30 text-xs font-mono">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
               <span className="text-slate-400">Tasa BCV:</span>
@@ -1148,32 +1157,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
             }}
           />
           <div className="flex-1 overflow-y-auto bg-slate-100">
-            {supabaseSchemaError && (
-              <div className="bg-amber-50 border-b border-amber-200 flex flex-col shadow-xs animate-slideDown p-4 text-xs">
-                <div className="max-w-4xl mx-auto flex items-center justify-between gap-4 w-full">
-                  <div className="flex items-center gap-3">
-                    <span className="p-2 rounded-xl bg-amber-100 text-amber-700 animate-pulse shrink-0">
-                      <AlertTriangle className="w-4 h-4" />
-                    </span>
-                    <div>
-                      <h4 className="font-extrabold text-amber-950 uppercase text-[11px] tracking-wider">
-                        ⚠️ Estructura de Base de Datos Supabase Incompleta
-                      </h4>
-                      <p className="text-[10px] text-amber-800 mt-0.5">
-                        El sistema detectó que tu base de datos de Supabase no contiene las tablas requeridas. Haz clic en "Ver Solución" para copiar el script SQL de inicialización.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('sheets')}
-                    className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-[10px] transition shrink-0 cursor-pointer shadow-xs"
-                  >
-                    Ver Solución
-                  </button>
-                </div>
-              </div>
-            )}
+
             {/* Global critical supplier prepayment balance alerts */}
             {/* Global critical supplier prepayment balance alerts with Team Personal Notification Dispatcher */}
             {criticalSupplierAlerts.length > 0 && (
@@ -3563,8 +3547,8 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
           </div>
         )}
 
-        {/* Tab 8: Supabase Cloud SQL Database Dashboard & Explorer */}
-        {activeTab === 'sheets' && (
+        {/* Tab 8: Supabase Cloud SQL Database Dashboard & Explorer (REMOVED) */}
+        {false && (
           <div className="p-6 overflow-y-auto space-y-6">
             {/* Banner Superior de Supabase */}
             <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white shadow-xl border border-indigo-500/20 space-y-5">
@@ -4163,7 +4147,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
                         <p className="text-xs text-rose-500 mt-1 max-w-md mx-auto">{supabaseExplorerError}</p>
                       </div>
                       
-                      {(supabaseExplorerError.includes('Could not find') || supabaseExplorerError.includes('PGRST205') || supabaseExplorerError.includes('relation') || supabaseExplorerError.includes('does not exist')) && (
+                      {(supabaseExplorerError?.includes('Could not find') || supabaseExplorerError?.includes('PGRST205') || supabaseExplorerError?.includes('relation') || supabaseExplorerError?.includes('does not exist')) && (
                         <div className="max-w-xl mx-auto p-5 rounded-2xl bg-white border border-rose-200 text-left text-slate-700 space-y-3 shadow-xs">
                           <h5 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5 text-rose-700">
                             <span>¿Por qué ocurre este error?</span>
@@ -5516,7 +5500,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
               isOpen={true}
               onClose={() => setActiveTab('finance')}
               sheetsConnected={sheetsState.isConnected}
-              onOpenSheetsSetup={() => setActiveTab('sheets')}
+              onOpenSheetsSetup={onOpenSheetsModal}
               googleUser={user}
               customers={customerUsers}
               onImportCustomers={async (newCustomers) => {
@@ -5567,7 +5551,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
                   <span>Personalización del Pie de Página (Footer)</span>
                 </h3>
                 <p className="text-slate-300 max-w-2xl leading-relaxed">
-                  Controla en tiempo real todos los textos, plataformas, métodos de pago, garantías y enlaces de soporte mostrados en la parte inferior de tu tienda. Los cambios se guardan localmente y se sincronizan de inmediato con Supabase.
+                  Controla en tiempo real todos los textos, plataformas, métodos de pago, garantías y enlaces de soporte mostrados en la parte inferior de tu tienda. Los cambios se guardan localmente de inmediato.
                 </p>
               </div>
 
