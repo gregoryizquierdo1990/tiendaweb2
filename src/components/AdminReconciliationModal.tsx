@@ -4402,7 +4402,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
                             <>
                               {supabaseRecords.length > 0 ? (
                                 Object.keys(supabaseRecords[0]).map((key) => (
-                                  <th key={key} className="p-3 capitalize">{key.replace(/_/g, ' ')}</th>
+                                  <th key={key} className="p-3 capitalize">{(key || '').replace(/_/g, ' ')}</th>
                                 ))
                               ) : (
                                 <th className="p-3">Registro</th>

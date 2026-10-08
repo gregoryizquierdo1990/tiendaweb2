@@ -252,7 +252,7 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
                   : 'bg-slate-100 text-slate-600 hover:text-slate-900'
               }`}
             >
-              {cat === 'todos' ? 'Todos' : cat.replace('_', ' ')}
+              {cat === 'todos' ? 'Todos' : (cat || '').replace('_', ' ')}
             </button>
           ))}
         </div>

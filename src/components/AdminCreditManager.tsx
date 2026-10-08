@@ -309,7 +309,7 @@ export const AdminCreditManager: React.FC<AdminCreditManagerProps> = ({
       dominio: DOMAIN_OFFICIAL
     });
 
-    const cleanPhone = order.customerPhone.replace(/\D/g, '');
+    const cleanPhone = (order.customerPhone || '').replace(/\D/g, '');
     const phoneWithCountry = cleanPhone.startsWith('58') ? cleanPhone : `58${cleanPhone.replace(/^0/, '')}`;
     const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(messageText)}`;
     window.open(url, '_blank');
