@@ -570,9 +570,7 @@ export function initRealtimeFirestoreSync() {
       list.push(docSnap.data() as Order);
     });
     list.sort((a, b) => b.id.localeCompare(a.id));
-    if (list.length > 0) {
-      store.setOrders(list);
-    }
+    store.setOrders(list);
     setIsSyncingFromFirestore(false);
   }, (err) => {
     console.warn('Notice listening to orders snapshot:', err);
