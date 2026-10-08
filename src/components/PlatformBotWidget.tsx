@@ -160,7 +160,7 @@ export const PlatformBotWidget: React.FC<PlatformBotWidgetProps> = ({
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
-          className={`group flex items-center gap-2.5 px-4 py-3 rounded-full text-white shadow-2xl transition-all duration-300 cursor-pointer ${
+          className={`hidden group flex items-center gap-2.5 px-4 py-3 rounded-full text-white shadow-2xl transition-all duration-300 cursor-pointer ${
             isOpen
               ? 'bg-slate-900 border border-slate-700 hover:bg-slate-800'
               : 'bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-indigo-500/30 hover:scale-105'
