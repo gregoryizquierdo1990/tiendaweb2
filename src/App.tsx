@@ -1107,6 +1107,7 @@ export default function App() {
       id: `cust-${Date.now()}`,
       internalId: `CLI-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       zenyBalance: 0,
+      discountPercent: newUser.discountPercent || 0,
       createdAt: new Date().toISOString()
     };
     setCustomerUsers((prev) => [created, ...prev]);
