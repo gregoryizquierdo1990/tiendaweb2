@@ -112,7 +112,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const handleCopyAccount = () => {
     if (selectedMethod) {
-      navigator.clipboard.writeText(selectedMethod.accountNumber.replace(/\s+/g, ''));
+      navigator.clipboard.writeText((selectedMethod.accountNumber || '').replace(/\s+/g, ''));
       setCopiedAccount(true);
       setTimeout(() => setCopiedAccount(false), 2000);
     }
