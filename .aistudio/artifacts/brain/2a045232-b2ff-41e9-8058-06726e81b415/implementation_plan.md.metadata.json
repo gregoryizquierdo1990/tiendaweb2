@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan arquitectónico para separar la tienda pública (www.gregoryizquierdo.xyz) y el panel administrativo en la ruta protegida (/admin), con login dedicado de usuario/contraseña maestra, respaldo de Google OAuth y ocultamiento total de accesos administrativos en la tienda pública.",
-  "updatedAt":  "2026-10-08T01:18:13.709732679Z",
+  "summary":  "Robust Bidirectional Supabase Sync & Control Panel Plan. Outlines the strategy to fix customer synchronization bugs, merge local and remote data structures, and introduce a gorgeous Connection Status & Manual Sync dashboard in the Admin section.",
+  "updatedAt":  "2026-10-08T14:29:22.582902431Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -40,6 +40,9 @@ export interface Product {
   downPaymentPercent?: number; // e.g. 50
   numberOfInstallments?: number; // e.g. 2
   installmentIntervalDays?: number; // e.g. 15
+  stock?: number;
+  isStockManual?: boolean;
+  manualStock?: number;
 }
 
 export interface AnnouncementBannerConfig {
@@ -89,6 +92,12 @@ export interface AppBrandingConfig {
   bannerEmail?: string;
   cardRadius?: 'rounded-xl' | 'rounded-2xl' | 'rounded-3xl';
   containerMaxWidth?: 'max-w-6xl' | 'max-w-7xl' | 'max-w-full';
+  // Footer custom configuration
+  footerDescription?: string;
+  footerGuaranteeText?: string;
+  footerPlatforms?: string[];
+  footerPaymentMethods?: string[];
+  footerWhatsAppUrl?: string;
 }
 
 export type PaymentMethodCategory = 

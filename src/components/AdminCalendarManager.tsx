@@ -1,4 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { fetchCalendarEvents, syncEventToCalendar, GoogleCalendarEvent } from '../services/googleCalendar';
+import { getAccessToken, signInWithGoogleIdentity } from '../services/googleAuth';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -78,10 +80,121 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
   const [currentMonth, setCurrentMonth] = useState<number>(() => today.getMonth());
   const [selectedDateStr, setSelectedDateStr] = useState<string>(todayStr);
   const [quickFilter, setQuickFilter] = useState<
-    'selected_day' | 'today' | 'tomorrow' | 'this_week' | 'month' | 'overdue'
+    'selected_day' | 'today' | 'this_week' | 'month' | 'overdue'
   >('selected_day');
   const [typeFilter, setTypeFilter] = useState<'all' | 'memberships' | 'installments'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Google Calendar Bidirectional State
+  const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([]);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleSyncMsg, setGoogleSyncMsg] = useState<string | null>(null);
+
+  // Manual Google Calendar Event Creation Form State
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newEvtSummary, setNewEvtSummary] = useState('');
+  const [newEvtDescription, setNewEvtDescription] = useState('');
+  const [newEvtDate, setNewEvtDate] = useState(todayStr);
+  const [newEvtLoading, setNewEvtLoading] = useState(false);
+  const [newEvtSuccess, setNewEvtSuccess] = useState(false);
+
+  const loadGoogleEvents = async (forceAuth = false) => {
+    setGoogleLoading(true);
+    setGoogleSyncMsg(null);
+    try {
+      let token = getAccessToken();
+      if (!token && forceAuth) {
+        setGoogleSyncMsg('Abriendo ventana de inicio de sesión con Google...');
+        const res = await signInWithGoogleIdentity();
+        token = res?.accessToken || null;
+      }
+      if (!token) {
+        setGoogleEvents([]);
+        setGoogleSyncMsg('Google Calendar no conectado. Haz clic en "Sincronizar Nube" para vincular tu cuenta.');
+        return;
+      }
+      const events = await fetchCalendarEvents();
+      setGoogleEvents(events);
+      setGoogleSyncMsg(`Sincronizado: ${events.length} eventos de Google Calendar cargados con éxito.`);
+    } catch (err: any) {
+      console.error(err);
+      setGoogleSyncMsg(err.message || 'Error de conexión con Google Calendar.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (token) {
+      loadGoogleEvents(false);
+    } else {
+      setGoogleSyncMsg('Google Calendar no conectado. Haz clic en "Sincronizar Nube" para vincular tu cuenta y ver tus eventos.');
+    }
+  }, []);
+
+  const handleCreateGoogleEventSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEvtSummary.trim() || !newEvtDate) return;
+    setNewEvtLoading(true);
+    setNewEvtSuccess(false);
+
+    try {
+      await syncEventToCalendar({
+        summary: newEvtSummary,
+        description: newEvtDescription,
+        start: newEvtDate,
+        end: newEvtDate
+      });
+      setNewEvtSuccess(true);
+      setNewEvtSummary('');
+      setNewEvtDescription('');
+      setTimeout(() => {
+        setNewEvtSuccess(false);
+        setShowCreateForm(false);
+      }, 1500);
+      // Reload bidirectionally in real-time!
+      loadGoogleEvents();
+    } catch (err: any) {
+      alert(err.message || 'Error al crear evento en Google Calendar');
+    } finally {
+      setNewEvtLoading(false);
+    }
+  };
+
+  const mappedGoogleEvents = useMemo(() => {
+    return googleEvents.map((evt) => {
+      let dateStr = evt.start?.date || '';
+      if (!dateStr && evt.start?.dateTime) {
+        dateStr = evt.start.dateTime.split('T')[0];
+      }
+      if (!dateStr) return null;
+
+      const dateObj = new Date(dateStr + 'T12:00:00');
+      const todayTime = new Date(todayStr + 'T12:00:00').getTime();
+      const expTime = dateObj.getTime();
+      const diffDays = isNaN(expTime) || isNaN(todayTime)
+        ? 0
+        : Math.ceil((expTime - todayTime) / (1000 * 60 * 60 * 24));
+
+      const isOverdue = diffDays < 0;
+      const isToday = diffDays === 0;
+      const isNear = diffDays > 0 && diffDays <= 3;
+
+      return {
+        id: evt.id,
+        summary: evt.summary || 'Evento sin título',
+        description: evt.description || '',
+        expDateStr: dateStr,
+        diffDays,
+        isOverdue,
+        isToday,
+        isNear,
+        htmlLink: evt.htmlLink,
+        isGoogleEvent: true
+      };
+    }).filter((e): e is NonNullable<typeof e> => e !== null);
+  }, [googleEvents, todayStr]);
 
   // Renew modal state
   const [renewOrder, setRenewOrder] = useState<Order | null>(null);
@@ -144,18 +257,33 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
 
   // Expiration count map by YYYY-MM-DD
   const expiryCountMap = useMemo(() => {
-    const map: Record<string, { total: number; overdue: number; today: number; near: number }> = {};
+    const map: Record<string, { total: number; overdue: number; today: number; near: number; googleCount: number }> = {};
+    
+    // Add local orders
     for (const item of ordersWithExpiry) {
       if (!map[item.expDateStr]) {
-        map[item.expDateStr] = { total: 0, overdue: 0, today: 0, near: 0 };
+        map[item.expDateStr] = { total: 0, overdue: 0, today: 0, near: 0, googleCount: 0 };
       }
       map[item.expDateStr].total += 1;
       if (item.isOverdue) map[item.expDateStr].overdue += 1;
       if (item.isToday) map[item.expDateStr].today += 1;
       if (item.isNear) map[item.expDateStr].near += 1;
     }
+    
+    // Add Google Calendar events
+    for (const item of mappedGoogleEvents) {
+      if (!map[item.expDateStr]) {
+        map[item.expDateStr] = { total: 0, overdue: 0, today: 0, near: 0, googleCount: 0 };
+      }
+      map[item.expDateStr].total += 1;
+      map[item.expDateStr].googleCount += 1;
+      if (item.isOverdue) map[item.expDateStr].overdue += 1;
+      if (item.isToday) map[item.expDateStr].today += 1;
+      if (item.isNear) map[item.expDateStr].near += 1;
+    }
+    
     return map;
-  }, [ordersWithExpiry]);
+  }, [ordersWithExpiry, mappedGoogleEvents]);
 
   // Calendar Grid Days Calculation
   const calendarDays = useMemo(() => {
@@ -204,8 +332,10 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
   }, [currentYear, currentMonth, todayStr, expiryCountMap]);
 
   // Filtered orders list for the right column
+  // Combined list of items shown on the selected day / filtered list (including Google Calendar events!)
   const filteredList = useMemo(() => {
-    return ordersWithExpiry.filter((item) => {
+    // Local events matching criteria
+    const localFiltered = ordersWithExpiry.filter((item) => {
       // Text Search
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
@@ -233,8 +363,39 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
       if (quickFilter === 'today') {
         return item.isToday;
       }
-      if (quickFilter === 'tomorrow') {
-        return item.diffDays === 1;
+      if (quickFilter === 'this_week') {
+        return item.diffDays >= 0 && item.diffDays <= 7;
+      }
+      if (quickFilter === 'overdue') {
+        return item.isOverdue;
+      }
+      if (quickFilter === 'month') {
+        const prefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+        return item.expDateStr.startsWith(prefix);
+      }
+      return true;
+    });
+
+    // Google Calendar events matching criteria
+    const googleFiltered = mappedGoogleEvents.filter((item) => {
+      if (typeFilter === 'installments' || typeFilter === 'memberships') {
+        // generic Google events are general, so they only show under 'all'
+        return false;
+      }
+      
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matches =
+          item.summary.toLowerCase().includes(query) ||
+          item.description.toLowerCase().includes(query);
+        if (!matches) return false;
+      }
+
+      if (quickFilter === 'selected_day') {
+        return item.expDateStr === selectedDateStr;
+      }
+      if (quickFilter === 'today') {
+        return item.isToday;
       }
       if (quickFilter === 'this_week') {
         return item.diffDays >= 0 && item.diffDays <= 7;
@@ -248,7 +409,13 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
       }
       return true;
     });
-  }, [ordersWithExpiry, quickFilter, typeFilter, selectedDateStr, currentYear, currentMonth, searchQuery]);
+
+    // Merge them: Google events are marked as isGoogleEvent: true
+    return [
+      ...localFiltered.map(l => ({ ...l, isGoogleEvent: false })),
+      ...googleFiltered.map(g => ({ ...g, isGoogleEvent: true }))
+    ];
+  }, [ordersWithExpiry, mappedGoogleEvents, quickFilter, typeFilter, selectedDateStr, currentYear, currentMonth, searchQuery]);
 
   // Navigation handlers
   const handlePrevMonth = () => {
@@ -318,6 +485,24 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
 
     onRenewOrder(renewOrder.id, renewDuration, newExpDateIso);
     setRenewSuccess(true);
+
+    // Sincronización bidireccional en tiempo real al renovar
+    try {
+      const expShort = newExpDateIso.split('T')[0];
+      syncEventToCalendar({
+        summary: `Vencimiento: ${renewOrder.productName} - ${renewOrder.customerName}`,
+        description: `Cliente: ${renewOrder.customerName}\nTeléfono: ${renewOrder.customerPhone}\nServicio: ${renewOrder.productName}\nRenovado por: ${renewDuration}\nSoporte: 04241983648`,
+        start: expShort,
+        end: expShort
+      }).then(() => {
+        loadGoogleEvents(); // recargar automáticamente en tiempo real
+      }).catch(err => {
+        console.warn('Google Calendar push failed during renewal:', err);
+      });
+    } catch (err) {
+      console.warn('Real-time Google Calendar renewal sync warning:', err);
+    }
+
     setTimeout(() => {
       setRenewSuccess(false);
       setRenewOrder(null);
@@ -365,14 +550,28 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {/* Sincronización en tiempo real Bidireccional */}
+            <button
+              type="button"
+              onClick={() => loadGoogleEvents(true)}
+              disabled={googleLoading}
+              className={`px-4 py-2 rounded-xl text-white text-xs font-bold shadow-lg transition cursor-pointer flex items-center gap-1.5 ${
+                googleLoading ? 'bg-indigo-800' : 'bg-indigo-600 hover:bg-indigo-500'
+              }`}
+              title="Sincronizar y consultar eventos de Google Calendar en tiempo real"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-indigo-200 ${googleLoading ? 'animate-spin' : ''}`} />
+              <span>{googleLoading ? 'Sincronizando...' : 'Sincronizar Nube'}</span>
+            </button>
+
             <button
               type="button"
               onClick={handleSyncGoogleCalendar}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg transition cursor-pointer flex items-center gap-1.5"
-              title="Sincronizar y exportar eventos a Google Calendar (.ics)"
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold border border-slate-700 transition cursor-pointer flex items-center gap-1.5"
+              title="Exportar archivo .ics para importar manualmente offline"
             >
-              <ExternalLink className="w-3.5 h-3.5 text-indigo-200" />
-              <span>Sincronizar Google Calendar</span>
+              <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+              <span>Exportar .ics</span>
             </button>
 
             <button
@@ -424,6 +623,37 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Google Calendar Real-Time Status Alert Banner */}
+      {googleSyncMsg && (
+        <div className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between gap-3 shadow-xs animate-fadeIn ${
+          googleSyncMsg.includes('Error') 
+            ? 'bg-rose-50 border-rose-200 text-rose-800' 
+            : googleSyncMsg.includes('Sincronizado')
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            : 'bg-amber-50 border-amber-200 text-amber-800'
+        }`}>
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${
+              googleSyncMsg.includes('Error') 
+                ? 'bg-rose-500 animate-ping' 
+                : googleSyncMsg.includes('Sincronizado')
+                ? 'bg-emerald-500'
+                : 'bg-amber-500 animate-pulse'
+            }`} />
+            <span>{googleSyncMsg}</span>
+          </div>
+          {!googleSyncMsg.includes('Sincronizado') && (
+            <button
+              type="button"
+              onClick={() => loadGoogleEvents(true)}
+              className="text-[10px] text-indigo-700 hover:text-indigo-900 font-extrabold underline cursor-pointer"
+            >
+              Intentar Sincronizar Ahora
+            </button>
+          )}
+        </div>
+      )}
 
       {/* DUAL VIEW CONTAINER */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -605,8 +835,6 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
                       )}`
                     : quickFilter === 'today'
                     ? 'Cortes que vencen HOY'
-                    : quickFilter === 'tomorrow'
-                    ? 'Cortes que vencen MAÑANA'
                     : quickFilter === 'this_week'
                     ? 'Cortes de los próximos 7 días'
                     : quickFilter === 'overdue'
@@ -652,17 +880,7 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
               >
                 🚨 Hoy ({todayTotal})
               </button>
-              <button
-                type="button"
-                onClick={() => setQuickFilter('tomorrow')}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap ${
-                  quickFilter === 'tomorrow'
-                    ? 'bg-indigo-900 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                ⏰ Mañana
-              </button>
+
               <button
                 type="button"
                 onClick={() => setQuickFilter('this_week')}
@@ -710,15 +928,102 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
                 </p>
               </div>
             ) : (
-              filteredList.map((item) => {
-                const bsEquiv = (item.order.total * bcvRate).toFixed(2);
+              filteredList.map((item: any) => {
+                if (item.isGoogleEvent) {
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/20 hover:border-indigo-300 hover:shadow-xs transition-all animate-fadeIn"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          {/* Event Summary & Badge */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <strong className="text-slate-900 text-sm font-extrabold flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+                              {item.summary}
+                            </strong>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-600 text-white font-black border border-indigo-700 flex items-center gap-1 shadow-2xs">
+                              <CalendarIcon className="w-3 h-3 text-white" />
+                              <span>Google Calendar</span>
+                            </span>
+                          </div>
+
+                          {/* Description */}
+                          {item.description && (
+                            <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                              {item.description}
+                            </p>
+                          )}
+
+                          {/* Date */}
+                          <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            <span>
+                              {safeFormatDate(
+                                item.expDateStr ? item.expDateStr + 'T12:00:00' : null,
+                                {
+                                  day: 'numeric',
+                                  month: 'long',
+                                  year: 'numeric'
+                                },
+                                item.expDateStr || '-'
+                              )}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Relative Expiry */}
+                        <div className="text-right shrink-0">
+                          {item.isOverdue ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 block mb-1">
+                              Pasado hace {Math.abs(item.diffDays)}d
+                            </span>
+                          ) : item.isToday ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950 font-black block mb-1 animate-pulse">
+                              ¡HOY!
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 block mb-1">
+                              En {item.diffDays} días
+                            </span>
+                          )}
+                          
+                          {item.htmlLink && (
+                            <a
+                              href={item.htmlLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold underline inline-flex items-center gap-0.5 mt-1"
+                            >
+                              <span>Ver en Google</span>
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const localItem = item as {
+                  order: Order;
+                  expDateStr: string;
+                  diffDays: number;
+                  isOverdue: boolean;
+                  isToday: boolean;
+                  isNear: boolean;
+                  isSenior: boolean | undefined;
+                  isTrust: boolean | undefined;
+                };
+                const bsEquiv = (localItem.order.total * bcvRate).toFixed(2);
                 return (
                   <div
-                    key={item.order.id}
+                    key={localItem.order.id}
                     className={`p-4 rounded-2xl border transition-all ${
-                      item.isOverdue
+                      localItem.isOverdue
                         ? 'bg-rose-50/50 border-rose-200 hover:border-rose-300'
-                        : item.isToday
+                        : localItem.isToday
                         ? 'bg-amber-50/60 border-amber-200 hover:border-amber-300 ring-1 ring-amber-300/40'
                         : 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-xs'
                     }`}
@@ -728,20 +1033,20 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
                         {/* Customer Name & Tags */}
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <strong className="text-slate-900 text-sm font-extrabold">
-                            {item.order.customerName}
+                            {localItem.order.customerName}
                           </strong>
-                          {Boolean(item.order.paymentCondition === 'cuotas' || item.order.installmentPlan) && (
+                          {Boolean(localItem.order.paymentCondition === 'cuotas' || localItem.order.installmentPlan) && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500 text-slate-950 font-black border border-amber-600 flex items-center gap-1 shadow-2xs">
                               <Layers className="w-3 h-3 text-slate-950" />
                               <span>Cobro de Cuota</span>
                             </span>
                           )}
-                          {item.isSenior && (
+                          {localItem.isSenior && (
                             <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-100 text-amber-800 font-bold border border-amber-200">
                               👴 3era Edad
                             </span>
                           )}
-                          {item.isTrust && !item.isSenior && (
+                          {localItem.isTrust && !localItem.isSenior && (
                             <span className="px-1.5 py-0.2 rounded text-[10px] bg-purple-100 text-purple-800 font-bold border border-purple-200">
                               🤝 Confianza
                             </span>
@@ -751,28 +1056,28 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
                         {/* Service & Expiration relative */}
                         <div className="text-xs text-slate-600 mt-1 flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-indigo-700">
-                            {item.order.productName}
+                            {localItem.order.productName}
                           </span>
-                          <span>• {item.order.accountType}</span>
-                          <span>• {item.order.duration}</span>
+                          <span>• {localItem.order.accountType}</span>
+                          <span>• {localItem.order.duration}</span>
                         </div>
 
                         {/* Phone & Date */}
                         <div className="text-[11px] text-slate-500 font-mono mt-1 flex items-center gap-3">
                           <span className="flex items-center gap-1">
                             <Phone className="w-3 h-3 text-slate-400" />
-                            <span>{item.order.customerPhone}</span>
+                            <span>{localItem.order.customerPhone}</span>
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3 text-slate-400" />
                             <span>
                               {safeFormatDate(
-                                item.expDateStr ? item.expDateStr + 'T12:00:00' : null,
+                                localItem.expDateStr ? localItem.expDateStr + 'T12:00:00' : null,
                                 {
                                   day: 'numeric',
                                   month: 'short'
                                 },
-                                item.expDateStr || '-'
+                                localItem.expDateStr || '-'
                               )}
                             </span>
                           </span>
@@ -781,22 +1086,22 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
 
                       {/* Expiration Status Pill & Price */}
                       <div className="text-right shrink-0">
-                        {item.isOverdue ? (
+                        {localItem.isOverdue ? (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 block mb-1">
-                            Vencido hace {Math.abs(item.diffDays)}d
+                            Vencido hace {Math.abs(localItem.diffDays)}d
                           </span>
-                        ) : item.isToday ? (
+                        ) : localItem.isToday ? (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950 font-black block mb-1 animate-pulse">
                             ¡VENCE HOY!
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 block mb-1">
-                            En {item.diffDays} días
+                            En {localItem.diffDays} días
                           </span>
                         )}
 
                         <div className="font-mono font-extrabold text-slate-900 text-xs">
-                          ${item.order.total.toFixed(2)} USD
+                          ${localItem.order.total.toFixed(2)} USD
                         </div>
                         <div className="font-mono text-[10px] text-slate-500">
                           Bs. {bsEquiv} (BCV)
@@ -808,7 +1113,7 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
                     <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-end gap-2">
                       <button
                         type="button"
-                        onClick={() => handleSendReminderWhatsApp(item)}
+                        onClick={() => handleSendReminderWhatsApp(localItem)}
                         className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
                         title="Enviar recordatorio de renovación por WhatsApp"
                       >
@@ -818,7 +1123,7 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
 
                       <button
                         type="button"
-                        onClick={() => setRenewOrder(item.order)}
+                        onClick={() => setRenewOrder(localItem.order)}
                         className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
                         title="Renovar suscripción y extender fecha"
                       >
@@ -830,6 +1135,92 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
                 );
               })
             )}
+            {/* Formulario para Crear Evento Directo en Google Calendar */}
+            <div className="pt-4 border-t border-slate-100 mt-4">
+              {!showCreateForm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateForm(true)}
+                  className="w-full py-2.5 rounded-xl border border-indigo-200 bg-indigo-50/40 text-indigo-700 hover:bg-indigo-50 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <CalendarIcon className="w-4 h-4 text-indigo-600" />
+                  <span>➕ Agregar Recordatorio en Google Calendar</span>
+                </button>
+              ) : (
+                <form onSubmit={handleCreateGoogleEventSubmit} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 animate-slideInRight">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
+                    <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                      <CalendarIcon className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Nuevo Recordatorio (Google Calendar)</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateForm(false)}
+                      className="text-slate-400 hover:text-slate-600 text-[10px] font-bold"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1">Título del Evento:</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Corte Netflix de Pedro, Revisión de Pago"
+                      value={newEvtSummary}
+                      onChange={(e) => setNewEvtSummary(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1">Descripción / Notas:</label>
+                    <textarea
+                      placeholder="Ej. Teléfono: 04241983648, Cuenta: pedro@gmail.com"
+                      value={newEvtDescription}
+                      onChange={(e) => setNewEvtDescription(e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1">Fecha de Ejecución:</label>
+                    <input
+                      type="date"
+                      required
+                      value={newEvtDate}
+                      onChange={(e) => setNewEvtDate(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white font-mono"
+                    />
+                  </div>
+
+                  {newEvtSuccess && (
+                    <div className="p-2 rounded-lg bg-emerald-50 text-emerald-800 font-bold text-[10px] text-center">
+                      ¡Creado en Google Calendar con éxito!
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateForm(false)}
+                      className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 font-bold text-[10px] hover:bg-slate-100"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={newEvtLoading}
+                      className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] shadow-sm disabled:bg-indigo-800"
+                    >
+                      {newEvtLoading ? 'Guardando...' : 'Crear Evento'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       </div>

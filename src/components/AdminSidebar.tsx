@@ -47,19 +47,18 @@ export const MENU_STRUCTURE: MenuCategoryDef[] = [
       { id: 'credits', label: 'Créditos & Cobranzas', icon: HeartHandshake, badgeKey: 'credits', color: 'text-amber-400' },
       { id: 'installments', label: 'Gestión de Cuotas', icon: Layers, badgeKey: 'installments', color: 'text-amber-400' },
       { id: 'calendar', label: 'Calendario Vencimientos', icon: CalendarDays, color: 'text-indigo-400' },
-      { id: 'reminders', label: 'Avisos (1 Día Antes)', icon: Bell, badgeKey: 'reminders', color: 'text-amber-400' },
       { id: 'incidents', label: 'Incidencias', icon: AlertTriangle, badgeKey: 'incidents', color: 'text-rose-400' },
     ]
   },
   {
     category: 'Configuración',
-    description: 'Personalización de marca, bots y tasas',
+    description: 'Categorías de servicios, bots, tasas y plantillas',
     items: [
-      { id: 'branding', label: 'Personalización de Marca', icon: Palette, color: 'text-indigo-400' },
       { id: 'categories', label: 'Categorías de Servicios', icon: Layers, color: 'text-amber-400' },
       { id: 'telegram_bot', label: 'Bot de Telegram', icon: Bot, color: 'text-sky-400' },
       { id: 'templates', label: 'Plantillas de Mensajes', icon: FileText, color: 'text-indigo-400' },
       { id: 'bcv', label: 'Tasa BCV', icon: TrendingUp, color: 'text-amber-400' },
+      { id: 'footer_config', label: 'Pie de Página (Footer)', icon: Palette, color: 'text-pink-400' },
     ]
   },
   {
@@ -82,7 +81,7 @@ export const MENU_STRUCTURE: MenuCategoryDef[] = [
     description: 'Bases de datos, nube, integraciones y dominio',
     items: [
       { id: 'integrations', label: 'Catálogo de Integraciones', icon: Layers, color: 'text-purple-400' },
-      { id: 'sheets', label: 'Google Drive & Sheets', icon: FileSpreadsheet, badgeKey: 'sheets', color: 'text-emerald-400' },
+      { id: 'sheets', label: 'Base de Datos Supabase', icon: Layers, color: 'text-sky-400' },
       { id: 'domain', label: 'Dominio Oficial', icon: Globe, color: 'text-emerald-400' },
       { id: 'faq', label: 'Preguntas Frecuentes', icon: HelpCircle, color: 'text-slate-400' },
     ]

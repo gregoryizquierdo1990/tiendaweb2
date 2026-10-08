@@ -190,9 +190,12 @@ export function buildWhatsAppReminderUrl(order: Order): string {
     'Mañana'
   );
 
+  const daysInfo = getDaysRemaining(creds?.expirationDate);
+  const timeContext = daysInfo.days === 0 ? 'hoy' : 'mañana';
+
   const message = `🔔 *Recordatorio de Vencimiento - Gregori Izquierdo Streaming*
 
-Hola *${order.customerName}*, te informamos que tu suscripción a *${order.productName}* (#${order.id}) vencerá el día *${expFormatted}* (mañana).
+Hola *${order.customerName}*, te informamos que tu suscripción a *${order.productName}* (#${order.id}) vencerá el día *${expFormatted}* (${timeContext}).
 
 Si deseas renovar sobre tu mismo perfil y no perder tu configuración ni historial, por favor respóndenos a este mensaje o ingresa en https://gregoryizquierdo.xyz para renovar con tus métodos de pago habituales o tu saldo Zeny.
 
@@ -209,7 +212,10 @@ export function buildTelegramReminderUrl(order: Order): string {
     'Mañana'
   );
 
-  const message = `🔔 Recordatorio: Tu suscripción a ${order.productName} vence mañana ${expFormatted}. Renueva en https://gregoryizquierdo.xyz para mantener tu perfil activo sin interrupciones.`;
+  const daysInfo = getDaysRemaining(creds?.expirationDate);
+  const timeContext = daysInfo.days === 0 ? 'hoy' : 'mañana';
+
+  const message = `🔔 Recordatorio: Tu suscripción a ${order.productName} vence ${timeContext} ${expFormatted}. Renueva en https://gregoryizquierdo.xyz para mantener tu perfil activo sin interrupciones.`;
   return `https://t.me/share/url?url=${encodeURIComponent('https://gregoryizquierdo.xyz')}&text=${encodeURIComponent(message)}`;
 }
 

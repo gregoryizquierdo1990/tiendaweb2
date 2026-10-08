@@ -71,6 +71,8 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
   const [formWarrantyMonths, setFormWarrantyMonths] = useState<number>(1);
   const [formInStock, setFormInStock] = useState<boolean>(true);
   const [formPopular, setFormPopular] = useState<boolean>(false);
+  const [formIsStockManual, setFormIsStockManual] = useState<boolean>(false);
+  const [formManualStock, setFormManualStock] = useState<number>(10);
   const [formColor, setFormColor] = useState('#4f46e5');
   const [formFeatures, setFormFeatures] = useState<string[]>([]);
   const [featureInput, setFeatureInput] = useState('');
@@ -102,6 +104,8 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
     setFormWarrantyMonths(prod.warrantyMonths || 1);
     setFormInStock(prod.inStock);
     setFormPopular(Boolean(prod.popular));
+    setFormIsStockManual(Boolean(prod.isStockManual));
+    setFormManualStock(prod.manualStock ?? prod.stock ?? 10);
     setFormColor(prod.color || '#4f46e5');
     setFormFeatures(prod.features || []);
 
@@ -127,6 +131,8 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
     setFormWarrantyMonths(1);
     setFormInStock(true);
     setFormPopular(false);
+    setFormIsStockManual(false);
+    setFormManualStock(10);
     setFormColor('#4f46e5');
     setFormFeatures([
       'Calidad Ultra HD 4K',
@@ -164,6 +170,9 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
       warrantyMonths: formWarrantyMonths,
       inStock: formInStock,
       popular: formPopular,
+      isStockManual: formIsStockManual,
+      manualStock: formManualStock,
+      stock: formIsStockManual ? formManualStock : (editingProduct?.stock ?? 10),
       color: formColor,
       accentBg: editingProduct?.accentBg || 'from-indigo-50 to-blue-100/50',
       logo: editingProduct?.logo || '',
@@ -634,6 +643,51 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
                     onChange={(e) => setFormWarrantyMonths(parseInt(e.target.value) || 1)}
                     className="w-full px-2 py-1 rounded-lg border bg-white text-xs font-bold"
                   />
+                </div>
+              </div>
+
+              {/* Control de Existencia e Inventario */}
+              <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200/80 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 className="font-bold text-amber-950 text-xs flex items-center gap-1.5">
+                      <span>📦 Control de Existencia & Inventario</span>
+                    </h4>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Sincroniza automáticamente el stock con los perfiles libres de las Cuentas Madre de Supabase o fíjalo de manera manual.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer bg-white p-3 rounded-xl border border-amber-200">
+                    <input
+                      type="checkbox"
+                      checked={formIsStockManual}
+                      onChange={(e) => setFormIsStockManual(e.target.checked)}
+                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                    />
+                    <div>
+                      <span className="font-bold text-slate-800 text-xs block">Existencia Manual</span>
+                      <span className="text-[9px] text-slate-400 block">Ignorar perfiles automáticos de cuentas madre</span>
+                    </div>
+                  </label>
+
+                  <div className={`p-3 rounded-xl border transition ${
+                    formIsStockManual ? 'bg-white border-amber-200' : 'bg-slate-100/50 border-slate-200 text-slate-400'
+                  }`}>
+                    <label className="block font-semibold text-xs mb-1">
+                      Cantidad en Existencia:
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      disabled={!formIsStockManual}
+                      value={formManualStock}
+                      onChange={(e) => setFormManualStock(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full px-3 py-1.5 rounded-lg border bg-white text-xs font-mono font-bold text-slate-900 disabled:bg-slate-100 disabled:text-slate-400 focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
                 </div>
               </div>
 

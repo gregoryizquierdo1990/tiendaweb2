@@ -92,7 +92,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         </p>
       </div>
 
-      {/* Account Type & Warranty */}
+      {/* Account Type & Warranty & Stock */}
       <div className="flex flex-wrap items-center gap-1.5 mb-4 text-xs font-medium">
         <span className={`px-2.5 py-1 rounded-lg border font-semibold ${
           product.accountType === 'Perfil privado'
@@ -106,6 +106,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1">
           <ShieldCheck className="w-3.5 h-3.5" />
           {product.warrantyMonths} mes garantía
+        </span>
+        <span className={`px-2.5 py-1 rounded-lg border font-semibold flex items-center gap-1 ${
+          (product.stock ?? 0) > 0
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+            : 'bg-rose-50 text-rose-700 border-rose-100'
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${
+            (product.stock ?? 0) > 0 ? 'bg-emerald-500' : 'bg-rose-500'
+          }`} />
+          {(product.stock ?? 0) > 0 ? `${product.stock} disponibles` : 'Agotado'}
         </span>
       </div>
 
@@ -177,11 +187,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       {/* CTA Button */}
       <button
         type="button"
+        disabled={(product.stock ?? 0) === 0}
         onClick={() => onSelectProduct(product, safeDuration)}
-        className="w-full py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-xs transition flex items-center justify-center gap-2 group-hover:shadow-indigo-100 cursor-pointer"
+        className={`w-full py-3 px-4 rounded-2xl font-semibold text-sm shadow-xs transition flex items-center justify-center gap-2 cursor-pointer ${
+          (product.stock ?? 0) > 0
+            ? 'bg-indigo-600 hover:bg-indigo-700 text-white group-hover:shadow-indigo-100'
+            : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none hover:bg-slate-200'
+        }`}
       >
-        <span>Comprar Ahora</span>
-        <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+        <span>{(product.stock ?? 0) > 0 ? 'Comprar Ahora' : 'Agotado'}</span>
+        {(product.stock ?? 0) > 0 && (
+          <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+        )}
       </button>
     </div>
   );

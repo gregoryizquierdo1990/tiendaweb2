@@ -55,7 +55,6 @@ import { AdminCalendarManager } from './AdminCalendarManager';
 import { AdminHandoverGuideModal } from './AdminHandoverGuideModal';
 import { AdminPurchasesAndFinanceManager } from './AdminPurchasesAndFinanceManager';
 import { AdminAuditLogManager } from './AdminAuditLogManager';
-import { AdminBrandingManager } from './AdminBrandingManager';
 import { AdminUserManager } from './AdminUserManager';
 import { AdminInstallmentManager } from './AdminInstallmentManager';
 import { AdminRefundManager } from './AdminRefundManager';
@@ -67,6 +66,7 @@ import { MarketingModule } from './MarketingModule';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminCategoryManager } from './AdminCategoryManager';
 import { getAccessToken } from '../services/googleAuth';
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import {
   DOMAIN_OFFICIAL,
   DEFAULT_MESSAGE_TEMPLATES,
@@ -106,9 +106,6 @@ import {
   formatGrpay,
   buildWhatsAppCredentialsUrl,
   buildTelegramCredentialsUrl,
-  buildFormattedCredentialsText,
-  buildWhatsAppReminderUrl,
-  buildTelegramReminderUrl,
   buildWhatsAppIncidentStatusUrl,
   buildTelegramIncidentStatusUrl,
   buildFormattedIncidentStatusText,
@@ -117,6 +114,224 @@ import {
   getDaysRemaining,
   safeFormatDate
 } from '../utils/formatters';
+const SUPABASE_SCHEMA_SQL = `-- Script SQL Completo de Base de Datos para Supabase (Estructura Unificada)
+-- Ejecuta este script en el SQL Editor de tu consola de Supabase (https://supabase.com)
+
+-- 1. Crear tabla de Categorías de Servicios
+CREATE TABLE IF NOT EXISTS public.categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    icon TEXT,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 2. Crear tabla de Cuentas Madre (Proveedores de streaming)
+CREATE TABLE IF NOT EXISTS public.parent_accounts (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    platform TEXT,
+    email TEXT,
+    password TEXT,
+    expiration_date TEXT,
+    max_slots INTEGER DEFAULT 5,
+    active_slots INTEGER DEFAULT 0,
+    purchase_price NUMERIC,
+    provider TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 3. Crear tabla de Perfiles de Streaming de la Cuenta Madre
+CREATE TABLE IF NOT EXISTS public.account_profiles (
+    id TEXT PRIMARY KEY,
+    parent_account_id TEXT REFERENCES public.parent_accounts(id) ON DELETE CASCADE,
+    profile_name TEXT,
+    pin TEXT,
+    assigned_customer TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 4. Crear tabla de Historial de Reversos
+CREATE TABLE IF NOT EXISTS public.refunds (
+    id BIGSERIAL PRIMARY KEY,
+    order_id TEXT,
+    customer_email TEXT,
+    amount NUMERIC,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 5. Crear tabla de Facturas
+CREATE TABLE IF NOT EXISTS public.invoices (
+    id TEXT PRIMARY KEY,
+    order_id TEXT,
+    payment_status TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 6. Crear tabla de Contratos
+CREATE TABLE IF NOT EXISTS public.contracts (
+    id TEXT PRIMARY KEY,
+    order_id TEXT,
+    status TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 7. Crear tabla de Clientes (Customers)
+CREATE TABLE IF NOT EXISTS public.customers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE,
+    phone TEXT,
+    role TEXT DEFAULT 'cliente',
+    zeny_balance NUMERIC DEFAULT 0.00,
+    is_suspended BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 8. Crear tabla de Catálogo de Productos y Servicios
+CREATE TABLE IF NOT EXISTS public.products (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT,
+    price_usd NUMERIC DEFAULT 0.00,
+    price_bs NUMERIC DEFAULT 0.00,
+    duration TEXT,
+    account_type TEXT,
+    description TEXT,
+    image_url TEXT,
+    stock INTEGER DEFAULT 10,
+    is_stock_manual BOOLEAN DEFAULT false,
+    manual_stock INTEGER DEFAULT 10,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 9. Crear tabla de Métodos de Pago
+CREATE TABLE IF NOT EXISTS public.payment_methods (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    bank_name TEXT,
+    doc_id TEXT,
+    phone TEXT,
+    payment_instructions TEXT,
+    currency TEXT DEFAULT 'USD',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 10. Crear tabla de FAQ
+CREATE TABLE IF NOT EXISTS public.faq_items (
+    id TEXT PRIMARY KEY,
+    category TEXT,
+    question TEXT,
+    answer TEXT,
+    sort_order INTEGER DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 11. Crear tabla de Wallet Topups
+CREATE TABLE IF NOT EXISTS public.wallet_topups (
+    id TEXT PRIMARY KEY,
+    customer_email TEXT,
+    amount_usd NUMERIC DEFAULT 0.00,
+    reference TEXT,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 12. Crear tabla de Franquiciados (Franchises)
+CREATE TABLE IF NOT EXISTS public.franchises (
+    id TEXT PRIMARY KEY,
+    business_name TEXT NOT NULL,
+    owner_name TEXT NOT NULL,
+    phone TEXT,
+    telegram_user TEXT,
+    email TEXT UNIQUE,
+    custom_domain TEXT,
+    wallet_custom_name TEXT DEFAULT 'ZenyPay',
+    monthly_fee_usd NUMERIC DEFAULT 0.00,
+    subscription_status TEXT DEFAULT 'active',
+    status TEXT DEFAULT 'active',
+    credit_due_date TEXT,
+    last_payment_date TEXT,
+    available_master_balance_usd NUMERIC DEFAULT 0.00,
+    notes TEXT,
+    extra_addons_monthly_usd NUMERIC DEFAULT 0.00,
+    is_reseller_network_active BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 13. Crear tabla de Abonos de Franquicias
+CREATE TABLE IF NOT EXISTS public.franchise_topups (
+    id TEXT PRIMARY KEY,
+    franchise_id TEXT REFERENCES public.franchises(id) ON DELETE CASCADE,
+    franchise_name TEXT,
+    franchise_phone TEXT,
+    franchise_telegram TEXT,
+    target_customer_name TEXT,
+    target_customer_id TEXT,
+    amount_usd NUMERIC DEFAULT 0.00,
+    amount_bs NUMERIC DEFAULT 0.00,
+    payment_method TEXT,
+    reference_number TEXT,
+    screenshot_image TEXT,
+    notes TEXT,
+    status TEXT DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    reviewed_at TEXT,
+    reviewed_by TEXT,
+    rejection_reason TEXT
+);
+
+-- Deshabilitar RLS para lecturas y escrituras directas
+ALTER TABLE public.categories DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.parent_accounts DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.account_profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.refunds DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.invoices DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.contracts DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payment_methods DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.faq_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wallet_topups DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.franchises DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.franchise_topups DISABLE ROW LEVEL SECURITY;
+
+-- Cargar semilla de datos iniciales
+INSERT INTO public.categories (id, name, icon, description) VALUES
+('cat-netflix', 'Netflix 4K', 'Tv', 'Cuentas completas y pantallas premium de Netflix Ultra HD.'),
+('cat-disney', 'Disney+ Premium', 'Tv', 'Perfiles y cuentas completas de Disney Plus con Star incluido.'),
+('cat-max', 'Max (HBO)', 'Tv', 'Acceso a las mejores películas y series de Warner Bros y HBO.')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.customers (id, name, email, phone, role, zeny_balance) VALUES
+('cust-gregory', 'Gregory Izquierdo', 'emprendimientogregoryizquierdo@gmail.com', '584241983648', 'admin', 150.00),
+('cust-cliente-1', 'Juan Pérez', 'juan.perez@example.com', '584121234567', 'cliente', 25.50),
+('cust-cliente-2', 'María Gómez', 'maria.gomez@example.com', '584249876543', 'cliente', 0.00)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.products (id, name, category, price_usd, duration, account_type, description, stock, is_stock_manual, manual_stock) VALUES
+('prod-netflix-1', 'Netflix Ultra HD', 'cat-netflix', 3.50, '30 Días', 'Pantalla Privada', 'Perfil privado con PIN de acceso personalizado en calidad 4K Ultra HD.', 15, false, 15),
+('prod-disney-1', 'Disney+ Premium', 'cat-disney', 2.50, '30 Días', 'Pantalla Privada', 'Acceso premium con perfil independiente para toda la familia.', 12, false, 12),
+('prod-max-1', 'Max (HBO) Premium', 'cat-max', 3.00, '30 Días', 'Pantalla Privada', 'Películas de estreno y series exclusivas en calidad máxima.', 8, false, 8)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.payment_methods (id, name, bank_name, doc_id, phone, payment_instructions, currency) VALUES
+('pm-pago-movil', 'Pago Móvil BCV', 'Banco de Venezuela (0102)', 'V-18999000', '04241983648', 'Realiza el pago al celular registrado y reporta el capture con referencia.', 'VES'),
+('pm-binance', 'Binance Pay', 'Binance', 'gregory.binance', 'N/A', 'Envía mediante Binance Pay ID y reporta tu ID de transacción.', 'USD'),
+('pm-zeny', 'Billetera Zeny', 'Saldo Interno', 'N/A', 'N/A', 'Descuento directo e instantáneo de tu saldo de billetera virtual Zeny.', 'USD')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.faq_items (id, category, question, answer, sort_order) VALUES
+('faq-1', 'Garantía', '¿Qué pasa si mi cuenta deja de funcionar?', 'Todas nuestras cuentas cuentan con garantía total por el tiempo contratado. Si tienes algún inconveniente, puedes abrir un reporte técnico en el Portal de Soporte y te lo solventaremos de inmediato.', 1),
+('faq-2', 'Pagos', '¿Cómo reportar un pago móvil o transferencia?', 'Realiza tu pago a nuestros datos oficiales, guarda el comprobante y sube la captura con el número de referencia en el formulario de pago del producto o sección de confirmación.', 2),
+('faq-3', 'Zeny', '¿Qué es el saldo ZenyPoints?', 'Es el saldo digital en dólares (USD) recargable para comprar al instante en nuestra plataforma sin esperar validación bancaria.', 3),
+('faq-4', 'Renovaciones', '¿Pierdo mi perfil si renuevo?', 'No, al renovar sobre tu mismo perfil conservas intactas tus configuraciones, historial y listas guardadas.', 4)
+ON CONFLICT (id) DO NOTHING;
+`;
+
 
 interface AdminReconciliationModalProps {
   orders: Order[];
@@ -207,6 +422,8 @@ interface AdminReconciliationModalProps {
   onDeleteExpense?: (expenseId: string) => void;
   onAddPaymentMethod?: (method: PaymentMethod) => void;
   onDeletePaymentMethod?: (methodId: string) => void;
+  onSyncDatabaseWithSupabase?: () => Promise<void>;
+  supabaseSchemaError?: string | null;
 }
 
 export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> = ({
@@ -225,6 +442,8 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
   onCreateNewSheet,
   onSelectExistingSheet,
   onSyncWithSheets,
+  onSyncDatabaseWithSupabase,
+  supabaseSchemaError,
   onSyncCustomersToSheet,
   onSyncReportsToSheet,
   onSyncIncidentsToSheet,
@@ -312,7 +531,105 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
     | 'expenses'
     | 'integrations'
     | 'marketing'
+    | 'footer_config'
   >('reconciliation');
+
+  // Supabase Database Explorer States
+  const [selectedSupabaseTable, setSelectedSupabaseTable] = useState<string>('categories');
+  const [supabaseRecords, setSupabaseRecords] = useState<any[]>([]);
+  const [supabaseExplorerLoading, setSupabaseExplorerLoading] = useState<boolean>(false);
+  const [supabaseExplorerError, setSupabaseExplorerError] = useState<string | null>(null);
+  const [supabaseTestInsertStatus, setSupabaseTestInsertStatus] = useState<string | null>(null);
+  const [isDbSyncing, setIsDbSyncing] = useState<boolean>(false);
+  const [dbSyncLogs, setDbSyncLogs] = useState<string[]>([]);
+
+  // States for live client-side Supabase credentials editing and dynamic querying
+  const [customTableName, setCustomTableName] = useState<string>('');
+  const [customUrlInput, setCustomUrlInput] = useState<string>(() => localStorage.getItem('CUSTOM_SUPABASE_URL') || '');
+  const [customKeyInput, setCustomKeyInput] = useState<string>(() => localStorage.getItem('CUSTOM_SUPABASE_ANON_KEY') || '');
+  const [showCredentialsForm, setShowCredentialsForm] = useState<boolean>(false);
+
+  // FAQ Inline Editing States
+  const [editingFaqId, setEditingFaqId] = useState<string | null>(null);
+  const [editFaqCategory, setEditFaqCategory] = useState<string>('');
+  const [editFaqQuestion, setEditFaqQuestion] = useState<string>('');
+  const [editFaqAnswer, setEditFaqAnswer] = useState<string>('');
+
+  const handleManualSupabaseSync = async () => {
+    if (!onSyncDatabaseWithSupabase) {
+      alert('Sincronizador no disponible.');
+      return;
+    }
+    setIsDbSyncing(true);
+    const nowStr = () => new Date().toLocaleTimeString();
+    setDbSyncLogs([`[${nowStr()}] Iniciando proceso de sincronización bidireccional...`]);
+    try {
+      await onSyncDatabaseWithSupabase();
+      setDbSyncLogs(prev => [
+        ...prev,
+        `[${nowStr()}] Descargando actualizaciones de la nube...`,
+        `[${nowStr()}] Fusionando con el estado local de forma inteligente...`,
+        `[${nowStr()}] Subiendo nuevos registros locales a la nube...`,
+        `[${nowStr()}] ¡Sincronización bidireccional completada con éxito!`
+      ]);
+      alert('¡Sincronización con Supabase completada con éxito!');
+    } catch (error: any) {
+      setDbSyncLogs(prev => [
+        ...prev,
+        `[${nowStr()}] ERROR en la sincronización: ${error?.message || error}`
+      ]);
+      alert(`Error al sincronizar: ${error?.message || error}`);
+    } finally {
+      setIsDbSyncing(false);
+    }
+  };
+
+  const fetchSupabaseRecords = async (tableName: string) => {
+    setSupabaseExplorerLoading(true);
+    setSupabaseExplorerError(null);
+    try {
+      const { data, error } = await supabase.from(tableName).select('*').limit(50);
+      if (error) {
+        throw error;
+      }
+      setSupabaseRecords(data || []);
+    } catch (err: any) {
+      console.error('Error fetching Supabase records:', err);
+      setSupabaseExplorerError(err.message || 'No se pudieron recuperar los registros.');
+      setSupabaseRecords([]);
+    } finally {
+      setSupabaseExplorerLoading(false);
+    }
+  };
+
+  const handleSaveCredentials = () => {
+    try {
+      localStorage.setItem('CUSTOM_SUPABASE_URL', customUrlInput.trim());
+      localStorage.setItem('CUSTOM_SUPABASE_ANON_KEY', customKeyInput.trim());
+      alert('¡Credenciales de Supabase guardadas con éxito! La página se recargará para aplicar los cambios.');
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleResetCredentials = () => {
+    try {
+      localStorage.removeItem('CUSTOM_SUPABASE_URL');
+      localStorage.removeItem('CUSTOM_SUPABASE_ANON_KEY');
+      alert('Se han restaurado las credenciales por defecto del sistema. La página se recargará.');
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  React.useEffect(() => {
+    if (activeTab === 'sheets') {
+      fetchSupabaseRecords(selectedSupabaseTable);
+    }
+  }, [activeTab, selectedSupabaseTable]);
+
   const [localMapping, setLocalMapping] = useState<ActionTemplateMapping>(actionMapping || DEFAULT_ACTION_MAPPING);
   const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('pending_reconciliation');
   const [giftCustomer, setGiftCustomer] = useState<CustomerUser | null>(null);
@@ -618,12 +935,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
     return matchesStatus && matchesSearch;
   });
 
-  // Find subscriptions nearing expiration (1 to 2 days before cutoff)
-  const expiringSoonOrders = orders.filter((o) => {
-    if (o.status !== 'confirmed' && o.status !== 'delivered') return false;
-    const info = getDaysRemaining(o.credentials?.expirationDate);
-    return info.days > 0 && info.days <= 2;
-  });
+
 
   // Calculate Financial Metrics & Service Breakdown
   const confirmedOrders = orders.filter((o) => o.status === 'confirmed' || o.status === 'delivered');
@@ -760,12 +1072,11 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
     <div className="fixed inset-0 z-50 bg-slate-900/30 backdrop-blur-xs flex flex-col h-screen w-screen overflow-hidden bg-slate-100 text-slate-800">
       <div className="w-full h-full flex flex-col overflow-hidden bg-slate-100">
         {/* Top Header - Fullscreen Workspace Bar */}
-        <div className="px-5 sm:px-8 py-3 border-b border-slate-800 bg-slate-950 text-white flex items-center justify-between shrink-0 shadow-md">
+        <div className="px-5 sm:px-8 py-2 sm:py-3 border-b border-slate-800 bg-slate-950 text-white flex items-center justify-between shrink-0 shadow-md">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-700 via-indigo-600 to-sky-500 p-0.5 shadow-md flex items-center justify-center">
-              <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center font-black text-indigo-300 text-xs">
-                GI
-              </div>
+            {/* Logo Image with Focused Circular Crop and Sutil Elegant Border - Mayor tamaño para lectura de detalle */}
+            <div className="w-16 h-16 shrink-0 flex items-center justify-center rounded-full overflow-hidden border-2 border-indigo-500/40 shadow-md bg-white p-0.5">
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-cover object-center rounded-full scale-[1.15]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -832,12 +1143,37 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
               incidents: pendingIncidentsCount,
               credits: orders.filter((o) => o.paymentCondition === 'credito' && o.creditStatus !== 'paid').length,
               installments: orders.filter((o) => o.paymentCondition === 'cuotas' || Boolean(o.installmentPlan)).length,
-              reminders: expiringSoonOrders.length,
               franchises: franchiseTopups.filter((r) => r.status === 'pending').length,
               sheets: sheetsState.isConnected
             }}
           />
           <div className="flex-1 overflow-y-auto bg-slate-100">
+            {supabaseSchemaError && (
+              <div className="bg-amber-50 border-b border-amber-200 flex flex-col shadow-xs animate-slideDown p-4 text-xs">
+                <div className="max-w-4xl mx-auto flex items-center justify-between gap-4 w-full">
+                  <div className="flex items-center gap-3">
+                    <span className="p-2 rounded-xl bg-amber-100 text-amber-700 animate-pulse shrink-0">
+                      <AlertTriangle className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h4 className="font-extrabold text-amber-950 uppercase text-[11px] tracking-wider">
+                        ⚠️ Estructura de Base de Datos Supabase Incompleta
+                      </h4>
+                      <p className="text-[10px] text-amber-800 mt-0.5">
+                        El sistema detectó que tu base de datos de Supabase no contiene las tablas requeridas. Haz clic en "Ver Solución" para copiar el script SQL de inicialización.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('sheets')}
+                    className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-[10px] transition shrink-0 cursor-pointer shadow-xs"
+                  >
+                    Ver Solución
+                  </button>
+                </div>
+              </div>
+            )}
             {/* Global critical supplier prepayment balance alerts */}
             {/* Global critical supplier prepayment balance alerts with Team Personal Notification Dispatcher */}
             {criticalSupplierAlerts.length > 0 && (
@@ -2799,101 +3135,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
           </div>
         )}
 
-        {/* Tab 4: Avisos (1 Día Antes) */}
-        {activeTab === 'reminders' && (
-          <div className="p-6 overflow-y-auto space-y-4">
-            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-3">
-              <Bell className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold">Control de Fechas de Notificación (1 Día Antes del Corte):</span>
-                <p className="mt-0.5 text-amber-800 leading-relaxed">
-                  El sistema detecta automáticamente las cuentas y pantallas que vencen mañana o en las próximas 48 horas. Desde aquí puedes enviar el recordatorio de renovación con 1 clic por WhatsApp o Telegram.
-                </p>
-              </div>
-            </div>
 
-            {expiringSoonOrders.length === 0 ? (
-              <div className="text-center py-12 px-4 rounded-2xl bg-slate-50 border border-slate-200">
-                <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-                <h4 className="font-bold text-slate-800 text-sm">No hay suscripciones que venzan mañana</h4>
-                <p className="text-xs text-slate-500 mt-1">
-                  Todas tus cuentas y perfiles activos tienen más de 2 días de vigencia.
-                </p>
-              </div>
-            ) : (
-              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px]">
-                    <tr>
-                      <th className="py-2.5 px-4">Cliente / Contacto</th>
-                      <th className="py-2.5 px-4">Servicio</th>
-                      <th className="py-2.5 px-4">Fecha de Corte</th>
-                      <th className="py-2.5 px-4">Días Restantes</th>
-                      <th className="py-2.5 px-4 text-right">Enviar Aviso (1 Día Antes)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {expiringSoonOrders.map((order) => {
-                      const daysInfo = getDaysRemaining(order.credentials?.expirationDate);
-                      const waRemUrl = buildWhatsAppReminderUrl(order);
-                      const tgRemUrl = buildTelegramReminderUrl(order);
-
-                      return (
-                        <tr key={order.id} className="hover:bg-amber-50/40">
-                          <td className="py-3 px-4">
-                            <div className="font-bold text-slate-900">{order.customerName}</div>
-                            <div className="text-slate-500 font-mono text-[11px]">{order.customerPhone}</div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="font-semibold text-slate-900">{order.productName}</div>
-                            <div className="text-slate-400 text-[10px]">#{order.id}</div>
-                          </td>
-                          <td className="py-3 px-4 font-bold text-amber-900">
-                            {safeFormatDate(
-                              order.credentials?.expirationDate,
-                              {
-                                month: 'long',
-                                day: 'numeric'
-                              },
-                              'Por definir'
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 animate-pulse">
-                              {daysInfo.days === 1 ? '¡Vence Mañana!' : `Vence en ${daysInfo.days} días`}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <div className="inline-flex items-center gap-2">
-                              <a
-                                href={waRemUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition"
-                              >
-                                <MessageCircle className="w-3.5 h-3.5" />
-                                <span>Avisar WhatsApp</span>
-                              </a>
-                              <a
-                                href={tgRemUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs flex items-center gap-1.5 transition"
-                              >
-                                <Send className="w-3.5 h-3.5" />
-                                <span>Telegram</span>
-                              </a>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Tab 5: Wallet Zeny */}
         {activeTab === 'topups' && (
@@ -3321,179 +3563,908 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
           </div>
         )}
 
-        {/* Tab 8: Mi Archivo de Control en Google Drive & Plantilla Descargable */}
+        {/* Tab 8: Supabase Cloud SQL Database Dashboard & Explorer */}
         {activeTab === 'sheets' && (
           <div className="p-6 overflow-y-auto space-y-6">
-            {/* Download Template Banner */}
-            <div className="p-6 rounded-3xl bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 text-white shadow-xl border border-emerald-500/30 space-y-5">
+            {/* Banner Superior de Supabase */}
+            <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white shadow-xl border border-indigo-500/20 space-y-5">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1.5">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30">
-                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Plantilla Base Oficial para Google Sheets</span>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold border border-indigo-500/30">
+                    <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Auditoría de Sistemas & Base de Datos Relacional</span>
                   </div>
-                  <h3 className="text-xl sm:text-2xl font-black">
-                    Descargar Archivo Inicial con Formato y Ejemplos Guía
+                  <h3 className="text-xl sm:text-2xl font-black tracking-tight">
+                    Explorador de Base de Datos Supabase (PostgreSQL)
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-                    Usa este archivo para vaciar tu inventario actual, clientes y pedidos. Viene pre-configurado con las 6 pestañas que utiliza el sistema y <strong>1 ejemplo real guía en cada caso</strong>.
+                    Monitorea en tiempo real las tablas estructuradas de Gregory Izquierdo Streaming. Consulta los proveedores asignados, perfiles de cuentas madre, logs de reversos y categorías de servicios directamente desde la nube de Supabase.
                   </p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                <div className="flex gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={downloadGoogleSheetsTemplate}
-                    className="px-4 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2 cursor-pointer"
+                    onClick={() => fetchSupabaseRecords(selectedSupabaseTable)}
+                    disabled={supabaseExplorerLoading}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
                   >
-                    <Download className="w-4 h-4 text-slate-950" />
-                    <span>Descargar Plantilla Multi-Hojas (.XLS)</span>
+                    <RefreshCw className={`w-3.5 h-3.5 ${supabaseExplorerLoading ? 'animate-spin' : ''}`} />
+                    <span>{supabaseExplorerLoading ? 'Refrescando...' : 'Refrescar Tablas'}</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={downloadOrdersCsvTemplate}
-                    className="px-4 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Download className="w-4 h-4 text-indigo-400" />
-                    <span>Descargar CSV Pedidos</span>
-                  </button>
+
                   <a
                     href="/proyecto-gregory-izquierdo.zip"
                     download="proyecto-gregory-izquierdo.zip"
-                    className="px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg transition flex items-center justify-center gap-1.5 cursor-pointer"
                     title="Descargar paquete completo del proyecto en formato .ZIP"
                   >
-                    <Download className="w-4 h-4 text-white" />
-                    <span>Descargar Código .ZIP</span>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Código Fuente .ZIP</span>
                   </a>
                 </div>
               </div>
 
-              {/* Step-by-Step Guide */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-800 text-xs">
-                <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
-                  <strong className="text-emerald-400 font-black block text-sm">Paso 1: Descargar</strong>
-                  <p className="text-slate-300 text-[11px]">
-                    Descarga el archivo <code>.xls</code> haciendo clic en el botón superior. Contiene las 6 pestañas maestras.
+              {/* Tarjetas de Métricas de Conexión en Vivo y Formulario de Ajustes */}
+              <div className="space-y-3 pt-4 border-t border-slate-800">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-medium">Estado de Conexión</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowCredentialsForm(!showCredentialsForm)}
+                        className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold underline cursor-pointer"
+                      >
+                        {showCredentialsForm ? 'Cerrar Ajustes' : 'Configurar'}
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                      <strong className={isSupabaseConfigured ? 'text-emerald-400 font-extrabold' : 'text-amber-400 font-extrabold'}>
+                        {isSupabaseConfigured ? '● Conectado (Nube Supabase)' : '○ Modo Sandbox (Memoria)'}
+                      </strong>
+                    </div>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <span className="text-slate-400 font-medium">Motor de Datos</span>
+                    <div>
+                      <strong className="text-white font-extrabold">PostgreSQL 15 + Supabase SDK</strong>
+                    </div>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <span className="text-slate-400 font-medium">Credenciales Activas</span>
+                    <div className="truncate" title={isSupabaseConfigured ? 'Personalizadas guardadas' : 'Defecto del sistema'}>
+                      <strong className="text-indigo-300 font-extrabold">
+                        {localStorage.getItem('CUSTOM_SUPABASE_URL') ? 'Personalizadas (localStorage)' : 'Configuración de Servidor'}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Formulario de Configuración Directa */}
+                {showCredentialsForm && (
+                  <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs space-y-3 animate-fadeIn">
+                    <h4 className="font-bold text-white text-sm">Configuración de Conexión Directa a Supabase</h4>
+                    <p className="text-slate-400 text-[11px] leading-relaxed">
+                      Conecta la aplicación directamente a tu propio proyecto de Supabase ingresando las credenciales de tu proyecto. Se almacenarán localmente de forma segura en tu navegador.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="block text-slate-400 font-medium">Supabase Project URL:</label>
+                        <input
+                          type="text"
+                          placeholder="https://xxxx.supabase.co"
+                          value={customUrlInput}
+                          onChange={(e) => setCustomUrlInput(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-slate-400 font-medium">Supabase Anon Key:</label>
+                        <input
+                          type="password"
+                          placeholder="eyJhbGciOiJIUzI1NiIsIn..."
+                          value={customKeyInput}
+                          onChange={(e) => setCustomKeyInput(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveCredentials}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] cursor-pointer"
+                      >
+                        Guardar y Conectar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleResetCredentials}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[11px] cursor-pointer"
+                      >
+                        Restaurar Valores por Defecto
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* PANEL DE CONTROL DE SINCRONIZACIÓN EN TIEMPO REAL */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Columna Izquierda: Estadísticas de Registro Local */}
+              <div className="lg:col-span-2 p-6 rounded-3xl bg-white border border-slate-200 space-y-4">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black text-slate-800 flex items-center gap-1.5">
+                    <span>Estado y Conteo de Registros Locales</span>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
+                      Listo para sincronizar
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    A continuación se listan las entidades y el número de registros en la memoria local del cliente que se fusionarán con Supabase de forma bidireccional.
                   </p>
                 </div>
-                <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
-                  <strong className="text-cyan-400 font-black block text-sm">Paso 2: Subir a Google Drive</strong>
-                  <p className="text-slate-300 text-[11px]">
-                    Entra a <strong>drive.google.com</strong>, sube el archivo descargado y haz clic en <em>"Abrir con Hojas de Cálculo de Google"</em>.
-                  </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5">
+                    <span className="text-slate-500 font-medium block">👥 Clientes</span>
+                    <div className="text-lg font-black text-slate-800 font-mono tabular-nums">
+                      {customerUsers.length}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5">
+                    <span className="text-slate-500 font-medium block">🛍️ Productos</span>
+                    <div className="text-lg font-black text-slate-800 font-mono tabular-nums">
+                      {products.length}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5">
+                    <span className="text-slate-500 font-medium block">💳 M. de Pago</span>
+                    <div className="text-lg font-black text-slate-800 font-mono tabular-nums">
+                      {paymentMethods.length}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5">
+                    <span className="text-slate-500 font-medium block">❓ Preguntas FAQ</span>
+                    <div className="text-lg font-black text-slate-800 font-mono tabular-nums">
+                      {faqItems.length}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5">
+                    <span className="text-slate-500 font-medium block">💎 Abonos Zeny</span>
+                    <div className="text-lg font-black text-slate-800 font-mono tabular-nums">
+                      {walletTopups.length}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5">
+                    <span className="text-slate-500 font-medium block">🏢 Franquicias</span>
+                    <div className="text-lg font-black text-slate-800 font-mono tabular-nums">
+                      {franchises?.length || 0}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5 col-span-2">
+                    <span className="text-slate-500 font-medium block">📝 Recargas de Franquicias</span>
+                    <div className="text-lg font-black text-slate-800 font-mono tabular-nums">
+                      {franchiseTopups?.length || 0}
+                    </div>
+                  </div>
                 </div>
-                <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
-                  <strong className="text-indigo-400 font-black block text-sm">Paso 3: Vincular Enlace</strong>
-                  <p className="text-slate-300 text-[11px]">
-                    Copia la URL o ID de tu hoja en Drive y pégala en el campo de abajo para sincronizar tus pedidos y ventas en vivo.
-                  </p>
+              </div>
+
+              {/* Columna Derecha: Botón de Sincronización y Logs */}
+              <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 text-white space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider">
+                      Controlador de Sincronización
+                    </h4>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Haz clic abajo para iniciar la sincronización bidireccional inmediata. El sistema descargará nuevos registros en la nube y subirá las inserciones locales creadas fuera de línea o recientemente.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleManualSupabaseSync}
+                    disabled={isDbSyncing || !isSupabaseConfigured}
+                    className={`w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition shadow-md ${
+                      isDbSyncing
+                        ? 'bg-amber-600 text-white cursor-not-allowed animate-pulse'
+                        : !isSupabaseConfigured
+                        ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                        : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    }`}
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isDbSyncing ? 'animate-spin' : ''}`} />
+                    <span>
+                      {isDbSyncing
+                        ? 'Sincronizando Base de Datos...'
+                        : !isSupabaseConfigured
+                        ? 'Configura Supabase para Sincronizar'
+                        : 'Sincronizar Todo con Supabase'}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Consola de logs */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] text-slate-400 font-mono block">Log de Sincronización:</span>
+                  <div className="p-3.5 rounded-xl bg-black border border-slate-800 font-mono text-[10px] text-emerald-400 h-28 overflow-y-auto space-y-1 scrollbar-thin">
+                    {dbSyncLogs.length === 0 ? (
+                      <span className="text-slate-500">Esperando inicio...</span>
+                    ) : (
+                      dbSyncLogs.map((log, i) => (
+                        <div key={i} className="truncate">{log}</div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Link Input Section */}
-            <div className="p-5 rounded-3xl bg-indigo-50/70 border border-indigo-200">
-              <div className="flex items-center gap-3 mb-2">
-                <FileSpreadsheet className="w-6 h-6 text-indigo-600" />
-                <h3 className="text-base font-bold text-slate-900">
-                  Vincular tu Archivo Maestro de Google Drive
-                </h3>
+            {/* TABLA DE CONTENIDOS Y SELECTOR DE TABLAS DE SUPABASE */}
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-4 rounded-3xl border border-slate-200">
+                <div className="space-y-0.5">
+                  <h4 className="text-sm font-black text-slate-800 flex items-center gap-1.5">
+                    <span>Selecciona una Tabla para Explorar</span>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold uppercase">
+                      SQL DB
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500">Haz clic en una pestaña para cargar los registros en vivo desde Supabase, o usa la búsqueda libre abajo.</p>
+                </div>
+
+                {/* Consulta de Tabla Personalizada Libre */}
+                <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-2xl border border-slate-200 w-full sm:w-auto sm:max-w-md shrink-0">
+                  <input
+                    type="text"
+                    placeholder="Buscar tabla personalizada (ej. logs)..."
+                    value={customTableName}
+                    onChange={(e) => setCustomTableName(e.target.value)}
+                    className="w-full bg-transparent text-slate-800 text-xs font-semibold focus:outline-none placeholder-slate-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (customTableName.trim()) {
+                        setSelectedSupabaseTable(customTableName.trim());
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold cursor-pointer shrink-0 transition"
+                  >
+                    Consultar
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 max-w-3xl">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSupabaseTable('categories')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedSupabaseTable === 'categories'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    📂 Categorías
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSupabaseTable('parent_accounts')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedSupabaseTable === 'parent_accounts'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    📺 Cuentas Madre
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSupabaseTable('account_profiles')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedSupabaseTable === 'account_profiles'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    👤 Perfiles
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSupabaseTable('refunds')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedSupabaseTable === 'refunds'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    💸 Reversos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSupabaseTable('customers')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedSupabaseTable === 'customers'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    👥 Clientes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSupabaseTable('products')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedSupabaseTable === 'products'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    🛍️ Productos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSupabaseTable('payment_methods')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedSupabaseTable === 'payment_methods'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    💳 Métodos de Pago
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSupabaseTable('faq_items')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedSupabaseTable === 'faq_items'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    ❓ FAQ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSupabaseTable('wallet_topups')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedSupabaseTable === 'wallet_topups'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    💎 Abonos Zeny
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSupabaseTable('franchises')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedSupabaseTable === 'franchises'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    🏢 Franquicias
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSupabaseTable('franchise_topups')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedSupabaseTable === 'franchise_topups'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    📈 Abonos Franquicias
+                  </button>
+                </div>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                Pega el enlace completo o el ID de tu hoja de Google Drive para mantener respaldado todo el inventario de cuentas, clientes y transacciones:
-              </p>
 
-              <form onSubmit={handleCustomSheetSubmit} className="flex gap-2 mb-3">
-                <input
-                  type="text"
-                  value={customSheetUrlOrId}
-                  onChange={(e) => setCustomSheetUrlOrId(e.target.value)}
-                  placeholder="Pega el enlace o ID de tu hoja de Google Drive (ej. https://docs.google.com/spreadsheets/d/...)"
-                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-indigo-500"
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-xs"
-                >
-                  Vincular Hoja
-                </button>
-              </form>
+              {/* Botón de Inserción de Prueba e Instructivo de Tablas */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-indigo-50/70 border border-indigo-100 rounded-3xl text-xs">
+                <div className="space-y-1 text-slate-700">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping" />
+                    <span>Consola de Acciones en Vivo:</span>
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Inserta un registro real de demostración en la tabla seleccionada para comprobar que se escribe en Supabase de forma instantánea.
+                  </p>
+                </div>
 
-              {sheetsState.isConnected && (
-                <div className="p-3 bg-white rounded-xl border border-indigo-100 flex items-center justify-between text-xs">
-                  <div>
-                    <span className="font-bold text-emerald-800">✓ Conectado: </span>
-                    <span className="font-semibold text-slate-900">{sheetsState.spreadsheetName}</span>
-                  </div>
-                  {sheetsState.spreadsheetUrl && (
-                    <a
-                      href={sheetsState.spreadsheetUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-600 font-semibold flex items-center gap-1 hover:underline"
-                    >
-                      <span>Abrir en Google Drive</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
+                <div className="flex items-center gap-2 shrink-0">
+                  {supabaseTestInsertStatus && (
+                    <span className="text-[11px] text-indigo-700 bg-white border border-indigo-100 px-3 py-1.5 rounded-xl font-bold font-mono animate-fadeIn">
+                      {supabaseTestInsertStatus}
+                    </span>
                   )}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setSupabaseTestInsertStatus('Insertando...');
+                      try {
+                        if (selectedSupabaseTable === 'categories') {
+                          const testId = `cat-test-${Math.floor(1000 + Math.random() * 9000)}`;
+                          const { error } = await supabase.from('categories').insert({
+                            id: testId,
+                            name: `Streaming Test ${Math.floor(100 + Math.random() * 900)}`,
+                            icon: 'Tv',
+                            description: 'Categoría de prueba creada desde el panel de control de base de datos Supabase.'
+                          });
+                          if (error) throw error;
+                          setSupabaseTestInsertStatus(`¡Éxito! Categoría insertada ID: ${testId}`);
+                        } else if (selectedSupabaseTable === 'parent_accounts') {
+                          const randomAcc = Math.floor(1000 + Math.random() * 9000);
+                          const { error } = await supabase.from('parent_accounts').insert({
+                            email: `proveedor-${randomAcc}@test.com`,
+                            password: 'password-secreta',
+                            provider: 'Netflix 4K Test',
+                            max_slots: 5,
+                            active_slots: 0,
+                            purchase_price: 9.99
+                          });
+                          if (error) throw error;
+                          setSupabaseTestInsertStatus(`¡Éxito! Cuenta madre creada para proveedor-${randomAcc}`);
+                        } else if (selectedSupabaseTable === 'account_profiles') {
+                          const { error } = await supabase.from('account_profiles').insert({
+                            parent_account_id: 1,
+                            profile_name: `Perfil Test ${Math.floor(10 + Math.random() * 90)}`,
+                            pin: '1234',
+                            assigned_customer: 'Gregory Izquierdo'
+                          });
+                          if (error) throw error;
+                          setSupabaseTestInsertStatus(`¡Éxito! Perfil asignado.`);
+                        } else if (selectedSupabaseTable === 'refunds') {
+                          const { error } = await supabase.from('refunds').insert({
+                            order_id: `ORD-TEST-${Math.floor(100 + Math.random() * 900)}`,
+                            customer_email: 'test@cliente.com',
+                            amount: 5.50,
+                            notes: 'Reverso simulado desde administrador Supabase.'
+                          });
+                          if (error) throw error;
+                          setSupabaseTestInsertStatus('¡Éxito! Log de reverso creado.');
+                        } else if (selectedSupabaseTable === 'customers') {
+                          const testId = `cust-test-${Math.floor(1000 + Math.random() * 9000)}`;
+                          const { error } = await supabase.from('customers').insert({
+                            id: testId,
+                            name: `Cliente Prueba ${Math.floor(10 + Math.random() * 90)}`,
+                            email: `cliente-${testId}@test.com`,
+                            phone: `58412${Math.floor(1000000 + Math.random() * 9000000)}`,
+                            role: 'cliente',
+                            zeny_balance: 50.00
+                          });
+                          if (error) throw error;
+                          setSupabaseTestInsertStatus(`¡Éxito! Cliente creado: ${testId}`);
+                        } else if (selectedSupabaseTable === 'products') {
+                          const testId = `prod-test-${Math.floor(1000 + Math.random() * 9000)}`;
+                          const { error } = await supabase.from('products').insert({
+                            id: testId,
+                            name: `Netflix Premium ${Math.floor(10 + Math.random() * 90)}`,
+                            category: 'cat-netflix',
+                            price_usd: 3.50,
+                            price_bs: 128.50,
+                            duration: '30 Días',
+                            account_type: 'Perfil Privado',
+                            description: 'Cuenta de prueba creada instantáneamente en Supabase.',
+                            stock: 10
+                          });
+                          if (error) throw error;
+                          setSupabaseTestInsertStatus(`¡Éxito! Producto creado: ${testId}`);
+                        } else if (selectedSupabaseTable === 'payment_methods') {
+                          const testId = `pm-test-${Math.floor(1000 + Math.random() * 9000)}`;
+                          const { error } = await supabase.from('payment_methods').insert({
+                            id: testId,
+                            name: `Pago Móvil ${Math.floor(10 + Math.random() * 90)}`,
+                            bank_name: 'Banco Mercantil',
+                            doc_id: 'V-20111222',
+                            phone: '04125555555',
+                            payment_instructions: 'Enviar pago móvil y reportar captura.',
+                            currency: 'VES',
+                            is_active: true
+                          });
+                          if (error) throw error;
+                          setSupabaseTestInsertStatus(`¡Éxito! Método de pago creado.`);
+                        } else if (selectedSupabaseTable === 'faq_items') {
+                          const testId = `faq-test-${Math.floor(1000 + Math.random() * 9000)}`;
+                          const { error } = await supabase.from('faq_items').insert({
+                            id: testId,
+                            category: 'Soporte',
+                            question: '¿Cómo reportar una falla?',
+                            answer: 'Puedes reportarla directamente desde tu portal de cliente con un par de clics.',
+                            sort_order: 1
+                          });
+                          if (error) throw error;
+                          setSupabaseTestInsertStatus(`¡Éxito! Pregunta frecuente creada.`);
+                        } else if (selectedSupabaseTable === 'wallet_topups') {
+                          const testId = `top-test-${Math.floor(1000 + Math.random() * 9000)}`;
+                          const { error } = await supabase.from('wallet_topups').insert({
+                            id: testId,
+                            customer_email: 'juan.perez@test.com',
+                            amount_usd: 20.00,
+                            reference: `REF-${Math.floor(100000 + Math.random() * 900000)}`,
+                            notes: 'Recarga de saldo simulada.'
+                          });
+                          if (error) throw error;
+                          setSupabaseTestInsertStatus(`¡Éxito! Abono Zeny creado.`);
+                        } else if (selectedSupabaseTable === 'franchises') {
+                          const testId = `franq-${Math.floor(1000 + Math.random() * 9000)}`;
+                          const { error } = await supabase.from('franchises').insert({
+                            id: testId,
+                            business_name: `Franquicia Prueba ${Math.floor(10 + Math.random() * 90)}`,
+                            owner_name: `Socio ${Math.floor(10 + Math.random() * 90)}`,
+                            email: `test-${testId}@franquicia.com`,
+                            phone: `+58424${Math.floor(1000000 + Math.random() * 9000000)}`,
+                            monthly_fee_usd: 25.00,
+                            available_master_balance_usd: 120.00,
+                            subscription_status: 'active'
+                          });
+                          if (error) throw error;
+                          setSupabaseTestInsertStatus(`¡Éxito! Franquiciado creado.`);
+                        } else if (selectedSupabaseTable === 'franchise_topups') {
+                          const testId = `top-fran-${Math.floor(1000 + Math.random() * 9000)}`;
+                          const { error } = await supabase.from('franchise_topups').insert({
+                            id: testId,
+                            franchise_id: 'franq-caracas',
+                            franchise_name: 'StreamPlus Caracas',
+                            amount_usd: 75.00,
+                            payment_method: 'Pago Móvil BCV',
+                            reference_number: `REF-${Math.floor(100000 + Math.random() * 900000)}`,
+                            status: 'pending'
+                          });
+                          if (error) throw error;
+                          setSupabaseTestInsertStatus(`¡Éxito! Abono de franquicia creado.`);
+                        }
+                        fetchSupabaseRecords(selectedSupabaseTable);
+                        setTimeout(() => setSupabaseTestInsertStatus(null), 3000);
+                      } catch (err: any) {
+                        console.error(err);
+                        setSupabaseTestInsertStatus(`Error: ${err.message || 'Error en inserción'}`);
+                      }
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold transition cursor-pointer flex items-center gap-1.5 shadow-md"
+                  >
+                    <span>➕ Crear Registro de Prueba en Supabase</span>
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* Structure Breakdown */}
-            <div className="p-5 rounded-3xl bg-slate-50 border border-slate-200">
-              <h4 className="font-bold text-slate-900 text-sm mb-3">
-                Pestañas y Estructura Incluida en la Plantilla con 1 Ejemplo Guía:
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-1">
-                  <div className="font-bold text-indigo-700 flex items-center gap-1.5">
-                    <span>1. Pedidos</span>
-                    <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-[10px]">16 columnas</span>
+              {/* PANEL DE REGISTROS DE LA BASE DE DATOS */}
+              <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">
+                <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse" />
+                    <span className="font-extrabold text-xs uppercase tracking-wider">
+                      Registros de Tabla: <span className="font-mono text-sky-300">{selectedSupabaseTable}</span>
+                    </span>
                   </div>
-                  <p className="text-slate-500 text-[11px]">Registro de todas las compras con fechas de corte, credenciales y comprobantes bancarios.</p>
-                  <p className="text-[10px] text-slate-400 font-mono">Ejemplo: ORD-2026-001 (Carlos Rodríguez - Netflix 4K)</p>
+                  <span className="text-[10px] text-slate-400 font-bold">
+                    Mostrando últimos 50 registros
+                  </span>
                 </div>
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-1">
-                  <div className="font-bold text-emerald-700 flex items-center gap-1.5">
-                    <span>2. Clientes</span>
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-[10px]">9 columnas</span>
-                  </div>
-                  <p className="text-slate-500 text-[11px]">Base de datos de compradores registrados, revendedores y saldo en wallet Zeny.</p>
-                  <p className="text-[10px] text-slate-400 font-mono">Ejemplo: USR-001 (María González - Saldo $15.00)</p>
-                </div>
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-1">
-                  <div className="font-bold text-amber-700 flex items-center gap-1.5">
-                    <span>3. Compras a Proveedores</span>
-                    <span className="px-1.5 py-0.5 rounded bg-amber-50 text-[10px]">14 columnas</span>
-                  </div>
-                  <p className="text-slate-500 text-[11px]">Cuentas madre compradas en USDT o USD, claves maestras, slots y PINes.</p>
-                  <p className="text-[10px] text-slate-400 font-mono">Ejemplo: PUR-001 (Netflix 5 Pantallas - $8.00 USDT)</p>
-                </div>
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-1">
-                  <div className="font-bold text-rose-700 flex items-center gap-1.5">
-                    <span>4. Incidencias</span>
-                    <span className="px-1.5 py-0.5 rounded bg-rose-50 text-[10px]">10 columnas</span>
-                  </div>
-                  <p className="text-slate-500 text-[11px]">Reportes de fallas técnicas, caídas de señal, reactivaciones y soluciones.</p>
-                  <p className="text-[10px] text-slate-400 font-mono">Ejemplo: INC-001 (Max - Pantalla en uso solucionada)</p>
-                </div>
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-1">
-                  <div className="font-bold text-cyan-700 flex items-center gap-1.5">
-                    <span>5. Productos</span>
-                    <span className="px-1.5 py-0.5 rounded bg-cyan-50 text-[10px]">9 columnas</span>
-                  </div>
-                  <p className="text-slate-500 text-[11px]">Catálogo de suscripciones, precios en USD/Bs y características del servicio.</p>
-                  <p className="text-[10px] text-slate-400 font-mono">Ejemplo: netflix (Netflix Premium 4K UHD - $3.50)</p>
-                </div>
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-1">
-                  <div className="font-bold text-slate-700 flex items-center gap-1.5">
-                    <span>6. Métodos de Pago</span>
-                    <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px]">7 columnas</span>
-                  </div>
-                  <p className="text-slate-500 text-[11px]">Datos de recepción bancaria, Pago Móvil, Binance Pay, Zelle y Zinli.</p>
-                  <p className="text-[10px] text-slate-400 font-mono">Ejemplo: pago_movil (Banesco - Cédula y Teléfono)</p>
+
+                {/* Tabla de Datos Dinámicos */}
+                <div className="overflow-x-auto">
+                  {supabaseExplorerLoading ? (
+                    <div className="p-12 text-center text-slate-400">
+                      <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin mx-auto mb-2" />
+                      <p className="font-bold text-slate-700 text-sm">Consultando Supabase en tiempo real...</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Estableciendo túnel SQL seguro...</p>
+                    </div>
+                  ) : supabaseExplorerError ? (
+                    <div className="p-8 text-center text-rose-600 bg-rose-50/50 space-y-4">
+                      <AlertCircle className="w-10 h-10 text-rose-500 mx-auto" />
+                      <div>
+                        <p className="font-black text-slate-900 text-base">⚠️ Error de Estructura de Base de Datos</p>
+                        <p className="text-xs text-rose-500 mt-1 max-w-md mx-auto">{supabaseExplorerError}</p>
+                      </div>
+                      
+                      {(supabaseExplorerError.includes('Could not find') || supabaseExplorerError.includes('PGRST205') || supabaseExplorerError.includes('relation') || supabaseExplorerError.includes('does not exist')) && (
+                        <div className="max-w-xl mx-auto p-5 rounded-2xl bg-white border border-rose-200 text-left text-slate-700 space-y-3 shadow-xs">
+                          <h5 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5 text-rose-700">
+                            <span>¿Por qué ocurre este error?</span>
+                          </h5>
+                          <p className="text-[11px] text-slate-600 leading-relaxed">
+                            Este error ocurre porque tu proyecto de Supabase está activo pero <strong>aún no has creado las tablas obligatorias</strong> en tu base de datos relacional.
+                          </p>
+                          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] space-y-2">
+                            <p className="font-bold text-slate-900">Pasos para solucionar en 20 segundos:</p>
+                            <ol className="list-decimal pl-4 space-y-1.5 text-slate-600">
+                              <li>Haz clic en el botón de abajo para <strong>copiar el Script SQL de inicialización</strong>.</li>
+                              <li>Entra en tu consola de <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-bold underline">Supabase Dashboard</a>.</li>
+                              <li>Ve a la pestaña <strong>SQL Editor</strong> en el menú lateral izquierdo.</li>
+                              <li>Haz clic en <strong>New Query</strong>, pega el código copiado y presiona <strong>Run</strong>. ¡Listo!</li>
+                            </ol>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(SUPABASE_SCHEMA_SQL);
+                              alert('¡Script SQL de inicialización copiado al portapapeles! Listo para pegar en el SQL Editor de tu consola Supabase.');
+                            }}
+                            className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-md transition cursor-pointer flex items-center justify-center gap-1.5"
+                          >
+                            <span>📋 Copiar Script SQL de Inicialización</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : supabaseRecords.length === 0 ? (
+                    <div className="p-12 text-center text-slate-400">
+                      <Layers className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="font-bold text-slate-700 text-sm">No se encontraron registros en `{selectedSupabaseTable}`</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {isSupabaseConfigured
+                          ? 'La tabla de la base de datos está vacía. Haz clic en "Crear Registro de Prueba" arriba.'
+                          : 'Estás usando el cliente fallback de memoria porque Supabase no tiene claves activas.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <table className="w-full text-xs text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200">
+                          {selectedSupabaseTable === 'categories' && (
+                            <>
+                              <th className="p-3">ID Categoría</th>
+                              <th className="p-3">Nombre</th>
+                              <th className="p-3">Ícono</th>
+                              <th className="p-3">Descripción</th>
+                            </>
+                          )}
+                          {selectedSupabaseTable === 'parent_accounts' && (
+                            <>
+                              <th className="p-3">ID</th>
+                              <th className="p-3">Email Proveedor</th>
+                              <th className="p-3">Proveedor / Servicio</th>
+                              <th className="p-3">Slots Máx</th>
+                              <th className="p-3">Slots Activos</th>
+                              <th className="p-3">Precio Compra ($)</th>
+                            </>
+                          )}
+                          {selectedSupabaseTable === 'account_profiles' && (
+                            <>
+                              <th className="p-3">ID Perfil</th>
+                              <th className="p-3">ID Cuenta Madre</th>
+                              <th className="p-3">Nombre Perfil</th>
+                              <th className="p-3">PIN</th>
+                              <th className="p-3">Cliente Asignado</th>
+                            </>
+                          )}
+                          {selectedSupabaseTable === 'refunds' && (
+                            <>
+                              <th className="p-3">ID Reverso</th>
+                              <th className="p-3">ID Pedido</th>
+                              <th className="p-3">Email Cliente</th>
+                              <th className="p-3">Monto Reverso ($)</th>
+                              <th className="p-3">Notas / Motivo</th>
+                            </>
+                          )}
+                          {selectedSupabaseTable === 'customers' && (
+                            <>
+                              <th className="p-3">ID Cliente</th>
+                              <th className="p-3">Nombre Completo</th>
+                              <th className="p-3">Email</th>
+                              <th className="p-3">Teléfono</th>
+                              <th className="p-3">Rol</th>
+                              <th className="p-3">Billetera Zeny ($)</th>
+                            </>
+                          )}
+                          {selectedSupabaseTable === 'products' && (
+                            <>
+                              <th className="p-3">ID Producto</th>
+                              <th className="p-3">Nombre</th>
+                              <th className="p-3">Duración</th>
+                              <th className="p-3">Tipo Cuenta</th>
+                              <th className="p-3">Precio ($)</th>
+                              <th className="p-3">Precio (Bs)</th>
+                              <th className="p-3">Stock</th>
+                            </>
+                          )}
+                          {selectedSupabaseTable === 'payment_methods' && (
+                            <>
+                              <th className="p-3">ID</th>
+                              <th className="p-3">Método</th>
+                              <th className="p-3">Banco / Red</th>
+                              <th className="p-3">Identificación</th>
+                              <th className="p-3">Teléfono</th>
+                              <th className="p-3">Moneda</th>
+                            </>
+                          )}
+                          {selectedSupabaseTable === 'faq_items' && (
+                            <>
+                              <th className="p-3">ID</th>
+                              <th className="p-3">Categoría</th>
+                              <th className="p-3">Pregunta</th>
+                              <th className="p-3">Respuesta</th>
+                              <th className="p-3">Orden</th>
+                            </>
+                          )}
+                          {selectedSupabaseTable === 'wallet_topups' && (
+                            <>
+                              <th className="p-3">ID Abono</th>
+                              <th className="p-3">Email Cliente</th>
+                              <th className="p-3">Monto Zeny ($)</th>
+                              <th className="p-3">Referencia</th>
+                              <th className="p-3">Notas</th>
+                            </>
+                          )}
+                          {selectedSupabaseTable === 'franchises' && (
+                            <>
+                              <th className="p-3">ID Franquicia</th>
+                              <th className="p-3">Nombre Comercial</th>
+                              <th className="p-3">Titular</th>
+                              <th className="p-3">Email</th>
+                              <th className="p-3">Suscripción</th>
+                              <th className="p-3">Fondo Master ($)</th>
+                            </>
+                          )}
+                          {selectedSupabaseTable === 'franchise_topups' && (
+                            <>
+                              <th className="p-3">ID Abono F.</th>
+                              <th className="p-3">Franquicia</th>
+                              <th className="p-3">Monto ($)</th>
+                              <th className="p-3">Método</th>
+                              <th className="p-3">Referencia</th>
+                              <th className="p-3">Estado</th>
+                            </>
+                          )}
+                          {!['categories', 'parent_accounts', 'account_profiles', 'refunds', 'customers', 'products', 'payment_methods', 'faq_items', 'wallet_topups', 'franchises', 'franchise_topups'].includes(selectedSupabaseTable) && (
+                            <>
+                              {supabaseRecords.length > 0 ? (
+                                Object.keys(supabaseRecords[0]).map((key) => (
+                                  <th key={key} className="p-3 capitalize">{key.replace(/_/g, ' ')}</th>
+                                ))
+                              ) : (
+                                <th className="p-3">Registro</th>
+                              )}
+                            </>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {supabaseRecords.map((row, idx) => (
+                          <tr key={row.id || idx} className="hover:bg-slate-50 transition font-medium text-slate-700">
+                            {selectedSupabaseTable === 'categories' && (
+                              <>
+                                <td className="p-3 font-mono text-indigo-600 font-black">{row.id}</td>
+                                <td className="p-3 text-slate-900 font-bold">{row.name}</td>
+                                <td className="p-3 font-mono text-slate-500">{row.icon || 'Tv'}</td>
+                                <td className="p-3 text-slate-500 truncate max-w-xs" title={row.description}>{row.description}</td>
+                              </>
+                            )}
+                            {selectedSupabaseTable === 'parent_accounts' && (
+                              <>
+                                <td className="p-3 font-mono text-indigo-600 font-black">{row.id}</td>
+                                <td className="p-3 text-slate-900 font-bold">{row.email}</td>
+                                <td className="p-3 font-bold text-slate-500">{row.provider}</td>
+                                <td className="p-3 font-mono text-slate-500">{row.max_slots} slots</td>
+                                <td className="p-3 font-mono font-extrabold text-indigo-600">{row.active_slots} slots</td>
+                                <td className="p-3 font-mono font-extrabold text-emerald-600">${row.purchase_price?.toFixed(2)}</td>
+                              </>
+                            )}
+                            {selectedSupabaseTable === 'account_profiles' && (
+                              <>
+                                <td className="p-3 font-mono text-indigo-600 font-black">{row.id}</td>
+                                <td className="p-3 font-mono text-slate-500">{row.parent_account_id}</td>
+                                <td className="p-3 text-slate-900 font-bold">{row.profile_name}</td>
+                                <td className="p-3 font-mono text-slate-500">{row.pin || 'N/A'}</td>
+                                <td className="p-3 font-bold text-indigo-600">{row.assigned_customer || 'Sin asignar'}</td>
+                              </>
+                            )}
+                            {selectedSupabaseTable === 'refunds' && (
+                              <>
+                                <td className="p-3 font-mono text-indigo-600 font-black">{row.id}</td>
+                                <td className="p-3 font-mono text-slate-500">{row.order_id}</td>
+                                <td className="p-3 text-slate-900 font-bold">{row.customer_email}</td>
+                                <td className="p-3 font-mono font-extrabold text-rose-600">${row.amount?.toFixed(2)} USD</td>
+                                <td className="p-3 text-slate-500 truncate max-w-xs" title={row.notes}>{row.notes}</td>
+                              </>
+                            )}
+                            {selectedSupabaseTable === 'customers' && (
+                              <>
+                                <td className="p-3 font-mono text-indigo-600 font-black">{row.id}</td>
+                                <td className="p-3 text-slate-900 font-bold">{row.name}</td>
+                                <td className="p-3 text-slate-500 font-mono">{row.email || 'N/A'}</td>
+                                <td className="p-3 text-slate-500 font-mono">{row.phone || 'N/A'}</td>
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                                    row.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'
+                                  }`}>
+                                    {row.role}
+                                  </span>
+                                </td>
+                                <td className="p-3 font-mono font-extrabold text-emerald-600">${row.zeny_balance?.toFixed(2)} USD</td>
+                              </>
+                            )}
+                            {selectedSupabaseTable === 'products' && (
+                              <>
+                                <td className="p-3 font-mono text-indigo-600 font-black">{row.id}</td>
+                                <td className="p-3 text-slate-900 font-bold">{row.name}</td>
+                                <td className="p-3 font-mono text-slate-500">{row.duration || 'N/A'}</td>
+                                <td className="p-3 font-bold text-indigo-600 text-[11px]">{row.account_type || 'N/A'}</td>
+                                <td className="p-3 font-mono font-extrabold text-emerald-600">${row.price_usd?.toFixed(2)}</td>
+                                <td className="p-3 font-mono text-slate-500">Bs {row.price_bs?.toFixed(2)}</td>
+                                <td className="p-3 font-mono font-black text-slate-900">{row.stock} uds</td>
+                              </>
+                            )}
+                            {selectedSupabaseTable === 'payment_methods' && (
+                              <>
+                                <td className="p-3 font-mono text-indigo-600 font-black">{row.id}</td>
+                                <td className="p-3 text-slate-900 font-bold">{row.name}</td>
+                                <td className="p-3 font-bold text-slate-500">{row.bank_name || 'N/A'}</td>
+                                <td className="p-3 font-mono text-slate-500">{row.doc_id || 'N/A'}</td>
+                                <td className="p-3 font-mono text-slate-500">{row.phone || 'N/A'}</td>
+                                <td className="p-3 font-mono font-extrabold text-indigo-600">{row.currency}</td>
+                              </>
+                            )}
+                            {selectedSupabaseTable === 'faq_items' && (
+                              <>
+                                <td className="p-3 font-mono text-indigo-600 font-black">{row.id}</td>
+                                <td className="p-3 font-bold text-indigo-600">{row.category}</td>
+                                <td className="p-3 text-slate-950 font-bold">{row.question}</td>
+                                <td className="p-3 text-slate-500 truncate max-w-xs" title={row.answer}>{row.answer}</td>
+                                <td className="p-3 font-mono text-slate-400 font-bold">{row.sort_order}</td>
+                              </>
+                            )}
+                            {selectedSupabaseTable === 'wallet_topups' && (
+                              <>
+                                <td className="p-3 font-mono text-indigo-600 font-black">{row.id}</td>
+                                <td className="p-3 text-slate-900 font-bold">{row.customer_email}</td>
+                                <td className="p-3 font-mono font-extrabold text-emerald-600">${row.amount_usd?.toFixed(2)} USD</td>
+                                <td className="p-3 font-mono text-indigo-600 font-black">{row.reference || 'N/A'}</td>
+                                <td className="p-3 text-slate-500 truncate max-w-xs" title={row.notes}>{row.notes || '-'}</td>
+                              </>
+                            )}
+                            {selectedSupabaseTable === 'franchises' && (
+                              <>
+                                <td className="p-3 font-mono text-indigo-600 font-black">{row.id}</td>
+                                <td className="p-3 text-slate-900 font-bold">{row.business_name}</td>
+                                <td className="p-3 font-bold text-slate-700">{row.owner_name}</td>
+                                <td className="p-3 font-mono text-slate-500">{row.email || 'N/A'}</td>
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                                    row.subscription_status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                                  }`}>
+                                    {row.subscription_status || 'active'}
+                                  </span>
+                                </td>
+                                <td className="p-3 font-mono font-extrabold text-indigo-600">${row.available_master_balance_usd?.toFixed(2)} USD</td>
+                              </>
+                            )}
+                            {selectedSupabaseTable === 'franchise_topups' && (
+                              <>
+                                <td className="p-3 font-mono text-indigo-600 font-black">{row.id}</td>
+                                <td className="p-3 text-slate-900 font-bold">{row.franchise_name}</td>
+                                <td className="p-3 font-mono font-extrabold text-emerald-600">${row.amount_usd?.toFixed(2)}</td>
+                                <td className="p-3 font-semibold text-slate-500">{row.payment_method}</td>
+                                <td className="p-3 font-mono text-indigo-600 font-black">{row.reference_number || 'N/A'}</td>
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                                    row.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : row.status === 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                                  }`}>
+                                    {row.status}
+                                  </span>
+                                </td>
+                              </>
+                            )}
+                            {!['categories', 'parent_accounts', 'account_profiles', 'refunds', 'customers', 'products', 'payment_methods', 'faq_items', 'wallet_topups', 'franchises', 'franchise_topups'].includes(selectedSupabaseTable) && (
+                              <>
+                                {Object.values(row).map((val: any, i) => (
+                                  <td key={i} className="p-3 truncate max-w-xs text-xs font-mono" title={typeof val === 'object' ? JSON.stringify(val) : String(val)}>
+                                    {typeof val === 'object' ? JSON.stringify(val) : String(val)}
+                                  </td>
+                                ))}
+                              </>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
             </div>
@@ -4260,27 +5231,103 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
               {/* FAQ List */}
               <div className="lg:col-span-2 space-y-3">
                 <div className="text-xs font-bold text-slate-700 uppercase">Preguntas Registradas ({faqItems.length})</div>
-                {faqItems.map((faq) => (
-                  <div key={faq.id} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 text-[10px] font-bold uppercase">
-                        {faq.category}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const updated = faqItems.filter((f) => f.id !== faq.id);
-                          onUpdateFaq(updated);
-                        }}
-                        className="text-rose-500 hover:text-rose-700 text-xs font-semibold cursor-pointer"
-                      >
-                        Eliminar
-                      </button>
+                {faqItems.map((faq) => {
+                  const isEditing = editingFaqId === faq.id;
+                  return (
+                    <div key={faq.id} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2">
+                      {isEditing ? (
+                        <div className="space-y-3 text-xs">
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Categoría</label>
+                            <input
+                              type="text"
+                              value={editFaqCategory}
+                              onChange={(e) => setEditFaqCategory(e.target.value)}
+                              className="w-full px-3 py-1.5 rounded-xl border bg-slate-50 text-xs text-slate-800"
+                            />
+                          </div>
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Pregunta *</label>
+                            <input
+                              type="text"
+                              value={editFaqQuestion}
+                              onChange={(e) => setEditFaqQuestion(e.target.value)}
+                              className="w-full px-3 py-1.5 rounded-xl border bg-slate-50 text-xs text-slate-800"
+                            />
+                          </div>
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Respuesta *</label>
+                            <textarea
+                              value={editFaqAnswer}
+                              onChange={(e) => setEditFaqAnswer(e.target.value)}
+                              rows={3}
+                              className="w-full px-3 py-1.5 rounded-xl border bg-slate-50 text-xs text-slate-800"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!editFaqQuestion.trim() || !editFaqAnswer.trim()) return;
+                                const updated = faqItems.map((f) =>
+                                  f.id === faq.id
+                                    ? { ...f, category: editFaqCategory.trim() || 'General', question: editFaqQuestion.trim(), answer: editFaqAnswer.trim() }
+                                    : f
+                                );
+                                onUpdateFaq(updated);
+                                setEditingFaqId(null);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] cursor-pointer"
+                            >
+                              Guardar Cambios
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingFaqId(null)}
+                              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] cursor-pointer"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 text-[10px] font-bold uppercase">
+                              {faq.category}
+                            </span>
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingFaqId(faq.id);
+                                  setEditFaqCategory(faq.category);
+                                  setEditFaqQuestion(faq.question);
+                                  setEditFaqAnswer(faq.answer);
+                                }}
+                                className="text-indigo-600 hover:text-indigo-800 text-xs font-semibold cursor-pointer"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = faqItems.filter((f) => f.id !== faq.id);
+                                  onUpdateFaq(updated);
+                                }}
+                                className="text-rose-500 hover:text-rose-700 text-xs font-semibold cursor-pointer"
+                              >
+                                Eliminar
+                              </button>
+                            </div>
+                          </div>
+                          <div className="font-bold text-slate-900 text-sm">{faq.question}</div>
+                          <p className="text-slate-600 text-xs leading-relaxed">{faq.answer}</p>
+                        </>
+                      )}
                     </div>
-                    <div className="font-bold text-slate-900 text-sm">{faq.question}</div>
-                    <p className="text-slate-600 text-xs">{faq.answer}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Add FAQ Form */}
@@ -4358,15 +5405,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
           </div>
         )}
 
-        {/* Tab: Personalización de Marca */}
-        {activeTab === 'branding' && (
-          <div className="overflow-y-auto p-6">
-            <AdminBrandingManager
-              currentBranding={branding || { projectName: 'Gregori Izquierdo Streaming', primaryColor: '#6366f1', secondaryColor: '#8b5cf6', fontFamily: 'Inter' }}
-              onSaveBranding={onSaveBranding || (() => {})}
-            />
-          </div>
-        )}
+
 
         {/* Tab: Categorías de Servicios */}
         {activeTab === 'categories' && (
@@ -4511,6 +5550,231 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
             />
           </div>
         )}
+
+        {/* Tab: Personalización del Pie de Página (Footer) */}
+        {activeTab === 'footer_config' && (() => {
+          const safeBranding: AppBrandingConfig = branding || {
+            projectName: 'Gregory Izquierdo Streaming',
+            primaryColor: '#6366f1',
+            secondaryColor: '#8b5cf6',
+            fontFamily: 'Plus Jakarta Sans'
+          };
+          return (
+            <div className="p-6 overflow-y-auto space-y-6 text-xs text-slate-700">
+              <div className="p-6 rounded-3xl bg-gradient-to-r from-pink-950 via-slate-900 to-indigo-950 text-white shadow-xl border border-pink-500/20 space-y-2">
+                <h3 className="text-xl font-black tracking-tight flex items-center gap-2">
+                  <Palette className="w-5 h-5 text-pink-400" />
+                  <span>Personalización del Pie de Página (Footer)</span>
+                </h3>
+                <p className="text-slate-300 max-w-2xl leading-relaxed">
+                  Controla en tiempo real todos los textos, plataformas, métodos de pago, garantías y enlaces de soporte mostrados en la parte inferior de tu tienda. Los cambios se guardan localmente y se sincronizan de inmediato con Supabase.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Formulario Principal de Configuración */}
+                <div className="space-y-4 bg-white p-5 rounded-3xl border border-slate-200">
+                  <h4 className="font-extrabold text-slate-900 text-sm border-b pb-2 mb-3">Información General del Footer</h4>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Descripción del Pie de Página</label>
+                      <textarea
+                        rows={3}
+                        value={safeBranding.footerDescription || ''}
+                        onChange={(e) => {
+                          if (onSaveBranding) {
+                            onSaveBranding({
+                              ...safeBranding,
+                              footerDescription: e.target.value
+                            });
+                          }
+                        }}
+                        className="w-full px-3 py-2 rounded-xl border bg-slate-50 text-xs text-slate-800 focus:outline-hidden"
+                        placeholder="Explica brevemente la misión o servicios de tu tienda..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Texto de Garantía Resaltado</label>
+                      <input
+                        type="text"
+                        value={safeBranding.footerGuaranteeText || ''}
+                        onChange={(e) => {
+                          if (onSaveBranding) {
+                            onSaveBranding({
+                              ...safeBranding,
+                              footerGuaranteeText: e.target.value
+                            });
+                          }
+                        }}
+                        className="w-full px-3 py-2 rounded-xl border bg-slate-50 text-xs text-slate-800 focus:outline-hidden"
+                        placeholder="ej. Garantía 100% de duración"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Enlace de Soporte por WhatsApp (URL Oficial)</label>
+                      <input
+                        type="text"
+                        value={safeBranding.footerWhatsAppUrl || ''}
+                        onChange={(e) => {
+                          if (onSaveBranding) {
+                            onSaveBranding({
+                              ...safeBranding,
+                              footerWhatsAppUrl: e.target.value
+                            });
+                          }
+                        }}
+                        className="w-full px-3 py-2 rounded-xl border bg-slate-50 text-xs text-slate-800 focus:outline-hidden"
+                        placeholder="https://wa.me/58..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Columnas del Footer (Plataformas y Métodos de Pago) */}
+                <div className="space-y-6">
+                  {/* Columna: Plataformas */}
+                  <div className="bg-white p-5 rounded-3xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <h4 className="font-extrabold text-slate-900 text-sm">Columna: Plataformas</h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = safeBranding.footerPlatforms || [];
+                          const value = prompt('Ingresa el nombre de la nueva plataforma:');
+                          if (value && value.trim() && onSaveBranding) {
+                            onSaveBranding({
+                              ...safeBranding,
+                              footerPlatforms: [...current, value.trim()]
+                            });
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-[10px] font-bold cursor-pointer transition-colors"
+                      >
+                        + Agregar Plataforma
+                      </button>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                      {(safeBranding.footerPlatforms || []).map((p, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
+                          <span className="font-semibold text-slate-800 text-[11px]">{p}</span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const value = prompt('Editar plataforma:', p);
+                                if (value && value.trim() && onSaveBranding) {
+                                  const current = [...(safeBranding.footerPlatforms || [])];
+                                  current[idx] = value.trim();
+                                  onSaveBranding({
+                                    ...safeBranding,
+                                    footerPlatforms: current
+                                  });
+                                }
+                              }}
+                              className="text-indigo-600 hover:text-indigo-800 font-bold text-[10px] cursor-pointer"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (onSaveBranding) {
+                                  const current = (safeBranding.footerPlatforms || []).filter((_, i) => i !== idx);
+                                  onSaveBranding({
+                                    ...safeBranding,
+                                    footerPlatforms: current
+                                  });
+                                }
+                              }}
+                              className="text-rose-500 hover:text-rose-700 font-bold text-[10px] cursor-pointer"
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {(safeBranding.footerPlatforms || []).length === 0 && (
+                        <p className="text-slate-400 text-center py-4">No hay plataformas registradas en el footer.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Columna: Pasarela de Pago Manual */}
+                  <div className="bg-white p-5 rounded-3xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <h4 className="font-extrabold text-slate-900 text-sm">Columna: Métodos de Pago</h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = safeBranding.footerPaymentMethods || [];
+                          const value = prompt('Ingresa el nombre del nuevo método de pago:');
+                          if (value && value.trim() && onSaveBranding) {
+                            onSaveBranding({
+                              ...safeBranding,
+                              footerPaymentMethods: [...current, value.trim()]
+                            });
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-[10px] font-bold cursor-pointer transition-colors"
+                      >
+                        + Agregar Método
+                      </button>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                      {(safeBranding.footerPaymentMethods || []).map((pm, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
+                          <span className="font-semibold text-slate-800 text-[11px]">{pm}</span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const value = prompt('Editar método de pago:', pm);
+                                if (value && value.trim() && onSaveBranding) {
+                                  const current = [...(safeBranding.footerPaymentMethods || [])];
+                                  current[idx] = value.trim();
+                                  onSaveBranding({
+                                    ...safeBranding,
+                                    footerPaymentMethods: current
+                                  });
+                                }
+                              }}
+                              className="text-indigo-600 hover:text-indigo-800 font-bold text-[10px] cursor-pointer"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (onSaveBranding) {
+                                  const current = (safeBranding.footerPaymentMethods || []).filter((_, i) => i !== idx);
+                                  onSaveBranding({
+                                    ...safeBranding,
+                                    footerPaymentMethods: current
+                                  });
+                                }
+                              }}
+                              className="text-rose-500 hover:text-rose-700 font-bold text-[10px] cursor-pointer"
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {(safeBranding.footerPaymentMethods || []).length === 0 && (
+                        <p className="text-slate-400 text-center py-4">No hay métodos de pago registrados en el footer.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
 
         {/* Gift Modal Dialog */}

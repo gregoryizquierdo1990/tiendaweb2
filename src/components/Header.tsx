@@ -187,18 +187,18 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20 gap-2 sm:gap-4">
+        <div className="flex items-center justify-between py-2.5 sm:py-3.5 gap-2 sm:gap-4">
           {/* Logo & Brand Name */}
           <div className="flex items-center gap-2 sm:gap-3">
             <a href="#" className="flex items-center gap-2 group">
-              {/* New Logo Image */}
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border border-slate-200 bg-white p-1 shrink-0">
-                <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
+              {/* Logo Image with Focused Circular Crop and Sutil Elegant Border - Mayor tamaño para lectura de detalle */}
+              <div className="w-22 h-22 sm:w-28 sm:h-28 shrink-0 flex items-center justify-center rounded-full overflow-hidden border-2 border-indigo-600/30 shadow-md bg-white p-0.5 transition-transform duration-300 group-hover:scale-105">
+                <img src="/logo.png" alt="Logo" className="w-full h-full object-cover object-center rounded-full scale-[1.15]" />
               </div>
 
               <div className="flex flex-col truncate">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs sm:text-sm font-extrabold tracking-tight text-slate-900 leading-tight truncate">
+                  <span className="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 leading-tight truncate">
                     Emprendimiento Gregory Izquierdo
                   </span>
                 </div>

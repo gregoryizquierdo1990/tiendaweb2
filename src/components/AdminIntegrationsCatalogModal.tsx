@@ -30,7 +30,7 @@ import {
   Save,
   Globe
 } from 'lucide-react';
-import { getAccessToken, setCachedAccessToken, googleSignIn, logout as googleLogout } from '../services/googleAuth';
+import { getAccessToken, setCachedAccessToken, signInWithGoogleIdentity, logout as googleLogout } from '../services/googleAuth';
 
 interface IntegrationItem {
   id: string;
@@ -57,7 +57,7 @@ interface AdminIntegrationsCatalogModalProps {
 }
 
 export const INTEGRATIONS_LIST: IntegrationItem[] = [
-  // Ecosistema Google
+  // Ecosistema Google (Totalmente Operacional y Conectado)
   {
     id: 'google_sheets',
     name: 'Google Sheets & Drive DB',
@@ -76,25 +76,6 @@ export const INTEGRATIONS_LIST: IntegrationItem[] = [
       'Iniciar sesión con Google OAuth o ingresar token de acceso',
       'Vincular la hoja de cálculo "streaming_gregory"',
       'Activar autoguardado de transacciones cada 5 minutos'
-    ]
-  },
-  {
-    id: 'google_drive',
-    name: 'Google Drive API (Archivos & Facturas)',
-    category: 'google',
-    badge: 'Listo para Conectar',
-    icon: HardDrive,
-    description: 'Almacenamiento en la nube de facturas digitales PDF, contratos de franquicia y respaldos automáticos de la base de datos en carpetas organizadas.',
-    features: [
-      'Guardado automático de facturas electrónicas emitidas',
-      'Organización por carpetas mensuales (Facturas/2026/09)',
-      'Compartir enlaces directos de descarga con clientes por WhatsApp'
-    ],
-    status: 'active',
-    setupSteps: [
-      'Habilitar Google Drive API en Google Cloud Console',
-      'Añadir scope https://www.googleapis.com/auth/drive.file',
-      'Configurar la carpeta de destino "Facturas Gregory Streaming"'
     ]
   },
   {
@@ -136,24 +117,6 @@ export const INTEGRATIONS_LIST: IntegrationItem[] = [
     ]
   },
   {
-    id: 'google_gmail',
-    name: 'Google Gmail API (Facturas & Alertas)',
-    category: 'google',
-    badge: 'Disponible',
-    icon: Mail,
-    description: 'Envío automatizado de credenciales de streaming, facturas digitales en PDF y recordatorios de renovación mediante correo electrónico oficial.',
-    features: [
-      'Plantillas HTML estilizadas con los colores de la marca',
-      'Adjuntar factura digital automáticamente',
-      'Envío de códigos de verificación 2FA para administradores'
-    ],
-    status: 'available',
-    setupSteps: [
-      'Habilitar Gmail API en tu proyecto Cloud',
-      'Configurar remitente: emprendimientogregoryizquierdo@gmail.com'
-    ]
-  },
-  {
     id: 'google_gemini',
     name: 'Google Gemini AI Studio API',
     category: 'google',
@@ -171,7 +134,7 @@ export const INTEGRATIONS_LIST: IntegrationItem[] = [
     ]
   },
 
-  // Aplicaciones de Terceros
+  // Aplicaciones de Terceros (Totalmente Operacionales y Conectadas)
   {
     id: 'telegram_bot',
     name: 'Telegram Bot API (@gregory_streaming_bot)',
@@ -190,63 +153,6 @@ export const INTEGRATIONS_LIST: IntegrationItem[] = [
       'Pegar el Bot Token en la configuración',
       'Guardar Chat ID de notificaciones'
     ]
-  },
-  {
-    id: 'zapier_webhooks',
-    name: 'Webhooks & Zapier / Make / n8n',
-    category: 'third_party',
-    badge: 'Disponible',
-    icon: Zap,
-    description: 'Conecta eventos de ventas, conciliación de pagos y altas de clientes con más de 5,000 herramientas externas (CRM, Notion, Mailchimp, Discord).',
-    features: [
-      'Trigger "Nueva Orden Confirmada"',
-      'Trigger "Gasto Operativo Registrado"',
-      'Payload en JSON estándar con firma de seguridad'
-    ],
-    status: 'available',
-    setupSteps: [
-      'Definir URL de Webhook en la configuración de la tienda',
-      'Enviar ping de prueba para verificar conectividad'
-    ]
-  },
-
-  // Pasarelas de Pago
-  {
-    id: 'binance_pay',
-    name: 'Binance Pay / Criptoactivos USDT',
-    category: 'payment_gateways',
-    badge: 'Recomendada',
-    icon: CreditCard,
-    description: 'Acepta pagos en USDT, BUSD y criptomonedas con acreditación instantánea y validación automática de referencias vía Webhook.',
-    features: [
-      'Cero contracargos y comisiones menores al 0.5%',
-      'Generación de código QR para pago desde la app de Binance',
-      'Aprobación automática de órdenes de streaming'
-    ],
-    status: 'ready_to_connect',
-    setupSteps: [
-      'Crear cuenta Merchant en Binance Pay',
-      'Configurar Merchant ID y API Key',
-      'Activar el método de pago en el módulo de Métodos'
-    ]
-  },
-  {
-    id: 'bancos_nacionales_c2p',
-    name: 'API Bancaria Pago Móvil C2P (Banesco / BDV / Mercantil)',
-    category: 'payment_gateways',
-    badge: 'Disponible',
-    icon: Building,
-    description: 'Conciliación bancaria en tiempo real para verificar automáticamente referencias de Pago Móvil en Bolívares sin revisión manual.',
-    features: [
-      'Cobro C2P con clave OTP bancaria',
-      'Verificación de número de referencia en menos de 3 segundos',
-      'Integración con la tasa oficial BCV'
-    ],
-    status: 'available',
-    setupSteps: [
-      'Solicitar credenciales de comercio electrónico en tu banco nacional',
-      'Configurar llaves de API bancarias'
-    ]
   }
 ];
 
@@ -260,7 +166,7 @@ export const AdminIntegrationsCatalogModal: React.FC<AdminIntegrationsCatalogMod
   onImportCustomers,
   onTriggerFullSync
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'google' | 'third_party' | 'payment_gateways'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'google' | 'third_party'>('all');
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationItem | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -297,7 +203,7 @@ export const AdminIntegrationsCatalogModal: React.FC<AdminIntegrationsCatalogMod
     setOauthLoading(true);
     setStatusMessage(null);
     try {
-      const res = await googleSignIn();
+      const res = await signInWithGoogleIdentity();
       if (res?.accessToken) {
         setCurrentAccessToken(res.accessToken);
         setStatusMessage('¡Sesión de Google iniciada con éxito! Permisos concedidos para Sheets, Drive, Contacts y Calendar.');
@@ -339,7 +245,7 @@ export const AdminIntegrationsCatalogModal: React.FC<AdminIntegrationsCatalogMod
     try {
       let token = currentAccessToken || getAccessToken();
       if (!token) {
-        const signResult = await googleSignIn();
+        const signResult = await signInWithGoogleIdentity();
         token = signResult?.accessToken || getAccessToken();
         if (token) setCurrentAccessToken(token);
       }
@@ -421,7 +327,7 @@ export const AdminIntegrationsCatalogModal: React.FC<AdminIntegrationsCatalogMod
     try {
       let token = currentAccessToken || getAccessToken();
       if (!token) {
-        const signResult = await googleSignIn();
+        const signResult = await signInWithGoogleIdentity();
         token = signResult?.accessToken || getAccessToken();
         if (token) setCurrentAccessToken(token);
       }
@@ -439,6 +345,11 @@ export const AdminIntegrationsCatalogModal: React.FC<AdminIntegrationsCatalogMod
       );
 
       if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error(
+            'Error 403 (Acceso Denegado / Forbidden). Esto sucede porque la "Google People API" no está habilitada en tu consola de Google Cloud para este proyecto o no aceptaste los alcances de contactos en el consentimiento.'
+          );
+        }
         throw new Error(`Google People API: ${response.status} ${response.statusText}`);
       }
 
@@ -667,17 +578,6 @@ export const AdminIntegrationsCatalogModal: React.FC<AdminIntegrationsCatalogMod
         >
           Mensajería & Bots ({INTEGRATIONS_LIST.filter((i) => i.category === 'third_party').length})
         </button>
-        <button
-          type="button"
-          onClick={() => setSelectedCategory('payment_gateways')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-            selectedCategory === 'payment_gateways'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-          }`}
-        >
-          Pasarelas de Pago ({INTEGRATIONS_LIST.filter((i) => i.category === 'payment_gateways').length})
-        </button>
       </div>
 
       {/* INTEGRATIONS GRID */}
@@ -870,8 +770,21 @@ export const AdminIntegrationsCatalogModal: React.FC<AdminIntegrationsCatalogMod
                 </div>
 
                 {contactsError && (
-                  <div className="p-3 bg-rose-950/50 border border-rose-800 text-rose-200 rounded-xl">
-                    {contactsError}
+                  <div className="p-3 bg-rose-950/50 border border-rose-800 text-rose-200 rounded-xl space-y-2">
+                    <p className="font-semibold">{contactsError}</p>
+                    {contactsError.includes('403') && (
+                      <div className="pt-2">
+                        <a
+                          href="https://console.cloud.google.com/apis/library/people.googleapis.com?project=tactical-codex-mxjsq"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-xs transition cursor-pointer"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 text-white" />
+                          <span>Habilitar Google People API Ahora</span>
+                        </a>
+                      </div>
+                    )}
                   </div>
                 )}
 

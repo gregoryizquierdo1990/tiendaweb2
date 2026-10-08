@@ -1,33 +1,15 @@
 import React, { useState } from 'react';
 import { ChevronDown, HelpCircle, ShieldCheck, Zap, CreditCard, RefreshCw, Wallet } from 'lucide-react';
+import { useFaqItems } from '../store/useAppStore';
 
 export const FAQSection: React.FC = () => {
-  const faqs = [
-    {
-      q: '¿Cómo funciona la pasarela de pago con conciliación manual?',
-      a: 'Seleccionas tu plataforma y plan (1, 3, 6 o 12 meses). Puedes pagar en Dólares ($ USD) o en Bolívares (Bs.) calculados a la tasa oficial del BCV. Contamos con 9 métodos de pago: Cuenta en EEUU (Zelle / ACH), Airtm, Pago Móvil (Venezuela), Binance Pay (USDT), Banco Pichincha (Ecuador), Wally, Zinli, UglyCash y TDC (Banesco Conecta). Realizas la transferencia, ingresas tu número de referencia bancario y nuestro equipo valida el ingreso en minutos para activar tu suscripción.'
-    },
-    {
-      q: '¿Qué es la Wallet Zeny y cómo funciona?',
-      a: 'Zeny es la moneda y billetera interna de StreamSync (1 Zeny = 1 USD / 1 USDT / equivalente en Bs. a tasa BCV). Puedes solicitar recargas de saldo abonando por cualquiera de nuestros métodos de pago. Una vez que el administrador acredita tu saldo en tu cuenta, puedes adquirir o renovar suscripciones con 1 solo clic y activación inmediata sin esperas. Importante: este saldo es exclusivo para compras y renovaciones en la plataforma, no es retirable ni canjeable por efectivo.'
-    },
-    {
-      q: '¿Cómo se actualiza la tasa oficial del Banco Central de Venezuela (BCV)?',
-      a: 'Nuestra plataforma se conecta diariamente y de forma automática a los servicios oficiales del BCV para actualizar el valor en Bolívares. Además, el administrador tiene la facultad de ajustar o fijar la tasa manualmente desde el panel de control si fuera necesario.'
-    },
-    {
-      q: '¿Dónde veo mis cuentas activas y su fecha de vencimiento?',
-      a: 'Al registrarte en el Área de Clientes con tu correo y contraseña, dispones de una pestaña llamada "Mis Suscripciones & Vencimientos". Allí verás cada servicio contratado, tus credenciales de acceso (usuario, clave, perfil y PIN) y una cuenta regresiva con los días exactos que restan para el vencimiento de cada pantalla.'
-    },
-    {
-      q: '¿Cómo se guardan los datos en Google Sheets?',
-      a: 'La plataforma integra Google Sheets oficial de tu Google Drive. Cada pedido, usuario y recarga se refleja en tiempo real en tu hoja de cálculo, permitiéndote llevar el control administrativo de tu negocio sin depender de bases de datos externas.'
-    },
-    {
-      q: '¿Qué garantía tienen las cuentas de streaming?',
-      a: 'Todas nuestras cuentas y pantallas cuentan con garantía total durante el 100% de la duración contratada (30, 90, 180 o 365 días). Si alguna plataforma presenta caída o bloqueo por actualización, nuestro equipo de soporte te restituye el perfil o cuenta en menos de 30 minutos sin costo adicional.'
-    }
-  ];
+  const storeFaqItems = useFaqItems();
+
+  const faqs = storeFaqItems.map(f => ({
+    q: f.question,
+    a: f.answer,
+    cat: f.category
+  }));
 
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 

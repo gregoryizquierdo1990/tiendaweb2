@@ -1,6 +1,19 @@
 import { Product, PaymentMethod, Order, CustomerUser, WalletTopup, IncidentReport, FranchiseTenant, FranchiseTopupReport, SupplierPurchase } from '../types';
 
-export const INITIAL_PAYMENT_METHODS: PaymentMethod[] = [];
+export const INITIAL_PAYMENT_METHODS: PaymentMethod[] = [
+  {
+    id: 'pm-bnc-pagomovil',
+    name: 'Pago Movil BNC',
+    shortName: 'BNC Pago Movil',
+    category: 'venezuela',
+    holderName: 'BNC (0191)',
+    accountNumber: '04242809333',
+    accountTypeLabel: 'V-18931731',
+    instructions: 'Enviar Comprobante de pago',
+    acceptedCurrencies: ['BS'],
+    active: true
+  }
+];
 
 export const INITIAL_PRODUCTS: Product[] = [
   {
