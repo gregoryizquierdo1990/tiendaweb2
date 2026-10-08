@@ -997,7 +997,6 @@ export default function App() {
       localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(next));
       return next;
     });
-    syncProductToFirestore(updatedProduct);
     showNotification('success', `Tarjeta "${updatedProduct.name}" actualizada con éxito.`);
   };
 
@@ -1007,7 +1006,6 @@ export default function App() {
       localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(next));
       return next;
     });
-    syncProductToFirestore(newProduct);
     showNotification('success', `Servicio "${newProduct.name}" añadido al catálogo.`);
   };
 
@@ -1017,7 +1015,6 @@ export default function App() {
       localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(next));
       return next;
     });
-    deleteProductFromFirestore(productId);
     showNotification('info', 'Servicio eliminado del catálogo.');
   };
 
