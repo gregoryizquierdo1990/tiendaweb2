@@ -108,14 +108,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {product.warrantyMonths} mes garantía
         </span>
         <span className={`px-2.5 py-1 rounded-lg border font-semibold flex items-center gap-1 ${
-          (product.stock ?? 0) > 0
+          product.inStock
             ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
             : 'bg-rose-50 text-rose-700 border-rose-100'
         }`}>
           <span className={`w-1.5 h-1.5 rounded-full ${
-            (product.stock ?? 0) > 0 ? 'bg-emerald-500' : 'bg-rose-500'
+            product.inStock ? 'bg-emerald-500' : 'bg-rose-500'
           }`} />
-          {(product.stock ?? 0) > 0 ? `${product.stock} disponibles` : 'Agotado'}
+          {product.inStock ? (
+            product.isStockManual ? `${product.stock} disponibles` : 'Disponible'
+          ) : 'Agotado'}
         </span>
       </div>
 
@@ -187,16 +189,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       {/* CTA Button */}
       <button
         type="button"
-        disabled={(product.stock ?? 0) === 0}
+        disabled={!product.inStock}
         onClick={() => onSelectProduct(product, safeDuration)}
         className={`w-full py-3 px-4 rounded-2xl font-semibold text-sm shadow-xs transition flex items-center justify-center gap-2 cursor-pointer ${
-          (product.stock ?? 0) > 0
+          product.inStock
             ? 'bg-indigo-600 hover:bg-indigo-700 text-white group-hover:shadow-indigo-100'
             : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none hover:bg-slate-200'
         }`}
       >
-        <span>{(product.stock ?? 0) > 0 ? 'Comprar Ahora' : 'Agotado'}</span>
-        {(product.stock ?? 0) > 0 && (
+        <span>{product.inStock ? 'Comprar Ahora' : 'Agotado'}</span>
+        {product.inStock && (
           <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
         )}
       </button>
