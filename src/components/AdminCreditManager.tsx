@@ -215,7 +215,7 @@ export const AdminCreditManager: React.FC<AdminCreditManagerProps> = ({
       isSeniorCitizen: selectedCustomer.isSeniorCitizen,
       isTrustClient: selectedCustomer.isTrustClient,
       credentials: {
-        accountUser: accountUser.trim() || `${selectedCustomer.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@streaming.com`,
+        accountUser: accountUser.trim() || `${(selectedCustomer.name || '').toLowerCase().replace(/[^a-z0-9]/g, '')}@streaming.com`,
         accountPass: accountPass.trim() || 'Activa2026*',
         profileName: profileName.trim() || selectedCustomer.name.split(' ')[0],
         pin: pin.trim() || undefined,
