@@ -109,7 +109,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         // If user typed a phone number, attempt match in existing users or append domain
         const emailToLogin = cleanEmail.includes('@') 
           ? cleanEmail 
-          : `${cleanEmail.replace(/\D/g, '')}@cliente.gregoryizquierdo.xyz`;
+          : `${(cleanEmail || '').replace(/\D/g, '')}@cliente.gregoryizquierdo.xyz`;
 
         const loggedUser = await loginWithEmailPassword(emailToLogin, password);
         onLoginSuccess(loggedUser);
