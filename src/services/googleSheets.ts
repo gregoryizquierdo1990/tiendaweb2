@@ -1,6 +1,7 @@
 import { Order, Product, PaymentMethod, OrderStatus, CurrencyCode, CustomerUser, WalletTopup, IncidentReport, FaqItem, MessageTemplate } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_PAYMENT_METHODS } from '../data/defaultCatalog';
 import { safeFormatDate, safeIsoDate } from '../utils/formatters';
+import { isGoogleOAuthToken } from './googleAuth';
 
 const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3/files';
@@ -13,26 +14,52 @@ export interface DriveSpreadsheetItem {
 }
 
 /**
+ * Valida si un ID de hoja de cálculo es válido y no es un marcador de posición de prueba
+ */
+export function isValidSpreadsheetId(id: string | null | undefined): boolean {
+  if (!id || typeof id !== 'string') return false;
+  const clean = id.trim();
+  if (clean === '1VgIiuwKARkrbGDzgNQadRH0AGyj7LlMo' || clean.length < 15) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Lists user spreadsheets from Google Drive
  */
 export async function listUserSpreadsheets(accessToken: string): Promise<DriveSpreadsheetItem[]> {
+  if (!accessToken || !isGoogleOAuthToken(accessToken)) {
+    return [];
+  }
+
   const query = encodeURIComponent("mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
   const url = `${DRIVE_API_BASE}?q=${query}&fields=files(id,name,modifiedTime,webViewLink)&orderBy=modifiedTime desc&pageSize=20`;
 
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: 'application/json'
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json'
+      }
+    });
+
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        console.warn('Acceso a Google Drive no autorizado o permisos insuficientes (401/403).');
+        return [];
+      }
+      const errorText = await res.text().catch(() => '');
+      console.warn(`Aviso al listar hojas de Drive (${res.status}):`, errorText);
+      return [];
     }
-  });
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Error al listar archivos de Drive: ${res.status} ${errorText}`);
+    const data = await res.json();
+    return data.files || [];
+  } catch (err: any) {
+    console.warn('No se pudo consultar Google Drive API:', err?.message || err);
+    return [];
   }
-
-  const data = await res.json();
-  return data.files || [];
 }
 
 /**
@@ -120,7 +147,7 @@ export async function initializeSpreadsheetData(
       'WhatsApp / Teléfono',
       'Rol (Cliente / Vendedor)',
       'Código Vendedor',
-      'Saldo Wallet GRPAY',
+      'Saldo Wallet Zeny',
       'Fecha de Registro',
       'Estado'
     ]
@@ -133,7 +160,7 @@ export async function initializeSpreadsheetData(
       'N° Ventas Confirmadas',
       'Total Ingresos (USD)',
       'Total Ingresos (Bs. Estimado)',
-      'Pagado con GRPAY Wallet',
+      'Pagado con Zeny Wallet',
       'Servicio Más Vendido'
     ]
   ];
@@ -254,6 +281,9 @@ export async function appendOrderToSheet(
   spreadsheetId: string,
   order: Order
 ): Promise<void> {
+  if (!isGoogleOAuthToken(accessToken) || !isValidSpreadsheetId(spreadsheetId)) {
+    return;
+  }
   const row = [
     order.id,
     new Date(order.createdAt).toLocaleString('es-VE'),
@@ -270,7 +300,7 @@ export async function appendOrderToSheet(
     translateStatusToSpanish(order.status),
     order.credentials
       ? `User: ${order.credentials.accountUser || ''} | Pass: ${order.credentials.accountPass || ''} | PIN: ${order.credentials.pin || ''} | Perfil: ${order.credentials.profileName || ''} | Corte: ${order.credentials.expirationDate || ''}`
-      : order.paidWithGrpay ? 'Pagado con Wallet GRPAY' : '',
+      : order.paidWithGrpay ? 'Pagado con Wallet Zeny' : '',
     order.assignedSellerName || 'Gregory Izquierdo (Principal)',
     order.customerNotes || ''
   ];
@@ -310,7 +340,7 @@ export async function syncCustomersToSheet(
       'WhatsApp / Teléfono',
       'Rol (Cliente / Vendedor)',
       'Código Vendedor',
-      'Saldo Wallet GRPAY',
+      'Saldo Wallet Zeny',
       'Fecha de Registro',
       'Estado'
     ]
@@ -323,7 +353,7 @@ export async function syncCustomersToSheet(
     c.phone,
     c.role === 'vendedor' ? 'VENDEDOR' : 'CLIENTE',
     c.sellerCode || '-',
-    `${c.grpayBalance.toFixed(2)} GRPAY`,
+    `${(c.zenyBalance || 0).toFixed(2)} Zeny`,
     safeFormatDate(c.createdAt, undefined, new Date().toLocaleDateString('es-VE')),
     'ACTIVO'
   ]);
@@ -747,6 +777,10 @@ export async function searchAndLinkSpreadsheetByName(
   accessToken: string,
   targetFileName: string = 'streaming_gregory'
 ): Promise<{ id: string; name: string; webViewLink?: string } | null> {
+  if (!accessToken || !isGoogleOAuthToken(accessToken)) {
+    return null;
+  }
+
   try {
     // 1. Exact or partial name match on Drive
     const cleanName = targetFileName.trim().replace(/'/g, "\\'");
@@ -765,6 +799,9 @@ export async function searchAndLinkSpreadsheetByName(
       if (data.files && data.files.length > 0) {
         return data.files[0];
       }
+    } else if (res.status === 401 || res.status === 403) {
+      console.warn('Acceso a Drive no autorizado o permisos insuficientes (401/403).');
+      return null;
     }
 
     // 2. Fallback: List recent 30 files and filter client-side (handles case sensitivity or downloaded naming)
@@ -788,9 +825,9 @@ export async function searchAndLinkSpreadsheetByName(
     }
 
     return null;
-  } catch (err) {
-    console.error('Error al buscar archivo en Google Drive:', err);
-    throw err;
+  } catch (err: any) {
+    console.warn('Aviso al buscar archivo en Google Drive:', err?.message || err);
+    return null;
   }
 }
 
@@ -810,6 +847,14 @@ export async function performFullPlatformSync(
     bcvRate: number;
   }
 ): Promise<{ success: boolean; syncedAt: string; stats: Record<string, number> }> {
+  if (!isGoogleOAuthToken(accessToken)) {
+    throw new Error('Se requiere una sesión activa con Google con permisos de Sheets autorizados.');
+  }
+
+  if (!isValidSpreadsheetId(spreadsheetId)) {
+    throw new Error('No hay una hoja de Google Sheets válida vinculada. Por favor crea o selecciona una hoja en el panel.');
+  }
+
   const syncedAt = new Date().toISOString();
   const dateFormatted = new Date().toLocaleString('es-VE');
 
@@ -836,16 +881,27 @@ export async function performFullPlatformSync(
       dateFormatted
     ]);
 
-    await fetch(`${SHEETS_API_BASE}/${spreadsheetId}/values/Pedidos!A1:M${orderRows.length + 1}?valueInputOption=USER_ENTERED`, {
+    const resPedidos = await fetch(`${SHEETS_API_BASE}/${spreadsheetId}/values/Pedidos!A1:M${orderRows.length + 1}?valueInputOption=USER_ENTERED`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ range: `Pedidos!A1:M${orderRows.length + 1}`, values: [orderHeaders, ...orderRows] })
     });
 
+    if (!resPedidos.ok) {
+      const errText = await resPedidos.text().catch(() => '');
+      if (resPedidos.status === 404) {
+        throw new Error('La hoja vinculada no fue encontrada en Google Drive (404). Verifica el ID o crea una hoja nueva.');
+      }
+      if (resPedidos.status === 403) {
+        throw new Error('Permisos insuficientes en Google Sheets (403). Conecta nuevamente tu cuenta de Google.');
+      }
+      throw new Error(`Error en Google Sheets API (${resPedidos.status}): ${errText}`);
+    }
+
     // 2. Sync Clientes & Fichas
     const customerHeaders = [
       'ID Cliente', 'Nombre', 'Email', 'Teléfono', 'Rol',
-      'Saldo GRPAY', 'Descuento %', 'Estado', 'Notas', 'Fecha Registro'
+      'Saldo Zeny', 'Descuento %', 'Estado', 'Notas', 'Fecha Registro'
     ];
     const customerRows = (payload.customers || []).map((c) => [
       c.id,
@@ -853,7 +909,7 @@ export async function performFullPlatformSync(
       c.email,
       c.phone,
       c.role || 'cliente',
-      c.grpayBalance || 0,
+      c.zenyBalance || 0,
       c.discountPercent || 0,
       c.isSuspended ? 'SUSPENDIDO' : 'ACTIVO',
       c.notes || '',
@@ -864,7 +920,7 @@ export async function performFullPlatformSync(
       method: 'PUT',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ range: `Clientes!A1:J${customerRows.length + 1}`, values: [customerHeaders, ...customerRows] })
-    });
+    }).catch((e) => console.warn('Aviso sincronizando Clientes:', e?.message || e));
 
     // 3. Sync Facturas si están disponibles
     if (payload.invoices && payload.invoices.length > 0) {
@@ -890,7 +946,7 @@ export async function performFullPlatformSync(
         method: 'PUT',
         headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ range: `Facturas!A1:K${invoiceRows.length + 1}`, values: [invoiceHeaders, ...invoiceRows] })
-      });
+      }).catch((e) => console.warn('Aviso sincronizando Facturas:', e?.message || e));
     }
 
     return {
@@ -903,8 +959,9 @@ export async function performFullPlatformSync(
       }
     };
   } catch (err: any) {
-    console.error('Error en sincronización total:', err);
+    console.warn('Aviso en sincronización total:', err?.message || err);
     throw err;
   }
 }
+
 

@@ -75,7 +75,7 @@ export function downloadGoogleSheetsTemplate() {
     <Cell><Data ss:Type="String">WhatsApp / Teléfono</Data></Cell>
     <Cell><Data ss:Type="String">Rol (Cliente / Vendedor)</Data></Cell>
     <Cell><Data ss:Type="String">Código Vendedor</Data></Cell>
-    <Cell><Data ss:Type="String">Saldo Wallet GRPAY</Data></Cell>
+    <Cell><Data ss:Type="String">Saldo Wallet Zeny</Data></Cell>
     <Cell><Data ss:Type="String">Fecha de Registro</Data></Cell>
     <Cell><Data ss:Type="String">Estado</Data></Cell>
    </Row>

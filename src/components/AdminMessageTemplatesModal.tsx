@@ -608,7 +608,7 @@ export const AdminMessageTemplatesModal: React.FC<AdminMessageTemplatesModalProp
                     <option value="entrega_credito">2. Entrega a Crédito</option>
                     <option value="entrega_regular">1. Entrega Regular</option>
                     <option value="bienvenida_cliente">5. Bienvenida a Nuevos Clientes</option>
-                    <option value="recarga_wallet">6. Recarga GRPAY Acreditada</option>
+                    <option value="recarga_wallet">6. Recarga Zeny Acreditada</option>
                     <option value="soporte_falla">7. Respuesta a Incidencias</option>
                   </select>
                 </div>

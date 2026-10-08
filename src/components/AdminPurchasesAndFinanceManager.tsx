@@ -5,8 +5,10 @@ import {
   PurchaseCurrency, 
   AccountSaleType,
   Order,
+  CustomerUser,
   Supplier 
 } from '../types';
+import { supabase } from '../services/supabaseClient';
 import { 
   Package, 
   Plus, 
@@ -59,6 +61,7 @@ interface AdminPurchasesAndFinanceManagerProps {
   onDeletePurchase: (purchaseId: string) => void;
   onUpdateCredentials: (purchaseId: string, email: string, pass: string) => void;
   orders: Order[];
+  customers: CustomerUser[];
 }
 
 const STORAGE_SUPPLIERS_KEY = 'streamsync_suppliers_directory_v1';
@@ -72,8 +75,10 @@ export const AdminPurchasesAndFinanceManager: React.FC<AdminPurchasesAndFinanceM
   onUpdatePurchase,
   onDeletePurchase,
   onUpdateCredentials,
-  orders
+  orders,
+  customers
 }) => {
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'matrix' | 'purchases' | 'renewals' | 'suppliers' | 'finances'>('matrix');
   const [platformsList, setPlatformsList] = useState<string[]>(DEFAULT_PLATFORMS);
   const [newCategoryInput, setNewCategoryInput] = useState('');
@@ -167,6 +172,13 @@ export const AdminPurchasesAndFinanceManager: React.FC<AdminPurchasesAndFinanceM
     setProfilesBuilder(updated);
   };
 
+  const handleAssignCustomer = (purchase: SupplierPurchase, slotId: string, customerId: string, customerName: string) => {
+    const updatedProfiles: AccountProfileSlot[] = (purchase.profiles || []).map(p => 
+      p.id === slotId ? { ...p, status: 'occupied' as const, assignedCustomerName: customerName, assignedCustomerId: customerId } : p
+    );
+    onUpdatePurchase({ ...purchase, profiles: updatedProfiles });
+  };
+
   const calculateExpiration = (start: string, days: number) => {
     const d = new Date(start);
     d.setDate(d.getDate() + days);
@@ -205,13 +217,13 @@ export const AdminPurchasesAndFinanceManager: React.FC<AdminPurchasesAndFinanceM
     setNewCategoryInput('');
   };
 
-  const handleCreatePurchaseSubmit = (e: React.FormEvent) => {
+  const handleCreatePurchaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const matchedSup = suppliers.find(s => s.id === formSupplierId);
     const supplierName = matchedSup ? matchedSup.name : 'Proveedor General';
 
     if (!formServiceName || !formEmail || !formPassword) {
-      alert('Por favor complete los campos obligatorios del servicio y credenciales.');
+      alert('Por favor complete los campos obligatorios.');
       return;
     }
 
@@ -223,7 +235,7 @@ export const AdminPurchasesAndFinanceManager: React.FC<AdminPurchasesAndFinanceM
         id: `slot-${Date.now()}-full`,
         profileName: 'Cuenta Completa / Total',
         pin: 'N/A',
-        status: 'available',
+        status: 'available' as const,
         durationDays: formDurationDays,
         startDate: formStartDate,
         expirationDate: expDate
@@ -233,34 +245,67 @@ export const AdminPurchasesAndFinanceManager: React.FC<AdminPurchasesAndFinanceM
       profileName: p.profileName,
       pin: p.pin,
       sellerName: p.sellerName,
-      status: 'available',
+      status: 'available' as const,
       durationDays: formDurationDays,
       startDate: formStartDate,
       expirationDate: expDate
     }));
 
-    onAddPurchase({
-      supplierName,
-      platform: formPlatform.toUpperCase(),
-      serviceName: formServiceName,
-      saleType: formSaleType,
-      paymentCurrency: formCurrency,
-      paymentAmount: formAmount,
-      costUsd: Number(costUsd.toFixed(2)),
-      startDate: formStartDate,
-      expirationDate: expDate,
-      durationDays: formDurationDays,
-      accountEmail: formEmail,
-      accountPassword: formPassword,
-      profiles: newProfiles,
-      status: 'active',
-      notes: formNotes
-    });
+    setLoading(true);
+    try {
+      // 1. Crear la cuenta madre en Supabase si está disponible
+      const accountId = `acc-${Date.now()}`;
+      try {
+        await supabase.from('parent_accounts').insert({
+          id: accountId,
+          name: formServiceName,
+          platform: formPlatform,
+          email: formEmail,
+          password: formPassword,
+          expiration_date: expDate
+        });
 
-    setShowAddModal(false);
-    setFormServiceName('');
-    setFormEmail('');
-    setFormPassword('');
+        // 2. Crear perfiles vinculados
+        const profilesForDb = profilesBuilder.map((p, idx) => ({
+          id: `prof-${Date.now()}-${idx}`,
+          parent_account_id: accountId,
+          profile_name: p.profileName,
+          is_active: true
+        }));
+        await supabase.from('account_profiles').insert(profilesForDb);
+      } catch (dbErr) {
+        console.warn('Supabase accounts sync notice:', dbErr);
+      }
+
+      // 3. Registrar compra financiera local y reactiva
+      onAddPurchase({
+        supplierName,
+        platform: formPlatform.toUpperCase(),
+        serviceName: formServiceName,
+        saleType: formSaleType,
+        paymentCurrency: formCurrency,
+        paymentAmount: formAmount,
+        costUsd: Number(costUsd.toFixed(2)),
+        startDate: formStartDate,
+        expirationDate: expDate,
+        durationDays: formDurationDays,
+        accountEmail: formEmail,
+        accountPassword: formPassword,
+        profiles: newProfiles,
+        status: 'active',
+        notes: formNotes
+      });
+
+      setShowAddModal(false);
+      setFormServiceName('');
+      setFormEmail('');
+      setFormPassword('');
+    } catch (err) {
+      console.error(err);
+      alert('Error al registrar.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openEditCredentials = (purchase: SupplierPurchase) => {

@@ -4,9 +4,10 @@ import {
   Clock, Tv, Users, HeartHandshake, Layers, CalendarDays, Bell, Building, AlertTriangle,
   Palette, Bot, FileText, TrendingUp, TrendingDown, BookOpen,
   ClipboardList, ShieldCheck,
-  FileSpreadsheet, Globe, HelpCircle, Sliders, Megaphone,
+  FileSpreadsheet, Globe, HelpCircle, Megaphone,
   ChevronDown, ChevronRight, Search
 } from 'lucide-react';
+import { useToggleGeminiPanel } from '../store/useAppStore';
 
 export interface MenuItemDef {
   id: string;
@@ -30,11 +31,10 @@ export const MENU_STRUCTURE: MenuCategoryDef[] = [
       { id: 'billing_contracts', label: 'Facturación y Contratos', icon: Receipt, color: 'text-emerald-400' },
       { id: 'purchases_finance', label: 'Compras & Finanzas', icon: Package, color: 'text-indigo-400' },
       { id: 'expenses', label: 'Gastos & Egresos', icon: TrendingDown, color: 'text-rose-400' },
-      { id: 'accounting', label: 'Contabilidad & Reportes', icon: BookOpen, color: 'text-indigo-400' },
       { id: 'refunds', label: 'Reversos & Devoluciones', icon: RotateCcw, color: 'text-rose-400' },
       { id: 'finance', label: 'Conciliación Mensual', icon: BarChart3, color: 'text-emerald-400' },
       { id: 'methods', label: 'Métodos de Pago', icon: CreditCard, color: 'text-slate-400' },
-      { id: 'topups', label: 'Wallet GRPAY', icon: Wallet, badgeKey: 'topups', color: 'text-emerald-400' },
+      { id: 'topups', label: 'Wallet Zeny', icon: Wallet, badgeKey: 'topups', color: 'text-emerald-400' },
     ]
   },
   {
@@ -43,12 +43,11 @@ export const MENU_STRUCTURE: MenuCategoryDef[] = [
     items: [
       { id: 'reconciliation', label: 'Ventas & Pedidos', icon: Clock, badgeKey: 'orders', color: 'text-indigo-400' },
       { id: 'products', label: 'Catálogo & Tarjetas', icon: Tv, color: 'text-indigo-400' },
-      { id: 'clients', label: 'Clientes & Vendedores', icon: Users, color: 'text-sky-400' },
+      { id: 'clients', label: 'Clientes', icon: Users, color: 'text-sky-400' },
       { id: 'credits', label: 'Créditos & Cobranzas', icon: HeartHandshake, badgeKey: 'credits', color: 'text-amber-400' },
       { id: 'installments', label: 'Gestión de Cuotas', icon: Layers, badgeKey: 'installments', color: 'text-amber-400' },
       { id: 'calendar', label: 'Calendario Vencimientos', icon: CalendarDays, color: 'text-indigo-400' },
       { id: 'reminders', label: 'Avisos (1 Día Antes)', icon: Bell, badgeKey: 'reminders', color: 'text-amber-400' },
-      { id: 'franchises', label: 'Franquiciados', icon: Building, badgeKey: 'franchises', color: 'text-purple-400' },
       { id: 'incidents', label: 'Incidencias', icon: AlertTriangle, badgeKey: 'incidents', color: 'text-rose-400' },
     ]
   },
@@ -57,8 +56,8 @@ export const MENU_STRUCTURE: MenuCategoryDef[] = [
     description: 'Personalización de marca, bots y tasas',
     items: [
       { id: 'branding', label: 'Personalización de Marca', icon: Palette, color: 'text-indigo-400' },
-      { id: 'visual_editor', label: 'Editor Visual UI', icon: Sliders, color: 'text-amber-400' },
-      { id: 'telegram_bot', label: 'Bot de Telegram & WhatsApp', icon: Bot, color: 'text-sky-400' },
+      { id: 'categories', label: 'Categorías de Servicios', icon: Layers, color: 'text-amber-400' },
+      { id: 'telegram_bot', label: 'Bot de Telegram', icon: Bot, color: 'text-sky-400' },
       { id: 'templates', label: 'Plantillas de Mensajes', icon: FileText, color: 'text-indigo-400' },
       { id: 'bcv', label: 'Tasa BCV', icon: TrendingUp, color: 'text-amber-400' },
     ]
@@ -97,6 +96,7 @@ interface AdminSidebarProps {
 }
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, onTabChange, badges = {} }) => {
+  const toggleGemini = useToggleGeminiPanel();
   const [expandedCategories, setExpandedCategories] = useState<string[]>([
     'Finanzas',
     'Gestión',
@@ -131,9 +131,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, onTabChan
             Navegación Modular
           </span>
         </div>
-        <span className="text-[10px] text-slate-500 font-mono bg-slate-900 px-2 py-0.5 rounded-md border border-slate-800">
-          5 Módulos
-        </span>
+        <button
+          onClick={toggleGemini}
+          className="p-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 transition cursor-pointer"
+          title="Abrir Gemini IA"
+        >
+          <Bot className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Quick Search */}

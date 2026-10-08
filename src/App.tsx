@@ -16,13 +16,12 @@ import { IncidentReportModal } from './components/IncidentReportModal';
 import { PlatformBotWidget } from './components/PlatformBotWidget';
 import { AddManualCustomerModal } from './components/AddManualCustomerModal';
 import { AnnouncementBanner } from './components/AnnouncementBanner';
+import { GeminiPanel } from './components/GeminiPanel';
 import { DEFAULT_MESSAGE_TEMPLATES, DOMAIN_OFFICIAL, DEFAULT_ACTION_MAPPING } from './utils/messageTemplates';
 import { logAuditEvent } from './services/auditLogger';
 import { useAppStore } from './store/useAppStore';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { InvoiceViewer } from './components/InvoiceViewer';
-import { VisualUIEditor } from './components/VisualUIEditor';
-import { Sliders } from 'lucide-react';
 import { registerServiceWorker, sendPushNotification } from './utils/pushNotifications';
 import { whatsappLink, BUSINESS } from './config/business';
 import {
@@ -67,7 +66,8 @@ import {
   initAuth,
   googleSignIn,
   logout,
-  getAccessToken
+  getAccessToken,
+  isGoogleOAuthToken
 } from './services/googleAuth';
 
 import {
@@ -83,7 +83,8 @@ import {
   syncFaqToSheet,
   syncMessageTemplatesToSheet,
   searchAndLinkSpreadsheetByName,
-  performFullPlatformSync
+  performFullPlatformSync,
+  isValidSpreadsheetId
 } from './services/googleSheets';
 
 import { fetchLiveBcvRate } from './services/bcvRate';
@@ -157,14 +158,10 @@ export default function App() {
   const [trackingOrderId, setTrackingOrderId] = useState<string>('');
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [staffMembers, setStaffMembers] = useState<Array<{ id: string; name: string; username: string; password?: string; role: 'admin' | 'operator' }>>([
-    { id: 'staff-1', name: 'Operador Principal', username: 'soporte', password: '123456', role: 'operator' }
-  ]);
   const [isSheetsModalOpen, setIsSheetsModalOpen] = useState(false);
   const [isCustomerAuthOpen, setIsCustomerAuthOpen] = useState(false);
   const [isCustomerPortalOpen, setIsCustomerPortalOpen] = useState(false);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
-  const [isVisualEditorOpen, setIsVisualEditorOpen] = useState(false);
   const STORAGE_SUPPLIER_PURCHASES_KEY = 'streamsync_supplier_purchases_v1';
   // Purchases & Expenses
   const { purchases: supplierPurchases, setPurchases: setSupplierPurchases } = useAppStore();
@@ -377,16 +374,21 @@ export default function App() {
   const [sheetsState, setSheetsState] = useState<SheetsConnectionState>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_SHEET_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && isValidSpreadsheetId(parsed.spreadsheetId)) {
+          return parsed;
+        }
+      }
     } catch (e) {
       console.warn('Could not load saved sheets state');
     }
     return {
-      isConnected: true,
-      spreadsheetId: '1VgIiuwKARkrbGDzgNQadRH0AGyj7LlMo',
-      spreadsheetName: 'Control Maestro StreamSync',
-      spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/1VgIiuwKARkrbGDzgNQadRH0AGyj7LlMo/edit',
-      lastSyncedAt: new Date().toISOString(),
+      isConnected: false,
+      spreadsheetId: '',
+      spreadsheetName: '',
+      spreadsheetUrl: '',
+      lastSyncedAt: null,
       syncStatus: 'idle'
     };
   });
@@ -458,7 +460,9 @@ export default function App() {
           displayName: currentUser.displayName,
           photoURL: currentUser.photoURL
         });
-        fetchDriveSheets(token);
+        if (isGoogleOAuthToken(token)) {
+          fetchDriveSheets(token);
+        }
       },
       () => {
         setGoogleUser(null);
@@ -481,13 +485,15 @@ export default function App() {
           uid: res.user.uid,
           email: res.user.email,
           displayName: res.user.displayName,
-          photoURL: res.user.photoURL
+          photoURL: res.user.photoURL ?? null
         });
         showNotification('success', `Conectado como ${res.user.displayName || res.user.email}`);
-        fetchDriveSheets(res.accessToken);
+        if (isGoogleOAuthToken(res.accessToken)) {
+          fetchDriveSheets(res.accessToken);
+        }
       }
     } catch (err: any) {
-      console.error('Google Sign In failed:', err);
+      console.warn('Google Sign In notice:', err?.message || err);
       showNotification('error', 'No se pudo iniciar sesión con Google.');
     }
   };
@@ -505,24 +511,24 @@ export default function App() {
 
   const fetchDriveSheets = async (tokenOverride?: string) => {
     const token = tokenOverride || getAccessToken();
-    if (!token) return;
+    if (!token || !isGoogleOAuthToken(token)) return;
     try {
       setIsLoadingDriveSheets(true);
       const files = await listUserSpreadsheets(token);
       setAvailableDriveSheets(files.map((f) => ({ id: f.id, name: f.name })));
     } catch (err: any) {
-      console.error('Error fetching drive sheets:', err);
-      showNotification('info', err.message || 'No se pudieron listar los archivos de Drive. Puedes crear una nueva hoja automáticamente.');
+      console.warn('Aviso listando archivos de Drive:', err?.message || err);
     } finally {
       setIsLoadingDriveSheets(false);
     }
   };
 
   const handleCreateNewSheet = async () => {
-    const token = getAccessToken();
-    if (!token) {
+    let token = getAccessToken();
+    if (!token || !isGoogleOAuthToken(token)) {
       await handleSignInGoogle();
-      return;
+      token = getAccessToken();
+      if (!token || !isGoogleOAuthToken(token)) return;
     }
     try {
       setSheetsState((prev) => ({ ...prev, syncStatus: 'syncing' }));
@@ -541,15 +547,19 @@ export default function App() {
       showNotification('success', '¡Hoja creada en tu Google Drive exitosamente!');
       fetchDriveSheets(token);
     } catch (err: any) {
-      console.error('Error creating spreadsheet:', err);
+      console.warn('Aviso al crear hoja de cálculo:', err?.message || err);
       setSheetsState((prev) => ({ ...prev, syncStatus: 'error', errorMessage: err.message }));
       showNotification('error', `Error al crear hoja: ${err.message}`);
     }
   };
 
   const handleSelectExistingSheet = async (id: string, name: string) => {
-    const token = getAccessToken();
-    if (!token) return;
+    let token = getAccessToken();
+    if (!token || !isGoogleOAuthToken(token)) {
+      await handleSignInGoogle();
+      token = getAccessToken();
+      if (!token || !isGoogleOAuthToken(token)) return;
+    }
     try {
       setSheetsState((prev) => ({ ...prev, syncStatus: 'syncing' }));
       const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${id}/edit`;
@@ -575,7 +585,7 @@ export default function App() {
         console.warn('Could not read existing rows from sheet:', e);
       }
     } catch (err: any) {
-      console.error('Error selecting existing sheet:', err);
+      console.warn('Aviso al vincular hoja existente:', err?.message || err);
       showNotification('error', 'Error al vincular hoja de cálculo.');
     }
   };
@@ -584,11 +594,11 @@ export default function App() {
 
   const handleSearchAndLinkFile = async (fileName: string = 'streaming_gregory') => {
     let token = getAccessToken();
-    if (!token) {
+    if (!token || !isGoogleOAuthToken(token)) {
       showNotification('info', 'Iniciando sesión con Google para buscar en tu Drive...');
       await handleSignInGoogle();
       token = getAccessToken();
-      if (!token) return;
+      if (!token || !isGoogleOAuthToken(token)) return;
     }
 
     try {
@@ -620,21 +630,21 @@ export default function App() {
         fetchDriveSheets(token);
       }
     } catch (err: any) {
-      console.error(err);
+      console.warn('Aviso al vincular archivo:', err?.message || err);
       showNotification('error', `Error al vincular: ${err.message}`);
     }
   };
 
   const handlePerformFullPlatformSync = async () => {
     let token = getAccessToken();
-    if (!token) {
-      showNotification('info', 'Inicia sesión con Google para sincronizar.');
+    if (!token || !isGoogleOAuthToken(token)) {
+      showNotification('info', 'Inicia sesión con Google para autorizar la sincronización de Sheets.');
       await handleSignInGoogle();
       token = getAccessToken();
-      if (!token) return;
+      if (!token || !isGoogleOAuthToken(token)) return;
     }
 
-    if (!sheetsState.isConnected || !sheetsState.spreadsheetId) {
+    if (!sheetsState.isConnected || !isValidSpreadsheetId(sheetsState.spreadsheetId)) {
       showNotification('info', 'Vincula una hoja de Google Drive primero.');
       setIsSheetsModalOpen(true);
       return;
@@ -643,7 +653,7 @@ export default function App() {
     try {
       setIsSyncingFull(true);
       showNotification('info', 'Iniciando respaldo total en Google Drive...');
-      const res = await performFullPlatformSync(token, sheetsState.spreadsheetId, {
+      const res = await performFullPlatformSync(token, sheetsState.spreadsheetId!, {
         orders,
         customers: customerUsers,
         invoices,
@@ -658,8 +668,8 @@ export default function App() {
       }));
       showNotification('success', `¡Sincronización total exitosa! ${res.stats.orders} pedidos y ${res.stats.customers} clientes guardados.`);
     } catch (err: any) {
-      console.error('Error en sincronización total:', err);
-      showNotification('error', `Error en sincronización: ${err.message}`);
+      console.warn('Aviso en sincronización total:', err?.message || err);
+      showNotification('error', `Error en sincronización: ${err.message || 'Error de conexión'}`);
     } finally {
       setIsSyncingFull(false);
     }
@@ -669,8 +679,8 @@ export default function App() {
   useEffect(() => {
     const timer = setInterval(() => {
       const token = getAccessToken();
-      if (token && sheetsState.isConnected && sheetsState.spreadsheetId) {
-        performFullPlatformSync(token, sheetsState.spreadsheetId, {
+      if (token && isGoogleOAuthToken(token) && sheetsState.isConnected && isValidSpreadsheetId(sheetsState.spreadsheetId)) {
+        performFullPlatformSync(token, sheetsState.spreadsheetId!, {
           orders,
           customers: customerUsers,
           invoices,
@@ -684,7 +694,7 @@ export default function App() {
             syncStatus: 'success'
           }));
         }).catch((err) => {
-          console.warn('Auto-sync silencioso (5 min) error:', err);
+          console.warn('Auto-sync silencioso (5 min) aviso:', err?.message || err);
         });
       }
     }, 5 * 60 * 1000);
@@ -850,12 +860,12 @@ export default function App() {
   };
 
   const handleAddUserFromAdmin = async (
-    newUser: Omit<CustomerUser, 'id' | 'grpayBalance' | 'createdAt'> & { discountPercent?: number }
+    newUser: Omit<CustomerUser, 'id' | 'zenyBalance' | 'createdAt'> & { discountPercent?: number }
   ) => {
     const created: CustomerUser = {
       ...newUser,
       id: `user-${Date.now()}`,
-      grpayBalance: 0,
+      zenyBalance: 0,
       createdAt: new Date().toISOString()
     };
     setCustomerUsers((prev) => {
@@ -894,23 +904,6 @@ export default function App() {
     showNotification('info', 'Servicio eliminado del catálogo.');
   };
 
-  const handleAddStaff = (newStaff: { id: string; name: string; username: string; password?: string; role: 'admin' | 'operator' }) => {
-    setStaffMembers((prev) => [newStaff, ...prev]);
-    showNotification('success', `Miembro de equipo ${newStaff.name} registrado con éxito.`);
-  };
-
-  const handleUpdateStaffPassword = (staffId: string, newPass: string) => {
-    setStaffMembers((prev) =>
-      prev.map((s) => (s.id === staffId ? { ...s, password: newPass } : s))
-    );
-    showNotification('success', 'Contraseña actualizada con éxito.');
-  };
-
-  const handleDeleteStaff = (staffId: string) => {
-    setStaffMembers((prev) => prev.filter((s) => s.id !== staffId));
-    showNotification('info', 'Miembro de equipo eliminado.');
-  };
-
   const handleToggleSuspendCustomer = (customerId: string) => {
     setCustomerUsers((prev) =>
       prev.map((u) => {
@@ -939,12 +932,12 @@ export default function App() {
     if (giftType === 'grpay') {
       const amount = parseFloat(amountOrProductId) || 10;
       setCustomerUsers((prev) =>
-        prev.map((u) => (u.id === customerId ? { ...u, grpayBalance: u.grpayBalance + amount } : u))
+        prev.map((u) => (u.id === customerId ? { ...u, zenyBalance: (u.zenyBalance || 0) + amount } : u))
       );
       if (activeCustomer && activeCustomer.id === customerId) {
-        setActiveCustomer((prev) => (prev ? { ...prev, grpayBalance: prev.grpayBalance + amount } : null));
+        setActiveCustomer((prev) => (prev ? { ...prev, zenyBalance: (prev.zenyBalance || 0) + amount } : null));
       }
-      showNotification('success', `¡Regalo enviado! Se acreditaron $${amount} USD en GRPAY a ${customer.name}.`);
+      showNotification('success', `¡Regalo enviado! Se acreditaron $${amount} USD en Zeny a ${customer.name}.`);
     } else if (giftType === 'membership') {
       const prod = products.find((p) => p.id === amountOrProductId);
       if (!prod) return;
@@ -987,7 +980,7 @@ export default function App() {
 
   // Customer Registration & Auth
   const handleRegisterCustomer = async (
-    newUser: Omit<CustomerUser, 'id' | 'grpayBalance' | 'createdAt'>
+    newUser: Omit<CustomerUser, 'id' | 'zenyBalance' | 'createdAt'>
   ): Promise<CustomerUser> => {
     if (newUser.email) {
       const existing = customerUsers.find((u) => u.email.toLowerCase() === newUser.email.toLowerCase());
@@ -999,7 +992,7 @@ export default function App() {
       ...newUser,
       id: `cust-${Date.now()}`,
       internalId: `CLI-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      grpayBalance: 0,
+      zenyBalance: 0,
       createdAt: new Date().toISOString()
     };
     setCustomerUsers((prev) => [created, ...prev]);
@@ -1014,11 +1007,11 @@ export default function App() {
       showNotification('error', 'Tu cuenta se encuentra suspendida para realizar compras. Contacta a soporte.');
       return;
     }
-    // If paid with GRPAY, deduct balance from activeCustomer
+    // If paid with Zeny, deduct balance from activeCustomer
     if (usedGrpay && activeCustomer) {
-      const deduction = order.total; // in USD / GRPAY
-      const newBalance = Math.max(0, activeCustomer.grpayBalance - deduction);
-      const updatedUser = { ...activeCustomer, grpayBalance: newBalance };
+      const deduction = order.total; // in USD / Zeny
+      const newBalance = Math.max(0, (activeCustomer.zenyBalance || 0) - deduction);
+      const updatedUser = { ...activeCustomer, zenyBalance: newBalance };
 
       setActiveCustomer(updatedUser);
       setCustomerUsers((prev) =>
@@ -1173,7 +1166,7 @@ export default function App() {
     );
   };
 
-  // Customer requests a GRPAY wallet topup
+  // Customer requests a Zeny wallet topup
   const handleRequestTopup = async (topup: WalletTopup) => {
     if (activeCustomer?.isSuspended) {
       showNotification('error', 'Tu cuenta se encuentra suspendida para recargas de saldo. Contacta a soporte.');
@@ -1183,7 +1176,7 @@ export default function App() {
     showNotification('success', 'Solicitud de recarga enviada. En espera de confirmación.');
   };
 
-  // Admin approves GRPAY topup
+  // Admin approves Zeny topup
   const handleApproveTopup = async (topupId: string) => {
     const targetTopup = walletTopups.find((t) => t.id === topupId);
     if (!targetTopup) return;
@@ -1196,18 +1189,18 @@ export default function App() {
       )
     );
 
-    // Credit user's GRPAY balance
+    // Credit user's Zeny balance
     setCustomerUsers((prev) =>
       prev.map((u) => {
         if (
           u.id === targetTopup.customerId ||
           u.email.toLowerCase() === targetTopup.customerEmail.toLowerCase()
         ) {
-          const newBal = (u.grpayBalance || 0) + targetTopup.amountGRPAY;
+          const newBal = (u.zenyBalance || 0) + (targetTopup.amountZenyPoints || targetTopup.amountZeny || 0);
           if (activeCustomer && activeCustomer.id === u.id) {
-            setActiveCustomer({ ...activeCustomer, grpayBalance: newBal });
+            setActiveCustomer({ ...activeCustomer, zenyBalance: newBal });
           }
-          return { ...u, grpayBalance: newBal };
+          return { ...u, zenyBalance: newBal };
         }
         return u;
       })
@@ -1215,11 +1208,11 @@ export default function App() {
 
     showNotification(
       'success',
-      `¡Recarga #${topupId} aprobada! +${targetTopup.amountGRPAY} GRPAY acreditados a ${targetTopup.customerEmail}.`
+      `¡Recarga #${topupId} aprobada! +${targetTopup.amountZeny} Zeny acreditados a ${targetTopup.customerEmail}.`
     );
   };
 
-  // Admin rejects GRPAY topup
+  // Admin rejects Zeny topup
   const handleRejectTopup = async (topupId: string, reason?: string) => {
     setWalletTopups((prev) =>
       prev.map((t) =>
@@ -1231,8 +1224,8 @@ export default function App() {
     showNotification('info', `Recarga #${topupId} rechazada.`);
   };
 
-  // Admin manually credits GRPAY to an email
-  // Admin manually credits or debits GRPAY to an email
+  // Admin manually credits Zeny to an email
+  // Admin manually credits or debits Zeny to an email
   const handleManualCreditGrpay = async (customerEmail: string, amount: number, operation: 'credit' | 'debit' = 'credit') => {
     const targetEmail = customerEmail.trim().toLowerCase();
     let found = false;
@@ -1243,12 +1236,12 @@ export default function App() {
       prev.map((u) => {
         if (u.email.toLowerCase() === targetEmail) {
           found = true;
-          const newBal = Math.max(0, Number(((u.grpayBalance || 0) + delta).toFixed(2)));
+          const newBal = Math.max(0, Number(((u.zenyBalance || 0) + delta).toFixed(2)));
           finalBalance = newBal;
           if (activeCustomer && activeCustomer.id === u.id) {
-            setActiveCustomer({ ...activeCustomer, grpayBalance: newBal });
+            setActiveCustomer({ ...activeCustomer, zenyBalance: newBal });
           }
-          return { ...u, grpayBalance: newBal };
+          return { ...u, zenyBalance: newBal };
         }
         return u;
       })
@@ -1261,11 +1254,11 @@ export default function App() {
           name: targetEmail.split('@')[0],
           email: targetEmail,
           phone: '+58',
-          grpayBalance: delta,
+          zenyBalance: delta,
           createdAt: new Date().toISOString()
         };
         setCustomerUsers((prev) => [newCust, ...prev]);
-        showNotification('success', `Usuario creado y acreditados +${delta} GRPAY a ${targetEmail}.`);
+        showNotification('success', `Usuario creado y acreditados +${delta} Zeny a ${targetEmail}.`);
       } else {
         showNotification('error', `No se encontró al usuario con correo ${targetEmail} para debitar.`);
       }
@@ -1273,9 +1266,9 @@ export default function App() {
     }
 
     if (delta >= 0) {
-      showNotification('success', `Acreditados +${delta} GRPAY a ${targetEmail}. Saldo: ${finalBalance} GRPAY.`);
+      showNotification('success', `Acreditados +${delta} Zeny a ${targetEmail}. Saldo: ${finalBalance} Zeny.`);
     } else {
-      showNotification('info', `Debitado saldo de ${Math.abs(delta)} GRPAY a ${targetEmail}. Saldo actual: ${finalBalance} GRPAY.`);
+      showNotification('info', `Debitado saldo de ${Math.abs(delta)} Zeny a ${targetEmail}. Saldo actual: ${finalBalance} Zeny.`);
     }
   };
 
@@ -1467,7 +1460,7 @@ export default function App() {
         c.id === customerId
           ? {
               ...c,
-              grpayBalance: (c.grpayBalance || 0) + amountUsd
+              zenyBalance: (c.zenyBalance || 0) + amountUsd
             }
           : c
       )
@@ -1616,19 +1609,19 @@ export default function App() {
           )}
         </section>
 
-        {/* GRPAY Wallet Explanatory Banner */}
+        {/* Zeny Wallet Explanatory Banner */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
           <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white relative overflow-hidden shadow-xl border border-slate-800">
             <div className="relative z-10 max-w-2xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold mb-3 border border-indigo-500/30">
                 <Wallet className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Moneda Interna GRPAY</span>
+                <span>Moneda Interna Zeny</span>
               </div>
               <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                Recarga tu Wallet GRPAY y activa tus cuentas al instante
+                Recarga tu Wallet Zeny y activa tus cuentas al instante
               </h3>
               <p className="text-slate-300 text-xs sm:text-sm mt-2 leading-relaxed">
-                Abona saldo en Bolívares (Tasa BCV) o USDT / Dólares. 1 GRPAY = 1 USD / 1 USDT. Usa tu saldo para comprar o renovar sin esperar tiempos de validación bancaria en cada compra.
+                Abona saldo en Bolívares (Tasa BCV) o USDT / Dólares. 1 ZenyPoint = 1 USD / 1 USDT. Usa tu saldo para comprar o renovar sin esperar tiempos de validación bancaria en cada compra.
               </p>
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <button
@@ -1642,7 +1635,7 @@ export default function App() {
                   }}
                   className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-900/50 transition cursor-pointer"
                 >
-                  {activeCustomer ? 'Abrir mi Wallet GRPAY' : 'Registrarme y Obtener Wallet'}
+                  {activeCustomer ? 'Abrir mi Wallet Zeny' : 'Registrarme y Obtener Wallet'}
                 </button>
                 <span className="text-[11px] text-slate-400">
                   • Saldo no canjeable ni transferible fuera de la plataforma
@@ -1681,7 +1674,7 @@ export default function App() {
                 </span>
                 <h4 className="font-bold text-slate-900 text-sm mb-1">Transfiere Seguro</h4>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Paga con cualquiera de nuestros 9 métodos o utiliza tu saldo de la wallet GRPAY.
+                  Paga con cualquiera de nuestros 9 métodos o utiliza tu saldo de la wallet Zeny.
                 </p>
               </div>
 
@@ -1828,10 +1821,6 @@ export default function App() {
             setIsAdminOpen(true);
             showNotification('success', `¡Bienvenido, ${adminProfile.name}!`);
           }}
-          staffMembers={staffMembers}
-          onAddStaff={handleAddStaff}
-          onUpdateStaffPassword={handleUpdateStaffPassword}
-          onDeleteStaff={handleDeleteStaff}
         />
       )}
 
@@ -2044,6 +2033,7 @@ export default function App() {
           </div>
         } />
       </Routes>
+      <GeminiPanel />
     </BrowserRouter>
   );
 }

@@ -66,7 +66,7 @@ export const Footer: React.FC<FooterProps> = ({
               <li>Wally & Zinli</li>
               <li>UglyCash</li>
               <li>TDC Banesco Conecta</li>
-              <li className="text-indigo-600 font-semibold">• Wallet Privada GRPAY</li>
+              <li className="text-indigo-600 font-semibold">• Wallet Privada Zeny</li>
             </ul>
           </div>
 

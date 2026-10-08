@@ -29,7 +29,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const safeDuration = product.prices[selectedDuration] ? selectedDuration : (availableDurations[0] || '1 mes');
   const basePriceUsd = product.prices[safeDuration]?.USD || 3.0;
 
-  // Calculate discount for product, customer, or reseller (vendedor)
+  // Calculate discount for product or customer
   const { finalPrice: finalPriceUsd, discountPercent, savings } = calculateDiscountedPrice(
     basePriceUsd,
     product.discountPercent,
@@ -42,8 +42,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const originalPriceBs = Number((basePriceUsd * bcvRate).toFixed(2));
   const originalDisplayPrice = currency === 'BS' ? originalPriceBs : basePriceUsd;
-
-  const isReseller = customerUser?.role === 'vendedor';
 
   return (
     <div className={`relative flex flex-col justify-between rounded-3xl bg-white border border-slate-200/90 p-5 sm:p-6 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 group ${
@@ -65,7 +63,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {discountPercent > 0 && (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-200">
               <Tag className="w-3 h-3" />
-              {isReseller ? `${discountPercent}% Vendedor` : `${discountPercent}% OFF`}
+              {discountPercent}% OFF
             </span>
           )}
 

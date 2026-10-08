@@ -1075,7 +1075,7 @@ export const AdminCreditManager: React.FC<AdminCreditManagerProps> = ({
                   <option value="Transferencia Bancaria">Transferencia Bancaria</option>
                   <option value="Binance Pay USDT">Binance Pay USDT</option>
                   <option value="Zinli">Zinli</option>
-                  <option value="Saldo GRPAY">Saldo GRPAY</option>
+                  <option value="Saldo Zeny">Saldo Zeny</option>
                 </select>
               </div>
 

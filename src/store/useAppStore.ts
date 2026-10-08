@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { 
   Product, Order, CustomerUser, FranchiseTenant, ExpenseItem, 
-  PaymentMethod, SupplierPurchase, AccountingEntry, AppBrandingConfig, Invoice 
+  PaymentMethod, SupplierPurchase, AccountingEntry, AppBrandingConfig, Invoice,
+  WalletTopup, IncidentReport, FaqItem
 } from '../types';
 import { 
   INITIAL_PRODUCTS, INITIAL_PAYMENT_METHODS, INITIAL_CUSTOMERS 
@@ -9,6 +10,8 @@ import {
 
 interface AppState {
   // Financial State
+  isGeminiPanelOpen: boolean;
+  toggleGeminiPanel: () => void;
   bankBalances: Record<string, { balanceUsd: number; balanceBs: number }>;
   accountsReceivable: any[];
   accountsPayable: any[];
@@ -37,7 +40,7 @@ interface AppState {
   setProducts: (products: Product[] | ((prev: Product[]) => Product[])) => void;
   setOrders: (orders: Order[] | ((prev: Order[]) => Order[])) => void;
   setCustomers: (customers: CustomerUser[] | ((prev: CustomerUser[]) => CustomerUser[])) => void;
-  setActiveCustomer: (customer: CustomerUser | null) => void;
+  setActiveCustomer: (customer: CustomerUser | null | ((prev: CustomerUser | null) => CustomerUser | null)) => void;
   setWalletTopups: (topups: WalletTopup[] | ((prev: WalletTopup[]) => WalletTopup[])) => void;
   setIncidents: (incidents: IncidentReport[] | ((prev: IncidentReport[]) => IncidentReport[])) => void;
   setFranchises: (franchises: FranchiseTenant[] | ((prev: FranchiseTenant[]) => FranchiseTenant[])) => void;
@@ -65,6 +68,8 @@ const load = <T,>(key: string, fallback: T): T => {
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
+  isGeminiPanelOpen: false,
+  toggleGeminiPanel: () => set((state) => ({ isGeminiPanelOpen: !state.isGeminiPanelOpen })),
   // Initialize from localStorage if available, or default data
   bankBalances: load('maxter_initial_bank_balances', {}),
   accountsReceivable: load('maxter_accounts_receivable', []),
@@ -84,7 +89,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   faqItems: load<FaqItem[]>('streamsync_faq_v1', [
     { id: 'faq-1', category: 'Garantía', question: '¿Qué pasa si mi cuenta deja de funcionar?', answer: 'Todas nuestras cuentas cuentan con garantía total por el tiempo contratado. Si tienes algún inconveniente, puedes abrir un reporte técnico en el Portal de Soporte y te lo solventaremos de inmediato.', order: 1 },
     { id: 'faq-2', category: 'Pagos', question: '¿Cómo reportar un pago móvil o transferencia?', answer: 'Realiza tu pago a nuestros datos oficiales, guarda el comprobante y sube la captura con el número de referencia en el formulario de pago del producto o sección de confirmación.', order: 2 },
-    { id: 'faq-3', category: 'GRPAY', question: '¿Qué es el saldo GRPAY?', answer: 'Es el saldo digital en dólares (USD) recargable para comprar al instante en nuestra plataforma sin esperar validación bancaria.', order: 3 },
+    { id: 'faq-3', category: 'Zeny', question: '¿Qué es el saldo ZenyPoints?', answer: 'Es el saldo digital en dólares (USD) recargable para comprar al instante en nuestra plataforma sin esperar validación bancaria.', order: 3 },
     { id: 'faq-4', category: 'Renovaciones', question: '¿Pierdo mi perfil si renuevo?', answer: 'No, al renovar sobre tu mismo perfil conservas intactas tus configuraciones, historial y listas guardadas.', order: 4 }
   ]),
   bcvRate: load<number>('streamsync_bcv_rate_v2', 36.85),
@@ -95,9 +100,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       primaryColor: '#6366f1',
       secondaryColor: '#8b5cf6',
       fontFamily: 'Plus Jakarta Sans',
-      heroTitle: 'Tus suscripciones de streaming favoritas con un',
-      heroTitleGradient: 'diseño claro y precio justo',
-      heroSubtitle: 'Perfiles privados con PIN y cuentas completas en 4K Ultra HD. Paga con Pago Móvil a tasa oficial BCV, Binance Pay, Zelle, Airtm, Pichincha, Zinli o saldo GRPAY.',
+      heroTitle: 'Tus Suscripciones y Servicios de Streaming favoritas',
+      heroTitleGradient: 'en un solo lugar',
+      heroSubtitle: 'Perfiles Privados, Cuentas Completas, Aplicaciones y mucho mas. Paga con Pago Movil a Tasa BCV Oficial , o a traves de : Binance Pay, Banco Guayaquil , Zinli o con tu Saldo de Billeterea Zeny.',
       heroBadgeText: 'Entrega Inmediata & Garantía Total de Duración',
       heroFontSize: '3xl',
       heroFontFamily: 'Plus Jakarta Sans',
@@ -144,9 +149,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { customers };
     });
   },
-  setActiveCustomer: (activeCustomer) => {
-    localStorage.setItem('streamsync_current_customer_v2', JSON.stringify(activeCustomer));
-    set({ activeCustomer });
+  setActiveCustomer: (val) => {
+    set((state) => {
+      const activeCustomer = typeof val === 'function' ? (val as any)(state.activeCustomer) : val;
+      localStorage.setItem('streamsync_current_customer_v2', JSON.stringify(activeCustomer));
+      return { activeCustomer };
+    });
   },
   setWalletTopups: (val) => {
     set((state) => {
@@ -267,3 +275,5 @@ export const useFaqItems = () => useAppStore((state) => state.faqItems);
 export const useBcvRate = () => useAppStore((state) => state.bcvRate);
 export const useBranding = () => useAppStore((state) => state.branding);
 export const usePurchases = () => useAppStore((state) => state.purchases);
+export const useGeminiPanelOpen = () => useAppStore((state) => state.isGeminiPanelOpen);
+export const useToggleGeminiPanel = () => useAppStore((state) => state.toggleGeminiPanel);

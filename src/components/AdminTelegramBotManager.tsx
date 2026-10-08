@@ -15,11 +15,10 @@ import {
   Edit3,
   Layers,
   Wallet,
-  Smartphone,
   ShieldCheck,
   RefreshCw
 } from 'lucide-react';
-import { AppBrandingConfig, Product, TelegramBotCustomCommand, WhatsAppApiConfig } from '../types';
+import { AppBrandingConfig, Product, TelegramBotCustomCommand } from '../types';
 
 interface AdminTelegramBotManagerProps {
   branding: AppBrandingConfig;
@@ -45,14 +44,14 @@ const DEFAULT_BOT_COMMANDS: TelegramBotCustomCommand[] = [
   {
     command: '/cuotas',
     description: 'Explicación del sistema de financiamiento en cuotas, inicial y plazos.',
-    responseTemplate: '💳 *SISTEMA DE FINANCIAMIENTO EN CUOTAS*\n\nAdquiere tus suscripciones fraccionadas:\n• *Inicial:* 50% al momento de ordenar.\n• *Cuotas restantes:* Cada 15 días o mensual.\n• *Abonos:* Puedes pagar desde tu portal web con Pago Móvil o Wallet GRPAY.\n\nDisfruta tu servicio desde el primer día con garantía total.',
+    responseTemplate: '💳 *SISTEMA DE FINANCIAMIENTO EN CUOTAS*\n\nAdquiere tus suscripciones fraccionadas:\n• *Inicial:* 50% al momento de ordenar.\n• *Cuotas restantes:* Cada 15 días o mensual.\n• *Abonos:* Puedes pagar desde tu portal web con Pago Móvil o Wallet Zeny.\n\nDisfruta tu servicio desde el primer día con garantía total.',
     category: 'cuotas',
     enabled: true
   },
   {
     command: '/wallet',
-    description: 'Información de la billetera interna GRPAY, saldo y recargas.',
-    responseTemplate: '💰 *WALLET GRPAY STREAMING*\n\nTu billetera interna digital privada:\n• 1 GRPAY = $1.00 USD / USDT.\n• Activación inmediata sin esperar verificación bancaria.\n• Recarga mediante Pago Móvil, Zelle o Binance Pay.\n\nConsulta tu saldo en tu portal: https://gregoryizquierdo.xyz',
+    description: 'Información de la billetera interna Zeny, saldo y recargas.',
+    responseTemplate: '💰 *WALLET Zeny STREAMING*\n\nTu billetera interna digital privada:\n• 1 Zeny = $1.00 USD / USDT.\n• Activación inmediata sin esperar verificación bancaria.\n• Recarga mediante Pago Móvil, Zelle o Binance Pay.\n\nConsulta tu saldo en tu portal: https://gregoryizquierdo.xyz',
     category: 'wallet',
     enabled: true
   },
@@ -77,8 +76,6 @@ export const AdminTelegramBotManager: React.FC<AdminTelegramBotManagerProps> = (
   products,
   onSaveBranding
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'telegram' | 'whatsapp_api'>('telegram');
-
   // Telegram States
   const [botToken, setBotToken] = useState(branding.telegramBotToken || '');
   const [botUsername, setTelegramBotUsername] = useState(branding.telegramBotUsername || '');
@@ -95,21 +92,6 @@ export const AdminTelegramBotManager: React.FC<AdminTelegramBotManagerProps> = (
   const [newCmdCategory, setNewCmdCategory] = useState<TelegramBotCustomCommand['category']>('general');
   const [showAddCmd, setShowAddCmd] = useState(false);
 
-  // WhatsApp API States
-  const [waConfig, setWaConfig] = useState<WhatsAppApiConfig>(
-    branding.whatsappApiConfig || {
-      enabled: false,
-      provider: 'cloud_api',
-      apiUrl: 'https://graph.facebook.com/v18.0',
-      apiToken: '',
-      phoneNumberId: '',
-      instanceName: 'GregoriStreamingBot',
-      status: 'disconnected'
-    }
-  );
-  const [waTestNumber, setWaTestNumber] = useState('');
-  const [waTestSuccess, setWaTestSuccess] = useState<string | null>(null);
-
   const [isSaved, setIsSaved] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
 
@@ -119,8 +101,7 @@ export const AdminTelegramBotManager: React.FC<AdminTelegramBotManagerProps> = (
       ...branding,
       telegramBotToken: botToken,
       telegramBotUsername: botUsername,
-      telegramBotCommands: commands,
-      whatsappApiConfig: waConfig
+      telegramBotCommands: commands
     });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
@@ -176,16 +157,6 @@ export const AdminTelegramBotManager: React.FC<AdminTelegramBotManagerProps> = (
     setTimeout(() => setCopiedCmd(null), 2000);
   };
 
-  const handleTestWhatsApp = () => {
-    if (!waTestNumber.trim()) {
-      alert('Ingresa un número para enviar la prueba.');
-      return;
-    }
-    setWaConfig((prev) => ({ ...prev, status: 'connected' }));
-    setWaTestSuccess(`¡Mensaje de prueba enviado exitosamente a ${waTestNumber}! Estado: Conectado.`);
-    setTimeout(() => setWaTestSuccess(null), 4000);
-  };
-
   return (
     <div className="space-y-6">
       {/* Top Banner */}
@@ -194,13 +165,13 @@ export const AdminTelegramBotManager: React.FC<AdminTelegramBotManagerProps> = (
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-bold mb-2 border border-blue-500/30">
               <Bot className="w-3.5 h-3.5 text-blue-400" />
-              <span>Bots & Notificaciones Automatizadas</span>
+              <span>Bot Oficial & Notificaciones</span>
             </div>
             <h2 className="text-2xl font-black tracking-tight">
-              Integración de Bot de Telegram & WhatsApp API
+              Integración de Bot de Telegram
             </h2>
             <p className="text-blue-200/80 text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-              Configura comandos dinámicos para consulta de catálogo, cuotas, wallet GRPAY y estado de cuentas de clientes, además de vincular WhatsApp API para envíos masivos directos.
+              Configura comandos dinámicos para consulta de catálogo, cuotas, wallet Zeny y estado de cuentas de tus clientes directamente en Telegram.
             </p>
           </div>
 
@@ -223,40 +194,9 @@ export const AdminTelegramBotManager: React.FC<AdminTelegramBotManagerProps> = (
             )}
           </div>
         </div>
-
-        {/* Sub-tabs switcher */}
-        <div className="flex items-center gap-2 mt-5 border-t border-slate-800 pt-3">
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('telegram')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${
-              activeSubTab === 'telegram'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Bot className="w-4 h-4" />
-            <span>Bot de Telegram & Comandos ({commands.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('whatsapp_api')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${
-              activeSubTab === 'whatsapp_api'
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Smartphone className="w-4 h-4" />
-            <span>Integración WhatsApp API Oficial</span>
-          </button>
-        </div>
       </div>
 
-      {/* SUBTAB 1: TELEGRAM BOT */}
-      {activeSubTab === 'telegram' && (
-        <div className="space-y-6">
+      <div className="space-y-6">
           {/* Telegram Credentials Card */}
           <form onSubmit={handleSaveAll} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-4">
             <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
@@ -317,7 +257,7 @@ export const AdminTelegramBotManager: React.FC<AdminTelegramBotManagerProps> = (
                   <span>Comandos Estructurados & Respuestas Automáticas</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Gestiona las respuestas sobre cuotas, billetera GRPAY, catálogo y atención al cliente.
+                  Gestiona las respuestas sobre cuotas, billetera Zeny, catálogo y atención al cliente.
                 </p>
               </div>
 
@@ -360,7 +300,7 @@ export const AdminTelegramBotManager: React.FC<AdminTelegramBotManagerProps> = (
                     >
                       <option value="general">General</option>
                       <option value="cuotas">Cuotas / Financiamiento</option>
-                      <option value="wallet">Wallet GRPAY</option>
+                      <option value="wallet">Wallet Zeny</option>
                       <option value="catalogo">Catálogo</option>
                       <option value="usuario">Consulta de Usuario</option>
                       <option value="soporte">Soporte Técnico</option>
@@ -465,141 +405,6 @@ export const AdminTelegramBotManager: React.FC<AdminTelegramBotManagerProps> = (
             </div>
           </div>
         </div>
-      )}
-
-      {/* SUBTAB 2: WHATSAPP API INTEGRATION */}
-      {activeSubTab === 'whatsapp_api' && (
-        <div className="space-y-6">
-          <form onSubmit={handleSaveAll} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
-                  <Smartphone className="w-5 h-5 text-emerald-600" />
-                  <span>Configuración de WhatsApp API Oficial / Cloud API</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Conecta tu instancia o número empresarial de WhatsApp para envío directo de comprobantes, recordatorios de cuotas y contratos.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-black uppercase ${
-                    waConfig.enabled
-                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  {waConfig.enabled ? 'Módulo Activado' : 'Módulo Inactivo'}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={waConfig.enabled}
-                  onChange={(e) => setWaConfig({ ...waConfig, enabled: e.target.checked })}
-                  className="w-5 h-5 text-emerald-600 rounded cursor-pointer"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">Proveedor / Arquitectura:</label>
-                <select
-                  value={waConfig.provider}
-                  onChange={(e) => setWaConfig({ ...waConfig, provider: e.target.value as any })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-bold bg-slate-50"
-                >
-                  <option value="cloud_api">WhatsApp Cloud API (Meta Oficial)</option>
-                  <option value="baileys">Servidor Baileys / Node.js Webhook</option>
-                  <option value="wppconnect">WPPConnect / Evolution API</option>
-                  <option value="custom_webhook">Webhook API Personalizado</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">Nombre de la Instancia:</label>
-                <input
-                  type="text"
-                  value={waConfig.instanceName || ''}
-                  onChange={(e) => setWaConfig({ ...waConfig, instanceName: e.target.value })}
-                  placeholder="GregoriStreamingBot"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">URL Endpoint API:</label>
-                <input
-                  type="url"
-                  value={waConfig.apiUrl}
-                  onChange={(e) => setWaConfig({ ...waConfig, apiUrl: e.target.value })}
-                  placeholder="https://graph.facebook.com/v18.0 o http://tuvps:8080"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">Phone Number ID (Meta):</label>
-                <input
-                  type="text"
-                  value={waConfig.phoneNumberId || ''}
-                  onChange={(e) => setWaConfig({ ...waConfig, phoneNumberId: e.target.value })}
-                  placeholder="Ej. 10928472918471"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block font-bold text-slate-800 mb-1">API Token / Bearer Token:</label>
-                <input
-                  type="password"
-                  value={waConfig.apiToken}
-                  onChange={(e) => setWaConfig({ ...waConfig, apiToken: e.target.value })}
-                  placeholder="EAAO... (Permanent Token de Meta o API Key del VPS)"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Test connection row */}
-            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Número de prueba (ej. 584121234567)"
-                  value={waTestNumber}
-                  onChange={(e) => setWaTestNumber(e.target.value)}
-                  className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white font-mono text-xs w-60"
-                />
-                <button
-                  type="button"
-                  onClick={handleTestWhatsApp}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs cursor-pointer"
-                >
-                  Probar Conexión
-                </button>
-              </div>
-
-              {waTestSuccess && (
-                <span className="text-emerald-800 font-bold flex items-center gap-1 animate-fadeIn">
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  {waTestSuccess}
-                </span>
-              )}
-            </div>
-
-            <div className="pt-2 flex justify-end">
-              <button
-                type="submit"
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md transition cursor-pointer flex items-center gap-2"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Guardar Configuración WhatsApp API</span>
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-    </div>
+      </div>
   );
 };

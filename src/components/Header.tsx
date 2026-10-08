@@ -8,7 +8,8 @@ import {
   RefreshCw,
   Tv,
   ExternalLink,
-  Smartphone
+  Smartphone,
+  MessageCircle
 } from 'lucide-react';
 import { CurrencyCode, SheetsConnectionState, CustomerUser } from '../types';
 import { formatGrpay } from '../utils/formatters';
@@ -56,7 +57,7 @@ export const Header: React.FC<HeaderProps> = ({
     ? banner.messages
     : [
         'Entrega inmediata en menos de 15 minutos con garantía total durante todo el mes.',
-        'Financiamiento disponible: Paga en cuotas al 50% inicial con Pago Móvil o Wallet GRPAY.',
+        'Financiamiento disponible: Paga en cuotas al 50% inicial con Pago Móvil o Wallet Zeny.',
         'Tasa Oficial BCV actualizada en vivo y sin comisiones ocultas.'
       ];
 
@@ -138,10 +139,17 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping absolute opacity-75" />
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
               </div>
-              <span className="text-slate-300 font-semibold text-xs sm:text-sm">Tasa Oficial BCV:</span>
-              <strong className="text-emerald-400 font-mono font-black text-sm sm:text-base md:text-lg tracking-tight tabular-nums">
-                {bcvRate} Bs/USD
-              </strong>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-300 font-semibold text-xs sm:text-sm">Tasa Oficial BCV:</span>
+                  <strong className="text-emerald-400 font-mono font-black text-sm sm:text-base md:text-lg tracking-tight tabular-nums">
+                    {bcvRate} Bs/USD
+                  </strong>
+                </div>
+                <span className="text-slate-300 font-semibold text-xs sm:text-sm">
+                  Fecha Valor: {new Date().toLocaleDateString()}
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={onRefreshBcv}
@@ -152,7 +160,6 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             </div>
             <span className="hidden xl:inline text-slate-500 text-xs">•</span>
-            <span className="hidden xl:inline text-slate-300 text-xs font-medium">Activación en 15 minutos con garantía</span>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 text-slate-300 ml-auto">
@@ -164,9 +171,6 @@ export const Header: React.FC<HeaderProps> = ({
               <Clock className="w-3.5 h-3.5 text-indigo-400" />
               <span>Rastrear Pedido</span>
             </button>
-            <div className="hidden sm:flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1.5 rounded-xl text-emerald-400 text-xs font-bold font-mono">
-              <span>1 GRPAY = $1.00 USD</span>
-            </div>
             {onOpenInstallModal && (
               <button
                 type="button"
@@ -184,39 +188,32 @@ export const Header: React.FC<HeaderProps> = ({
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20 gap-2 sm:gap-4">
-          {/* Logo & Brand Name: Gregori Izquierdo Streaming */}
-          <div className="flex items-center gap-3">
-            <a href="#" className="flex items-center gap-2.5 sm:gap-3 group">
-              {/* Custom Monogram GI Crest Logo */}
-              <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-700 via-indigo-600 to-sky-500 p-0.5 shadow-md shadow-indigo-100 group-hover:scale-105 transition-transform flex items-center justify-center">
-                <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600/30 via-transparent to-sky-500/20" />
-                  <span className="font-black text-transparent bg-clip-text bg-gradient-to-tr from-white via-indigo-100 to-sky-300 text-base tracking-tighter">
-                    GI
-                  </span>
-                  <div className="absolute -bottom-1 w-5 h-1 rounded-full bg-indigo-500 blur-xs" />
-                </div>
+          {/* Logo & Brand Name */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <a href="#" className="flex items-center gap-2 group">
+              {/* New Logo Image */}
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border border-slate-200 bg-white p-1 shrink-0">
+                <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
               </div>
 
-              <div className="flex flex-col">
+              <div className="flex flex-col truncate">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-base sm:text-lg lg:text-xl font-extrabold tracking-tight text-slate-900 leading-tight">
-                    Gregori Izquierdo
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black uppercase bg-indigo-50 text-indigo-700 border border-indigo-100 hidden sm:inline">
-                    Streaming
+                  <span className="text-xs sm:text-sm font-extrabold tracking-tight text-slate-900 leading-tight truncate">
+                    Emprendimiento Gregory Izquierdo
                   </span>
                 </div>
-                <span className="text-[10px] tracking-wider uppercase font-semibold text-slate-400 flex items-center gap-1">
-                  <span>Cuentas & Pantallas Privadas</span>
-                  <span className="hidden lg:inline">• gregoryizquierdo.xyz</span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-600">
+                  J-50639379-4
+                </span>
+                <span className="text-[9px] sm:text-[10px] tracking-wider uppercase font-semibold text-slate-500 flex items-center gap-1 truncate">
+                  <span>Streaming · Cuentas & Servicios</span>
                 </span>
               </div>
             </a>
           </div>
 
-          {/* Action Bar */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Action Bar - Aligned Right */}
+          <div className="flex items-center justify-end gap-2 sm:gap-3 flex-1 px-2">
             {/* Currency selector: USD / BS */}
             <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold text-slate-600">
               <button
@@ -245,7 +242,7 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={onOpenCustomerModal}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200/80 hover:bg-indigo-100 transition cursor-pointer"
-                title="Ver mis suscripciones y wallet GRPAY"
+                title="Ver mis suscripciones y wallet Zeny"
               >
                 <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shadow-xs">
                   {customerUser.name.substring(0, 1)}
@@ -255,7 +252,7 @@ export const Header: React.FC<HeaderProps> = ({
                     {customerUser.name.split(' ')[0]}
                   </div>
                   <div className="text-[10px] font-extrabold text-indigo-700 font-mono">
-                    {formatGrpay(customerUser.grpayBalance)}
+                    {formatGrpay(customerUser.zenyBalance)}
                   </div>
                 </div>
               </button>
@@ -263,11 +260,14 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={onOpenCustomerAuth}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition cursor-pointer"
                 title="Iniciar Sesión / Registro de Clientes"
               >
-                <User className="w-3.5 h-3.5" />
-                <span>Ingresar</span>
+                <User className="w-4 h-4" />
+                <div className="flex flex-col items-start leading-none">
+                  <span className="text-xs font-bold">Ingresar</span>
+                  <span className="text-[8px] sm:text-[10px] opacity-90 font-medium">Clientes</span>
+                </div>
               </button>
             )}
 
@@ -278,14 +278,25 @@ export const Header: React.FC<HeaderProps> = ({
               className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-300" />
-              <span className="hidden md:inline">Admin & Conciliación</span>
-              <span className="md:hidden">Admin</span>
+              <span className="hidden md:inline">Admin</span>
               {(pendingOrdersCount > 0 || pendingTopupsCount > 0) && (
                 <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950 animate-pulse">
                   {pendingOrdersCount + pendingTopupsCount}
                 </span>
               )}
             </button>
+
+            {/* WhatsApp Support Button */}
+            <a
+              href="https://wa.me/584241983648?text=Hola,%20necesito%20Soporte/Asesoria"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+              title="Soporte WhatsApp"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Soporte</span>
+            </a>
           </div>
         </div>
       </div>

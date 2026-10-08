@@ -8,8 +8,8 @@ export const FAQSection: React.FC = () => {
       a: 'Seleccionas tu plataforma y plan (1, 3, 6 o 12 meses). Puedes pagar en Dólares ($ USD) o en Bolívares (Bs.) calculados a la tasa oficial del BCV. Contamos con 9 métodos de pago: Cuenta en EEUU (Zelle / ACH), Airtm, Pago Móvil (Venezuela), Binance Pay (USDT), Banco Pichincha (Ecuador), Wally, Zinli, UglyCash y TDC (Banesco Conecta). Realizas la transferencia, ingresas tu número de referencia bancario y nuestro equipo valida el ingreso en minutos para activar tu suscripción.'
     },
     {
-      q: '¿Qué es la Wallet GRPAY y cómo funciona?',
-      a: 'GRPAY es la moneda y billetera interna de StreamSync (1 GRPAY = 1 USD / 1 USDT / equivalente en Bs. a tasa BCV). Puedes solicitar recargas de saldo abonando por cualquiera de nuestros métodos de pago. Una vez que el administrador acredita tu saldo en tu cuenta, puedes adquirir o renovar suscripciones con 1 solo clic y activación inmediata sin esperas. Importante: este saldo es exclusivo para compras y renovaciones en la plataforma, no es retirable ni canjeable por efectivo.'
+      q: '¿Qué es la Wallet Zeny y cómo funciona?',
+      a: 'Zeny es la moneda y billetera interna de StreamSync (1 Zeny = 1 USD / 1 USDT / equivalente en Bs. a tasa BCV). Puedes solicitar recargas de saldo abonando por cualquiera de nuestros métodos de pago. Una vez que el administrador acredita tu saldo en tu cuenta, puedes adquirir o renovar suscripciones con 1 solo clic y activación inmediata sin esperas. Importante: este saldo es exclusivo para compras y renovaciones en la plataforma, no es retirable ni canjeable por efectivo.'
     },
     {
       q: '¿Cómo se actualiza la tasa oficial del Banco Central de Venezuela (BCV)?',
@@ -43,7 +43,7 @@ export const FAQSection: React.FC = () => {
             Preguntas Frecuentes
           </h2>
           <p className="mt-2 text-sm text-slate-500 max-w-xl mx-auto">
-            Todo sobre los 9 métodos de pago, wallet GRPAY, tasa BCV y garantías.
+            Todo sobre los 9 métodos de pago, wallet Zeny, tasa BCV y garantías.
           </p>
         </div>
 

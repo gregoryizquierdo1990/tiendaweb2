@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Users,
   ShieldCheck,
-  Key,
-  Lock,
   Check,
   Search,
   Phone,
@@ -11,40 +9,28 @@ import {
   UserCheck,
   RotateCcw,
   Edit3,
-  Send,
   MessageCircle,
-  FileText,
-  Settings,
-  QrCode,
-  Smartphone,
-  HelpCircle,
-  CheckCircle2,
-  DollarSign,
   Briefcase,
   Layers,
   Save,
-  X
+  X,
+  Lock,
+  Sparkles,
+  CheckCircle2,
+  Trash2
 } from 'lucide-react';
 import { CustomerUser, FranchiseTenant } from '../types';
 import { logAuditEvent } from '../services/auditLogger';
 import { useAppStore } from '../store/useAppStore';
 
-export type AdminSecurityAuthMethod = 'google_authenticator' | 'whatsapp' | 'telegram' | 'email' | 'security_question';
-
 export interface AdminUserData {
   id: string;
-  username: string;
-  password?: string;
   name: string;
   role: string;
   phone: string;
   email: string;
   status: string;
-  authMethod: AdminSecurityAuthMethod;
-  googleAuthSecret?: string;
-  securityQuestion?: string;
-  securityAnswer?: string;
-  telegramChatId?: string;
+  authMethod: 'google_oauth';
 }
 
 interface AdminUserManagerProps {
@@ -53,38 +39,15 @@ interface AdminUserManagerProps {
   onResetPassword: (userId: string, newPass: string, userType: 'admin' | 'customer' | 'franchise' | 'seller') => void;
 }
 
-const DEFAULT_ADMINS: AdminUserData[] = [
-  {
-    id: 'admin-maxter',
-    username: 'maxter',
-    password: 'nolimits.10',
-    name: 'Gregory Izquierdo',
-    role: 'Administrador Maestro (Dueño)',
-    phone: '+584241983648',
-    email: 'emprendimientogregoryizquierdo@gmail.com',
-    status: 'Activo',
-    authMethod: 'google_authenticator',
-    googleAuthSecret: 'JBSWY3DPEHPK3PXP',
-    securityQuestion: '¿Cuál es el nombre de tu primera mascota?',
-    securityAnswer: 'Max',
-    telegramChatId: '@gregory_streaming'
-  },
-  {
-    id: 'admin-neron',
-    username: 'neron',
-    password: 'nero090889',
-    name: 'Pablo Gonzalez',
-    role: 'Administrador Maestro (Equipo)',
-    phone: '+584241983648',
-    email: 'emprendimientogregoryizquierdo@gmail.com',
-    status: 'Activo',
-    authMethod: 'google_authenticator',
-    googleAuthSecret: 'HXDMVJECJJWSRZ3U',
-    securityQuestion: '¿En qué ciudad naciste?',
-    securityAnswer: 'Caracas',
-    telegramChatId: '@pablo_gonzalez'
-  }
-];
+const PRIMARY_GOOGLE_ADMIN: AdminUserData = {
+  id: 'admin-maxter',
+  name: 'Gregory Izquierdo',
+  role: 'Administrador Maestro & Propietario (Acceso Total)',
+  phone: '+584241983648',
+  email: 'emprendimientogregoryizquierdo@gmail.com',
+  status: 'Activo & Verificado por Google',
+  authMethod: 'google_oauth'
+};
 
 export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
   customers: propCustomers,
@@ -103,32 +66,49 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
   const [selectedUserForReset, setSelectedUserForReset] = useState<{
     id: string;
     name: string;
-    type: 'admin' | 'customer' | 'franchise' | 'sub';
+    type: 'customer' | 'franchise' | 'sub';
     phone: string;
     email: string;
   } | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
-  // Editable Notification Message Template
-  const [notificationTemplate, setNotificationTemplate] = useState(
-    `Hola {nombre}, tus datos de acceso al sistema han sido actualizados.\nUsuario / Correo: {usuario}\nNueva Contraseña: {clave}\nSoporte Oficial: 04241983648 / +584241983648`
-  );
-  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
-
-  // Master Admin State (Editable & Persisted)
-  const [masterAdmins, setMasterAdmins] = useState<AdminUserData[]>(() => {
+  // Perfil del Administrador Único de Google (Persistido)
+  const [adminProfile, setAdminProfile] = useState<AdminUserData>(() => {
     try {
-      const saved = localStorage.getItem('streamsync_master_admins_v1');
+      const saved = localStorage.getItem('streamsync_primary_google_admin_v2');
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.error(e);
     }
-    return DEFAULT_ADMINS;
+    return PRIMARY_GOOGLE_ADMIN;
   });
 
-  const [editingAdmin, setEditingAdmin] = useState<AdminUserData | null>(null);
-  const [showQrModalForAdmin, setShowQrModalForAdmin] = useState<AdminUserData | null>(null);
+  const [isEditingAdmin, setIsEditingAdmin] = useState(false);
+  const [adminEditForm, setAdminEditForm] = useState({
+    name: adminProfile.name,
+    phone: adminProfile.phone,
+    email: adminProfile.email
+  });
+
+  // Purgar credenciales maestras inseguras y operadores huérfanos al inicializar
+  useEffect(() => {
+    try {
+      localStorage.removeItem('portal_staff_members');
+      localStorage.removeItem('streamsync_staff_members');
+      // Guardar perfil limpio consolidado
+      localStorage.setItem('streamsync_primary_google_admin_v2', JSON.stringify(adminProfile));
+      // Mantener sincronizado el email en la lista para validación de googleAuth
+      localStorage.setItem('streamsync_master_admins_v1', JSON.stringify([{
+        id: adminProfile.id,
+        name: adminProfile.name,
+        email: adminProfile.email,
+        authMethod: 'google_oauth'
+      }]));
+    } catch (e) {
+      console.error('Error purgando operadores anteriores:', e);
+    }
+  }, [adminProfile]);
 
   // Modal to edit full user data ficha (Clients, Sellers, Resellers, Franchises, Sub-franchises, Sub-clients)
   const [editingFicha, setEditingFicha] = useState<{
@@ -148,16 +128,7 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
     role?: 'cliente' | 'vendedor';
   } | null>(null);
 
-  // Save master admins to localStorage when updated
-  useEffect(() => {
-    try {
-      localStorage.setItem('streamsync_master_admins_v1', JSON.stringify(masterAdmins));
-    } catch (e) {
-      console.error('Error saving master admins', e);
-    }
-  }, [masterAdmins]);
-
-  // Collect all sub-franchises across franchises
+  // Sub-franchises across franchises
   const allSubFranchises = franchises.flatMap((f) =>
     (f.subFranchises || []).map((sub: any) => ({
       ...sub,
@@ -166,8 +137,8 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
     }))
   );
 
-  // Real subfranchise clients (persisted in localStorage, clean default)
-  const [subClients, setSubClients] = useState<any[]>(() => {
+  // Sub-clients
+  const [subClients] = useState<any[]>(() => {
     try {
       const raw = localStorage.getItem('gi_subclients_v1');
       if (raw) return JSON.parse(raw);
@@ -177,15 +148,32 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
     return [];
   });
 
+  const handleSaveAdminProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updated: AdminUserData = {
+      ...adminProfile,
+      name: adminEditForm.name.trim() || 'Gregory Izquierdo',
+      phone: adminEditForm.phone.trim() || '+584241983648',
+      email: adminEditForm.email.trim().toLowerCase() || PRIMARY_GOOGLE_ADMIN.email
+    };
+    setAdminProfile(updated);
+    setIsEditingAdmin(false);
+
+    logAuditEvent({
+      action: 'UPDATE_ADMIN_PROFILE',
+      description: `Datos de contacto del administrador único actualizados: ${updated.name} (${updated.email})`,
+      severity: 'info',
+      actorRole: 'admin',
+      actor: 'Administrador Maestro'
+    });
+
+    setSuccessNotice('¡Datos del Administrador Maestro actualizados con éxito!');
+    setTimeout(() => setSuccessNotice(null), 4000);
+  };
+
   const handlePasswordResetSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUserForReset || !newPassword) return;
-
-    if (selectedUserForReset.type === 'admin') {
-      setMasterAdmins((prev) =>
-        prev.map((a) => (a.id === selectedUserForReset.id ? { ...a, password: newPassword } : a))
-      );
-    }
 
     onResetPassword(
       selectedUserForReset.id,
@@ -205,16 +193,6 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
     setSelectedUserForReset(null);
     setNewPassword('');
     setTimeout(() => setSuccessNotice(null), 5000);
-  };
-
-  const handleSaveAdminEdit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingAdmin) return;
-
-    setMasterAdmins((prev) => prev.map((a) => (a.id === editingAdmin.id ? editingAdmin : a)));
-    setEditingAdmin(null);
-    setSuccessNotice(`¡Ficha de seguridad y método de acceso del administrador ${editingAdmin.name} actualizados con éxito!`);
-    setTimeout(() => setSuccessNotice(null), 4000);
   };
 
   const handleSaveFicha = (e: React.FormEvent) => {
@@ -287,13 +265,6 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
     setTimeout(() => setSuccessNotice(null), 4000);
   };
 
-  const formatCustomMessage = (name: string, identifier: string, pass: string) => {
-    return notificationTemplate
-      .replace(/{nombre}/g, name)
-      .replace(/{usuario}/g, identifier)
-      .replace(/{clave}/g, pass);
-  };
-
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
@@ -303,187 +274,110 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
             <Check className="w-4 h-4 text-emerald-400" />
             <span>{successNotice}</span>
           </div>
-          <button onClick={() => setSuccessNotice(null)} className="text-emerald-400 hover:text-white">✕</button>
+          <button onClick={() => setSuccessNotice(null)} className="text-emerald-400 hover:text-white cursor-pointer">✕</button>
         </div>
       )}
 
-      {/* SECTION 1: MASTER ADMINS WITH AUTHENTICATION METHOD SETTINGS */}
+      {/* SECTION 1: UNIQUE GOOGLE ADMINISTRATOR */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              <span>Administradores Maestros & Métodos de Autenticación 2FA</span>
+              <span>Administrador Único del Sistema</span>
             </h3>
             <p className="text-xs text-slate-400">
-              Configura el método de seguridad preferido de cada administrador (Google Authenticator, WhatsApp, Telegram, Email o Pregunta Secreta).
+              Acceso blindado y exclusivo mediante el botón de autenticación oficial de Google. Operadores secundarios y contraseñas maestras eliminados.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowTemplateEditor(!showTemplateEditor)}
-            className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 font-bold text-xs flex items-center gap-2 transition cursor-pointer self-start sm:self-auto"
-          >
-            <Settings className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Editar Plantilla de Notificación</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Google OAuth 2.0 Activo</span>
+            </span>
+          </div>
         </div>
 
-        {/* Template Editor Collapsible */}
-        {showTemplateEditor && (
-          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 animate-fadeIn">
-            <label className="block text-xs font-bold text-slate-300">
-              Plantilla de Mensaje para Envío de Credenciales:
-            </label>
-            <textarea
-              rows={3}
-              value={notificationTemplate}
-              onChange={(e) => setNotificationTemplate(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white outline-none focus:border-indigo-500 font-mono"
-            />
-            <p className="text-[11px] text-slate-500">Variables disponibles: {'{nombre}'}, {'{usuario}'}, {'{clave}'}</p>
-          </div>
-        )}
+        {/* Master Admin Card */}
+        <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900/95 to-indigo-950/40 border border-slate-800 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Master Admins Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {masterAdmins.map((adm) => (
-            <div
-              key={adm.id}
-              className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 space-y-4 shadow-xl relative"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-white font-extrabold text-sm">{adm.name}</span>
-                  </div>
-                  <span className="text-[11px] text-indigo-400 font-mono">{adm.role}</span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setEditingAdmin(adm)}
-                  className="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 font-bold text-xs transition flex items-center gap-1 cursor-pointer"
-                >
-                  <Edit3 className="w-3 h-3" />
-                  <span>Configurar 2FA & Ficha</span>
-                </button>
-              </div>
-
-              {/* Security Method Badge */}
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-slate-500 uppercase font-bold block">Método de Acceso Seguro 2FA:</span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    {adm.authMethod === 'google_authenticator' && (
-                      <>
-                        <QrCode className="w-4 h-4 text-emerald-400" />
-                        <span className="text-xs font-bold text-emerald-300">Google Authenticator (TOTP 6 Dígitos)</span>
-                      </>
-                    )}
-                    {adm.authMethod === 'whatsapp' && (
-                      <>
-                        <Smartphone className="w-4 h-4 text-emerald-400" />
-                        <span className="text-xs font-bold text-emerald-300">Código OTP vía WhatsApp</span>
-                      </>
-                    )}
-                    {adm.authMethod === 'telegram' && (
-                      <>
-                        <Send className="w-4 h-4 text-sky-400" />
-                        <span className="text-xs font-bold text-sky-300">Código OTP vía Telegram</span>
-                      </>
-                    )}
-                    {adm.authMethod === 'email' && (
-                      <>
-                        <Mail className="w-4 h-4 text-indigo-400" />
-                        <span className="text-xs font-bold text-indigo-300">Código OTP vía Correo</span>
-                      </>
-                    )}
-                    {adm.authMethod === 'security_question' && (
-                      <>
-                        <HelpCircle className="w-4 h-4 text-amber-400" />
-                        <span className="text-xs font-bold text-amber-300">Pregunta de Seguridad Secreta</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {adm.authMethod === 'google_authenticator' && (
-                  <button
-                    type="button"
-                    onClick={() => setShowQrModalForAdmin(adm)}
-                    className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 text-xs font-bold flex items-center gap-1 cursor-pointer"
-                    title="Ver QR y Clave Secreta"
-                  >
-                    <QrCode className="w-3.5 h-3.5" />
-                    <span>Ver QR</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Details */}
-              <div className="text-xs font-mono space-y-1 text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-slate-800/60">
-                <div className="flex justify-between border-b border-slate-800/60 pb-1">
-                  <span className="text-slate-500">Usuario:</span>
-                  <span className="text-white font-bold">{adm.username}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-800/60 pb-1">
-                  <span className="text-slate-500">Teléfono:</span>
-                  <span className="text-slate-300">{adm.phone}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Correo:</span>
-                  <span className="text-slate-300 text-[11px] truncate max-w-[180px]">{adm.email}</span>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+            {/* Admin identity */}
+            <div className="flex items-start sm:items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-emerald-500 p-0.5 shadow-xl shadow-indigo-500/20 shrink-0">
+                <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+                  <ShieldCheck className="w-8 h-8 text-emerald-400" />
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectedUserForReset({
-                      id: adm.id,
-                      name: adm.name,
-                      type: 'admin',
-                      phone: adm.phone,
-                      email: adm.email
-                    })
-                  }
-                  className="py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Cambiar Clave</span>
-                </button>
-
-                <div className="flex items-center gap-1">
-                  <a
-                    href={`https://wa.me/${adm.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                      formatCustomMessage(adm.name, adm.username, adm.password || '')
-                    )}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex-1 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs transition flex items-center justify-center gap-1"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span>WhatsApp</span>
-                  </a>
-
-                  <a
-                    href={`mailto:${adm.email}?subject=${encodeURIComponent(
-                      'Credenciales Actualizadas - Sistema'
-                    )}&body=${encodeURIComponent(formatCustomMessage(adm.name, adm.username, adm.password || ''))}`}
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-                    title="Enviar por Correo"
-                  >
-                    <Mail className="w-4 h-4" />
-                  </a>
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="text-lg font-black text-white">{adminProfile.name}</h4>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider">
+                    Super Admin • Dueño
+                  </span>
                 </div>
+                <p className="text-xs text-indigo-300 font-mono flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Acceso Único por Correo Gmail Autorizado</span>
+                </p>
               </div>
             </div>
-          ))}
+
+            {/* Actions */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminEditForm({
+                    name: adminProfile.name,
+                    phone: adminProfile.phone,
+                    email: adminProfile.email
+                  });
+                  setIsEditingAdmin(true);
+                }}
+                className="px-4 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Actualizar Datos de Contacto</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Details Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-6 mt-6 border-t border-slate-800/80">
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
+                Correo Electrónico Autorizado Google:
+              </span>
+              <div className="font-mono text-emerald-300 font-extrabold text-xs break-all flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>{adminProfile.email}</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
+                Teléfono de Contacto / Soporte:
+              </span>
+              <div className="font-mono text-white font-bold text-xs flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>{adminProfile.phone}</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
+                Políticas de Seguridad:
+              </span>
+              <div className="text-indigo-300 font-bold text-xs flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                <span>Credenciales maestras eliminadas • Sin contraseñas débiles</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -493,10 +387,10 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
           <div>
             <h3 className="text-sm font-bold text-slate-300 flex items-center gap-2 uppercase tracking-wider">
               <Users className="w-4 h-4 text-indigo-400" />
-              <span>Directorio Completo con Edición de Fichas</span>
+              <span>Directorio General de Clientes & Franquicias</span>
             </h3>
             <p className="text-xs text-slate-400">
-              Edita datos de clientes, vendedores, revendedores, franquiciados, subfranquiciados y clientes de subfranquiciados.
+              Administración de cuentas de clientes, vendedores, revendedores y redes de franquicias.
             </p>
           </div>
 
@@ -756,8 +650,8 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
                       <div>Correo: <span className="text-white truncate block max-w-[170px]">{cust.email}</span></div>
                       <div>Teléfono: <span className="text-white">{cust.phone}</span></div>
                       <div>
-                        Billetera GRPAY:{' '}
-                        <span className="text-emerald-400 font-bold">${cust.grpayBalance.toFixed(2)}</span>
+                        Billetera Zeny:{' '}
+                        <span className="text-emerald-400 font-bold">${(cust.grpayBalance || 0).toFixed(2)}</span>
                       </div>
                       {cust.notes && (
                         <div className="text-[10px] text-slate-500 truncate">Nota: {cust.notes}</div>
@@ -809,7 +703,7 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
         </div>
       </div>
 
-      {/* MODAL: RESET PASSWORD */}
+      {/* MODAL: RESET PASSWORD (PARA CLIENTES Y FRANQUICIAS) */}
       {selectedUserForReset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
@@ -820,7 +714,7 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
               <button
                 type="button"
                 onClick={() => setSelectedUserForReset(null)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-white cursor-pointer"
               >
                 ✕
               </button>
@@ -842,22 +736,22 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
               <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 space-y-1">
                 <div>Al confirmar:</div>
                 <div className="text-emerald-400">• Se actualizará la clave del usuario en el sistema.</div>
-                <div className="text-emerald-400">• Se registrará automáticamente en la Bitácora (Audit Log).</div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setSelectedUserForReset(null)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold"
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                 >
-                  Confirmar & Registrar en Bitácora
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Confirmar Cambio</span>
                 </button>
               </div>
             </form>
@@ -865,444 +759,190 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
         </div>
       )}
 
-      {/* MODAL: EDIT USER FICHA (CLIENTS, SELLERS, RESELLERS, FRANCHISES, SUB-FRANCHISES, SUB-CLIENTS) */}
-      {editingFicha && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 my-8">
+      {/* MODAL: EDIT MASTER ADMIN CONTACT DATA */}
+      {isEditingAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
-                  <Edit3 className="w-5 h-5" />
-                </span>
-                <div>
-                  <h3 className="text-base font-bold text-white">
-                    Editar Ficha de {editingFicha.roleType === 'franchise' ? 'Franquicia' : editingFicha.roleType === 'subfranchise' ? 'Sub-Franquicia' : editingFicha.roleType === 'seller' ? 'Vendedor / Revendedor' : 'Cliente'}
-                  </h3>
-                  <p className="text-xs text-slate-400">{editingFicha.name}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingFicha(null)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveFicha} className="space-y-3.5 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Nombre / Razón Social:</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingFicha.name}
-                    onChange={(e) => setEditingFicha({ ...editingFicha, name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                {(editingFicha.roleType === 'franchise' || editingFicha.roleType === 'subfranchise') && (
-                  <div>
-                    <label className="block font-semibold text-slate-300 mb-1">Titular Responsable:</label>
-                    <input
-                      type="text"
-                      value={editingFicha.ownerName || ''}
-                      onChange={(e) => setEditingFicha({ ...editingFicha, ownerName: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Teléfono Móvil (WhatsApp):</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingFicha.phone}
-                    onChange={(e) => setEditingFicha({ ...editingFicha, phone: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Correo Electrónico:</label>
-                  <input
-                    type="email"
-                    required
-                    value={editingFicha.email}
-                    onChange={(e) => setEditingFicha({ ...editingFicha, email: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* Roles & Balances */}
-              {(editingFicha.roleType === 'customer' || editingFicha.roleType === 'seller' || editingFicha.roleType === 'reseller') && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <label className="block font-semibold text-slate-300 mb-1">Tipo de Usuario:</label>
-                    <select
-                      value={editingFicha.role || 'cliente'}
-                      onChange={(e) =>
-                        setEditingFicha({
-                          ...editingFicha,
-                          role: e.target.value as 'cliente' | 'vendedor'
-                        })
-                      }
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white outline-none focus:border-indigo-500"
-                    >
-                      <option value="cliente">Cliente Regular</option>
-                      <option value="vendedor">Vendedor / Revendedor Oficial</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-300 mb-1">Saldo en Billetera GRPAY ($ USD):</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={editingFicha.grpayBalance ?? 0}
-                        onChange={(e) =>
-                          setEditingFicha({
-                            ...editingFicha,
-                            grpayBalance: parseFloat(e.target.value) || 0
-                          })
-                        }
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-7 pr-3 py-2 text-white font-mono outline-none focus:border-indigo-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Franchise Balance */}
-              {editingFicha.roleType === 'franchise' && (
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Saldo Master Billetera USD:</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={editingFicha.grpayBalance ?? 0}
-                      onChange={(e) =>
-                        setEditingFicha({
-                          ...editingFicha,
-                          grpayBalance: parseFloat(e.target.value) || 0
-                        })
-                      }
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-7 pr-3 py-2 text-white font-mono outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Notes */}
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Notas Internas de la Ficha:</label>
-                <textarea
-                  rows={2}
-                  placeholder="Detalles sobre compras frecuentes, convenios especiales o descuentos..."
-                  value={editingFicha.notes || ''}
-                  onChange={(e) => setEditingFicha({ ...editingFicha, notes: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setEditingFicha(null)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-600/30 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Guardar Ficha en Base de Datos</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: EDIT ADMIN 2FA & SECURITY METHOD */}
-      {editingAdmin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 my-8">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
-                  <ShieldCheck className="w-5 h-5" />
-                </span>
-                <div>
-                  <h3 className="text-base font-bold text-white">
-                    Configuración de Seguridad & 2FA: {editingAdmin.name}
-                  </h3>
-                  <p className="text-xs text-slate-400">Escoge el método de autenticación preferido para este administrador</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingAdmin(null)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveAdminEdit} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Nombre Completo:</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingAdmin.name}
-                    onChange={(e) => setEditingAdmin({ ...editingAdmin, name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Usuario de Acceso:</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingAdmin.username}
-                    onChange={(e) => setEditingAdmin({ ...editingAdmin, username: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* METHOD SELECTION */}
-              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                <label className="block font-bold text-slate-200">
-                  Método de Autenticación de Seguridad (2FA):
-                </label>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditingAdmin({ ...editingAdmin, authMethod: 'google_authenticator' })}
-                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
-                      editingAdmin.authMethod === 'google_authenticator'
-                        ? 'bg-emerald-600/20 border-emerald-500 text-white shadow-xs'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <QrCode className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <div>
-                      <div className="font-bold text-xs text-white">Google Authenticator</div>
-                      <div className="text-[10px] text-slate-400">Token TOTP de 6 dígitos</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setEditingAdmin({ ...editingAdmin, authMethod: 'whatsapp' })}
-                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
-                      editingAdmin.authMethod === 'whatsapp'
-                        ? 'bg-emerald-600/20 border-emerald-500 text-white shadow-xs'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Smartphone className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <div>
-                      <div className="font-bold text-xs text-white">WhatsApp</div>
-                      <div className="text-[10px] text-slate-400">Código OTP por mensaje</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setEditingAdmin({ ...editingAdmin, authMethod: 'telegram' })}
-                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
-                      editingAdmin.authMethod === 'telegram'
-                        ? 'bg-sky-600/20 border-sky-500 text-white shadow-xs'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Send className="w-4 h-4 text-sky-400 shrink-0" />
-                    <div>
-                      <div className="font-bold text-xs text-white">Telegram</div>
-                      <div className="text-[10px] text-slate-400">Código vía bot/chat</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setEditingAdmin({ ...editingAdmin, authMethod: 'email' })}
-                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
-                      editingAdmin.authMethod === 'email'
-                        ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-xs'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Mail className="w-4 h-4 text-indigo-400 shrink-0" />
-                    <div>
-                      <div className="font-bold text-xs text-white">Email</div>
-                      <div className="text-[10px] text-slate-400">Código OTP por correo</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setEditingAdmin({ ...editingAdmin, authMethod: 'security_question' })}
-                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 sm:col-span-2 transition cursor-pointer ${
-                      editingAdmin.authMethod === 'security_question'
-                        ? 'bg-amber-600/20 border-amber-500 text-white shadow-xs'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <HelpCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                    <div>
-                      <div className="font-bold text-xs text-white">Preguntas de Seguridad</div>
-                      <div className="text-[10px] text-slate-400">Respuesta a pregunta secreta personalizada</div>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Conditional Fields based on method */}
-                {editingAdmin.authMethod === 'google_authenticator' && (
-                  <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2 animate-fadeIn">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-emerald-400">Clave Secreta TOTP:</span>
-                      <span className="font-mono text-xs bg-slate-950 px-2 py-0.5 rounded text-white font-bold border border-slate-800">
-                        {editingAdmin.googleAuthSecret || 'JBSWY3DPEHPK3PXP'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">
-                      Escanea el código QR con Google Authenticator o introduce la clave secreta directamente en la aplicación.
-                    </p>
-                  </div>
-                )}
-
-                {editingAdmin.authMethod === 'security_question' && (
-                  <div className="space-y-2 pt-1 animate-fadeIn">
-                    <div>
-                      <label className="block text-slate-400 mb-1">Pregunta Secreta:</label>
-                      <input
-                        type="text"
-                        value={editingAdmin.securityQuestion || ''}
-                        onChange={(e) => setEditingAdmin({ ...editingAdmin, securityQuestion: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Respuesta Secreta:</label>
-                      <input
-                        type="text"
-                        value={editingAdmin.securityAnswer || ''}
-                        onChange={(e) => setEditingAdmin({ ...editingAdmin, securityAnswer: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Phone & Email */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Teléfono:</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingAdmin.phone}
-                    onChange={(e) => setEditingAdmin({ ...editingAdmin, phone: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Correo:</label>
-                  <input
-                    type="email"
-                    required
-                    value={editingAdmin.email}
-                    onChange={(e) => setEditingAdmin({ ...editingAdmin, email: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setEditingAdmin(null)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-600/30 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Guardar Configuración 2FA</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: QR CODE GOOGLE AUTHENTICATOR SETUP */}
-      {showQrModalForAdmin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <QrCode className="w-4 h-4 text-emerald-400" />
-                <span>Google Authenticator 2FA</span>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                <span>Datos del Administrador Maestro</span>
               </h3>
               <button
                 type="button"
-                onClick={() => setShowQrModalForAdmin(null)}
-                className="text-slate-400 hover:text-white"
+                onClick={() => setIsEditingAdmin(false)}
+                className="text-slate-400 hover:text-white cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            {/* QR Code graphic */}
-            <div className="bg-white p-4 rounded-2xl inline-block shadow-md">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                  `otpauth://totp/GregoryIzquierdo:${showQrModalForAdmin.username}?secret=${
-                    showQrModalForAdmin.googleAuthSecret || 'JBSWY3DPEHPK3PXP'
-                  }&issuer=StreamSync`
-                )}`}
-                alt="QR Code Google Authenticator"
-                className="w-44 h-44 mx-auto"
-              />
-            </div>
-
-            <div className="text-xs space-y-1.5">
-              <div className="text-slate-400">Clave secreta manual:</div>
-              <div className="font-mono text-emerald-300 font-bold bg-slate-950 p-2 rounded-xl border border-slate-800 select-all">
-                {showQrModalForAdmin.googleAuthSecret || 'JBSWY3DPEHPK3PXP'}
+            <form onSubmit={handleSaveAdminProfile} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre Completo:</label>
+                <input
+                  type="text"
+                  required
+                  value={adminEditForm.name}
+                  onChange={(e) => setAdminEditForm({ ...adminEditForm, name: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                />
               </div>
-              <p className="text-[11px] text-slate-500 pt-1">
-                Abre la app de Google Authenticator en tu teléfono, pulsa "+" y selecciona "Escanear código QR".
-              </p>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Correo Electrónico de Google Autorizado:
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={adminEditForm.email}
+                  onChange={(e) => setAdminEditForm({ ...adminEditForm, email: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-emerald-300 font-mono outline-none focus:border-emerald-500"
+                />
+                <span className="text-[11px] text-slate-500 mt-1 block">
+                  Solo esta cuenta de Google podrá acceder al portal administrativo.
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Teléfono de Soporte / Contacto:</label>
+                <input
+                  type="text"
+                  required
+                  value={adminEditForm.phone}
+                  onChange={(e) => setAdminEditForm({ ...adminEditForm, phone: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-mono outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingAdmin(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Guardar Cambios</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT FICHA (CLIENTS, FRANCHISES, RESELLERS) */}
+      {editingFicha && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white">
+                Editar Ficha: {editingFicha.name}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditingFicha(null)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowQrModalForAdmin(null)}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-600/20 cursor-pointer"
-            >
-              Listo, Ya lo Escaneé
-            </button>
+            <form onSubmit={handleSaveFicha} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre / Razón Social:</label>
+                <input
+                  type="text"
+                  required
+                  value={editingFicha.name}
+                  onChange={(e) => setEditingFicha({ ...editingFicha, name: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {editingFicha.ownerName !== undefined && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre del Titular:</label>
+                  <input
+                    type="text"
+                    value={editingFicha.ownerName}
+                    onChange={(e) => setEditingFicha({ ...editingFicha, ownerName: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Teléfono:</label>
+                  <input
+                    type="text"
+                    value={editingFicha.phone}
+                    onChange={(e) => setEditingFicha({ ...editingFicha, phone: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Correo:</label>
+                  <input
+                    type="email"
+                    value={editingFicha.email}
+                    onChange={(e) => setEditingFicha({ ...editingFicha, email: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {editingFicha.grpayBalance !== undefined && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Saldo Billetera / Master (USD):
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editingFicha.grpayBalance}
+                    onChange={(e) => setEditingFicha({ ...editingFicha, grpayBalance: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-emerald-400 font-bold outline-none focus:border-indigo-500"
+                  />
+                </div>
+              )}
+
+              {editingFicha.notes !== undefined && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Notas Internas:</label>
+                  <textarea
+                    rows={2}
+                    value={editingFicha.notes}
+                    onChange={(e) => setEditingFicha({ ...editingFicha, notes: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingFicha(null)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Guardar Ficha</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

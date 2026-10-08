@@ -327,7 +327,7 @@ export const AdminBillingAndContractsManager: React.FC<AdminBillingAndContractsM
               Facturación Digital & Gestión de Contratos
             </h2>
             <p className="text-indigo-200/80 text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-              Emite facturas fiscales y comerciales por cada orden con serial correlativo, genera documentos en PDF listos para imprimir, gestiona contratos de franquicia y actualízalos automáticamente ante renovaciones.
+              Emite facturas fiscales y comerciales por cada orden con serial correlativo, genera documentos en PDF listos para imprimir, gestiona contratos de servicio para clientes y actualízalos automáticamente ante renovaciones.
             </p>
           </div>
 
@@ -378,7 +378,7 @@ export const AdminBillingAndContractsManager: React.FC<AdminBillingAndContractsM
             }`}
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Contratos de Franquicias & Términos ({contracts.length})</span>
+            <span>Contratos de Servicio & Términos ({contracts.length})</span>
           </button>
         </div>
       </div>
@@ -664,7 +664,7 @@ export const AdminBillingAndContractsManager: React.FC<AdminBillingAndContractsM
                   >
                     <option value="Pago Móvil">Pago Móvil</option>
                     <option value="Transferencia Bancaria">Transferencia Bancaria</option>
-                    <option value="Wallet GRPAY">Saldo Wallet GRPAY</option>
+                    <option value="Wallet Zeny">Saldo Wallet Zeny</option>
                     <option value="Zelle">Zelle</option>
                     <option value="Binance Pay / USDT">Binance Pay / USDT</option>
                     <option value="Efectivo">Efectivo</option>
@@ -895,7 +895,7 @@ export const AdminBillingAndContractsManager: React.FC<AdminBillingAndContractsM
                   <strong>PARTE A (Licenciante / Plataforma):</strong> {viewingContract.parties.partyA}
                 </p>
                 <p>
-                  <strong>PARTE B (Franquiciado / Cliente):</strong> {viewingContract.parties.partyB} (Doc ID:{' '}
+                  <strong>PARTE B (Cliente / Suscriptor):</strong> {viewingContract.parties.partyB} (Doc ID:{' '}
                   {viewingContract.parties.docIdB} • Tel: {viewingContract.parties.phoneB} • Email:{' '}
                   {viewingContract.parties.emailB})
                 </p>
@@ -911,14 +911,14 @@ export const AdminBillingAndContractsManager: React.FC<AdminBillingAndContractsM
               <div className="pt-6 border-t border-slate-200 grid grid-cols-2 gap-8 text-center text-xs">
                 <div>
                   <div className="border-b border-slate-400 pb-12" />
-                  <span className="font-bold text-slate-900 block mt-2">Gregori Izquierdo</span>
+                  <span className="font-bold text-slate-900 block mt-2">Emprendimiento Gregory Izquierdo</span>
                   <span className="text-[10px] text-slate-500">Titular de la Plataforma</span>
                 </div>
 
                 <div>
                   <div className="border-b border-slate-400 pb-12" />
                   <span className="font-bold text-slate-900 block mt-2">{viewingContract.parties.partyB}</span>
-                  <span className="text-[10px] text-slate-500">Franquiciado / Suscriptor</span>
+                  <span className="text-[10px] text-slate-500">Cliente / Suscriptor</span>
                 </div>
               </div>
             </div>

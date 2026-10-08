@@ -48,9 +48,9 @@ export const PLATFORM_ACTION_DEFINITIONS: ActionDefinition[] = [
   },
   {
     id: 'recarga_wallet',
-    name: '6. Notificación de Saldo GRPAY Acreditado',
+    name: '6. Notificación de Saldo Zeny Acreditado',
     category: 'fidelizacion',
-    description: 'Se envía al aprobar una recarga de saldo o regalo en la Wallet GRPAY.',
+    description: 'Se envía al aprobar una recarga de saldo o regalo en la Wallet Zeny.',
     defaultTemplateId: 'recarga_wallet_exitosa'
   },
   {
@@ -222,7 +222,7 @@ En nuestra plataforma podrás disfrutar de las mejores cuentas y perfiles de str
   },
   {
     id: 'recarga_wallet_exitosa',
-    title: 'Recarga de Saldo GRPAY Exitosa',
+    title: 'Recarga de Saldo Zeny Exitosa',
     category: 'whatsapp',
     description: 'Notificación cuando se aprueba una recarga de saldo en la billetera virtual del cliente.',
     variables: [
@@ -233,9 +233,9 @@ En nuestra plataforma podrás disfrutar de las mejores cuentas y perfiles de str
     ],
     content: `💳 *¡Recarga Aprobada en Gregori Izquierdo Streaming!*
 
-Hola *{cliente}*, tu recarga de saldo GRPAY ha sido acreditada con éxito:
+Hola *{cliente}*, tu recarga de saldo Zeny ha sido acreditada con éxito:
 💰 *Monto Recargado:* \${monto_usd} USD
-⭐ *Nuevo Saldo Disponible:* \${saldo_actual} GRPAY
+⭐ *Nuevo Saldo Disponible:* \${saldo_actual} Zeny
 
 Puedes usar tu saldo directamente en {dominio} para renovar o comprar pantallas sin esperar confirmación bancaria.`
   },

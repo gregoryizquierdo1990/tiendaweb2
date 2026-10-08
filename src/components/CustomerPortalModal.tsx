@@ -148,7 +148,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
         customerId: user.id,
         customerName: user.name,
         customerEmail: user.email,
-        amountGRPAY: topupAmountUsd,
+        amountZeny: topupAmountUsd,
         amountPaid,
         currency: isBs ? 'BS' : 'USD',
         paymentMethodId: selectedMethod.id,
@@ -208,7 +208,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
           </div>
         </div>
 
-        {/* GRPAY Wallet Highlight Card */}
+        {/* Zeny Wallet Highlight Card */}
         <div className="p-6 bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white shrink-0">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -216,7 +216,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                 <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Billetera Privada StreamSync</span>
                 <span className="px-1.5 py-0.2 rounded bg-indigo-500/40 text-[10px] text-indigo-100 font-mono">
-                  1 GRPAY = 1 USD / 1 USDT
+                  1 Zeny = 1 USD / 1 USDT
                 </span>
               </div>
               <div className="flex items-baseline gap-3">
@@ -224,7 +224,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                   {formatGrpay(user.grpayBalance)}
                 </span>
                 <span className="text-xs sm:text-sm text-indigo-200 font-medium">
-                  ≈ Bs. {(user.grpayBalance * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  ≈ Bs. {((user.grpayBalance || 0) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                 </span>
               </div>
               <p className="text-[11px] text-indigo-200/80 mt-1 max-w-md">
@@ -242,7 +242,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                 className="py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs shadow-md shadow-emerald-900/40 flex items-center gap-2 transition cursor-pointer"
               >
                 <Plus className="w-4 h-4 text-slate-950" />
-                <span>Recargar Saldo GRPAY</span>
+                <span>Recargar Saldo Zeny</span>
               </button>
             </div>
           </div>
@@ -544,16 +544,16 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
           </div>
         )}
 
-        {/* Tab 2: Billetera GRPAY & Recargas */}
+        {/* Tab 2: Billetera Zeny & Recargas */}
         {activeTab === 'wallet' && (
           <div className="p-6 overflow-y-auto space-y-6">
             {/* Wallet Rules Notice */}
             <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-3">
               <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold">Política de Uso de la Wallet GRPAY:</span>
+                <span className="font-bold">Política de Uso de la Wallet Zeny:</span>
                 <p className="mt-0.5 text-amber-800 leading-relaxed">
-                  El saldo GRPAY es recargado mediante comprobante verificado por el administrador (1 GRPAY = $1.00 USD / 1 USDT / Tasa BCV en Bolívares).
+                  El saldo Zeny es recargado mediante comprobante verificado por el administrador (1 Zeny = $1.00 USD / 1 USDT / Tasa BCV en Bolívares).
                   <strong> Este saldo es de uso estricto y exclusivo para compras y renovaciones dentro de la página; no es canjeable ni transferible fuera de la plataforma.</strong>
                 </p>
               </div>
@@ -578,7 +578,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                 <div className="text-center py-8 px-4 rounded-2xl bg-slate-50 border border-slate-200">
                   <Wallet className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                   <p className="text-xs text-slate-500">
-                    Aún no has solicitado recargas de saldo GRPAY.
+                    Aún no has solicitado recargas de saldo Zeny.
                   </p>
                 </div>
               ) : (
@@ -587,7 +587,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px]">
                       <tr>
                         <th className="py-2.5 px-4">Recarga ID</th>
-                        <th className="py-2.5 px-4">Monto GRPAY</th>
+                        <th className="py-2.5 px-4">Monto Zeny</th>
                         <th className="py-2.5 px-4">Transferido</th>
                         <th className="py-2.5 px-4">Método</th>
                         <th className="py-2.5 px-4">Referencia</th>
@@ -598,7 +598,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                       {myTopups.map((topup) => (
                         <tr key={topup.id}>
                           <td className="py-3 px-4 font-mono font-bold text-slate-900">#{topup.id}</td>
-                          <td className="py-3 px-4 font-bold text-indigo-700">+{formatGrpay(topup.amountGRPAY)}</td>
+                          <td className="py-3 px-4 font-bold text-indigo-700">+{formatGrpay(topup.amountZeny)}</td>
                           <td className="py-3 px-4 text-slate-600">
                             {formatCurrency(topup.amountPaid, topup.currency)}
                           </td>
@@ -765,7 +765,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                         </td>
                         <td className="py-3 px-4 font-bold text-slate-900">
                           {ord.paidWithGrpay ? (
-                            <span className="text-indigo-700">Saldo GRPAY</span>
+                            <span className="text-indigo-700">Saldo Zeny</span>
                           ) : (
                             formatCurrency(ord.total, ord.currency)
                           )}
@@ -935,7 +935,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b border-slate-200">
                   <div>
                     <h2 className="text-lg font-black text-slate-900">GREGORI IZQUIERDO STREAMING</h2>
-                    <p className="text-xs text-slate-500 font-mono">RIF: J-50123456-7</p>
+                    <p className="text-xs text-slate-500 font-mono">RIF: J-50639379-4</p>
                     <p className="text-xs text-slate-500">Servicios Digitales & Plataformas Streaming 24/7</p>
                     <p className="text-xs text-slate-500">WhatsApp Oficial: +58 424-1983648</p>
                   </div>
@@ -1043,7 +1043,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
           </div>
         )}
 
-        {/* Sub-modal: Top up GRPAY Wallet */}
+        {/* Sub-modal: Top up Zeny Wallet */}
         {isTopupModalOpen && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-fadeIn">
             <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 overflow-hidden max-h-[90vh] overflow-y-auto">
@@ -1054,10 +1054,10 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-slate-900">
-                      Recargar Saldo en Wallet GRPAY
+                      Recargar Saldo en Wallet Zeny
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      1 GRPAY = 1.00 USD / 1 USDT • Tasa BCV Oficial: {bcvRate} Bs/USD
+                      1 Zeny = 1.00 USD / 1 USDT • Tasa BCV Oficial: {bcvRate} Bs/USD
                     </p>
                   </div>
                 </div>
@@ -1079,7 +1079,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                   </h4>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto">
                     El administrador verificará tu transferencia y acreditará{' '}
-                    <strong>{formatGrpay(topupSuccess.amountGRPAY)}</strong> en tu cuenta.
+                    <strong>{formatGrpay(topupSuccess.amountZeny)}</strong> en tu cuenta.
                   </p>
 
                   <a
@@ -1105,10 +1105,10 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                 </div>
               ) : (
                 <form onSubmit={handleSubmitTopup} className="space-y-4">
-                  {/* Amount in GRPAY / USD */}
+                  {/* Amount in Zeny / USD */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Monto a Recargar en GRPAY (USD):
+                      Monto a Recargar en Zeny (USD):
                     </label>
                     <div className="grid grid-cols-5 gap-1.5 mb-2">
                       {[1, 3, 5, 10, 15, 20, 25, 30, 40, 50].map((amt) => (
@@ -1122,7 +1122,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                               : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
                           }`}
                         >
-                          {amt} GRPAY
+                          {amt} Zeny
                         </button>
                       ))}
                     </div>
@@ -1137,7 +1137,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                       <span className="text-xs font-bold text-slate-500 whitespace-nowrap">
-                        GRPAY ($ USD)
+                        Zeny ($ USD)
                       </span>
                     </div>
 

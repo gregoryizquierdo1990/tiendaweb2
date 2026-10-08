@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Palette, Sparkles, Check, Globe, FileText, Image as ImageIcon, RotateCcw } from 'lucide-react';
+import { Palette, Sparkles, Check, Image as ImageIcon, RotateCcw } from 'lucide-react';
 import { AppBrandingConfig } from '../types';
 
 interface AdminBrandingManagerProps {
@@ -26,8 +26,6 @@ export const AdminBrandingManager: React.FC<AdminBrandingManagerProps> = ({
 
   const [contactPhoneInput, setContactPhoneInput] = useState((currentBranding.contactPhones || ['+58 412 1234567']).join(', '));
   const [contactEmailInput, setContactEmailInput] = useState((currentBranding.contactEmails || ['soporte@gregoryizquierdo.xyz']).join(', '));
-  const [telegramBotToken, setTelegramBotToken] = useState(currentBranding.telegramBotToken || '');
-  const [telegramBotUsername, setTelegramBotUsername] = useState(currentBranding.telegramBotUsername || '');
 
   // Announcement Banner States
   const [bannerEnabled, setBannerEnabled] = useState(currentBranding.announcementBanner?.enabled ?? true);
@@ -39,7 +37,7 @@ export const AdminBrandingManager: React.FC<AdminBrandingManagerProps> = ({
   const [bannerMessages, setBannerMessages] = useState<string[]>(
     currentBranding.announcementBanner?.messages || [
       'Entrega inmediata en menos de 15 minutos con garantía total durante todo el mes.',
-      'Financiamiento disponible: Paga en cuotas al 50% inicial con Pago Móvil o Wallet GRPAY.',
+      'Financiamiento disponible: Paga en cuotas al 50% inicial con Pago Móvil o Wallet Zeny.',
       'Tasa Oficial BCV actualizada en vivo y sin comisiones ocultas.'
     ]
   );
@@ -71,8 +69,6 @@ export const AdminBrandingManager: React.FC<AdminBrandingManagerProps> = ({
       fontFamily,
       contactPhones: phones,
       contactEmails: emails,
-      telegramBotToken,
-      telegramBotUsername,
       announcementBanner: {
         enabled: bannerEnabled,
         animationType: bannerAnim,
@@ -283,43 +279,6 @@ export const AdminBrandingManager: React.FC<AdminBrandingManagerProps> = ({
             />
           </div>
 
-          <div className="md:col-span-2 p-4 rounded-2xl bg-indigo-950/40 border border-indigo-800/60 space-y-3">
-            <h4 className="font-extrabold text-sm text-indigo-300 flex items-center gap-2">
-              <Globe className="w-4 h-4 text-indigo-400" />
-              <span>Integración y Enlace de Bot Oficial de Telegram</span>
-            </h4>
-            <p className="text-xs text-slate-300">
-              Conecta tu Bot Token otorgado por @BotFather para sincronizar comandos automáticos (/start, /catalogo, /cuotas, /soporte).
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                  Username del Bot (sin @):
-                </label>
-                <input
-                  type="text"
-                  value={telegramBotUsername}
-                  onChange={(e) => setTelegramBotUsername(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono"
-                  placeholder="GregoriIzquierdoBot"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                  Bot Token API (@BotFather):
-                </label>
-                <input
-                  type="password"
-                  value={telegramBotToken}
-                  onChange={(e) => setTelegramBotToken(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono"
-                  placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyZ"
-                />
-              </div>
-            </div>
-          </div>
 
           {/* BANNER PUBLICITARIO SUPERIOR (Configuración, Mensajes y Animación) */}
           <div className="md:col-span-2 p-5 rounded-2xl bg-gradient-to-br from-indigo-950/60 to-slate-950 border border-indigo-700/50 space-y-4">

@@ -19,6 +19,7 @@ import {
   Edit3
 } from 'lucide-react';
 import { Order, CustomerUser, PaymentMethod } from '../types';
+import { supabase } from '../services/supabaseClient';
 
 interface AdminRefundManagerProps {
   orders: Order[];
@@ -119,81 +120,97 @@ export const AdminRefundManager: React.FC<AdminRefundManagerProps> = ({
   };
 
   // Submit refund
-  const handleConfirmRefund = () => {
+  const handleConfirmRefund = async () => {
     if (!selectedOrder) return;
     setIsProcessing(true);
 
-    const effectiveReason = refundReason === 'Otro' ? customReason : refundReason;
-    const finalAmount = refundType === 'full' ? selectedOrder.total : refundAmountUsd;
-    const amountBs = Number((finalAmount * bcvRate).toFixed(2));
+    try {
+      const effectiveReason = refundReason === 'Otro' ? customReason : refundReason;
+      const finalAmount = refundType === 'full' ? selectedOrder.total : refundAmountUsd;
+      const amountBs = Number((finalAmount * bcvRate).toFixed(2));
 
-    // 1. If refund method is GRPAY Wallet, credit customer balance
-    if (refundMethod === 'grpay_wallet' && selectedOrder.customerId && onUpdateCustomerBalance) {
-      onUpdateCustomerBalance(selectedOrder.customerId, finalAmount);
-    }
-
-    // 2. Clear credentials if releasing account
-    const updatedCredentials = releaseAccount ? undefined : selectedOrder.credentials;
-
-    // 3. Assemble full refundDetails object
-    const refundDetails = {
-      refundDate: new Date().toISOString(),
-      amountUsd: finalAmount,
-      amountBs,
-      reason: effectiveReason,
-      refundMethod,
-      beneficiaryName: beneficiaryName.trim() || selectedOrder.customerName,
-      beneficiaryDocId: beneficiaryDocId.trim() || undefined,
-      targetBank: refundMethod === 'grpay_wallet' ? 'Wallet GRPAY Interna' : targetBank.trim(),
-      targetAccountOrPhone: refundMethod === 'grpay_wallet' ? `Saldo acreditado a ${selectedOrder.customerEmail}` : targetAccountOrPhone.trim(),
-      transactionReference: transactionReference.trim() || (refundMethod === 'grpay_wallet' ? `GRPAY-REF-${selectedOrder.id}` : 'PENDIENTE'),
-      accountReleased: releaseAccount,
-      processedBy: 'Gregori Izquierdo (Admin)',
-      notes: adminNotes.trim() || undefined
-    };
-
-    // 4. Update order status
-    const updatedOrder: Order = {
-      ...selectedOrder,
-      status: 'rejected',
-      rejectionReason: `DEVOLUCIÓN Y REVERSO: ${effectiveReason} ($${finalAmount.toFixed(2)} USD / Bs. ${amountBs.toFixed(2)} vía ${
-        refundMethod === 'grpay_wallet' ? 'Wallet GRPAY' : targetBank
-      } - Ref: ${refundDetails.transactionReference})`,
-      refundDetails,
-      credentials: updatedCredentials
-    };
-
-    onUpdateOrder(updatedOrder);
-
-    // 5. Audit Log
-    if (onLogAudit) {
-      onLogAudit({
-        actor: 'Gregori Izquierdo (Admin)',
-        action: 'PROCESAR_REVERSO_DEVOLUCION',
-        description: `Reverso de $${finalAmount.toFixed(2)} USD procesado para Pedido #${selectedOrder.id} (${selectedOrder.customerName}). Beneficiario: ${refundDetails.beneficiaryName} | Banco: ${refundDetails.targetBank} | Ref: ${refundDetails.transactionReference} | Motivo: ${effectiveReason}. Cuenta liberada: ${releaseAccount ? 'Sí' : 'No'}.`,
-        severity: 'warning',
-        metadata: {
-          orderId: selectedOrder.id,
-          customerName: selectedOrder.customerName,
-          amountUsd: finalAmount,
-          amountBs,
-          refundDetails,
-          reason: effectiveReason,
-          refundMethod,
-          releaseAccount
-        }
+      // 1. Registrar Devolución en Base de Datos (SQL)
+      await supabase.from('refunds').insert({
+        id: `ref-${Date.now()}`,
+        order_id: selectedOrder.id,
+        amount_refunded: finalAmount,
+        reason: effectiveReason,
+        status: 'completed'
       });
+
+      // 2. Impactar Facturación y Contratos
+      await supabase.from('invoices').update({ payment_status: 'cancelled' }).eq('order_id', selectedOrder.id);
+      await supabase.from('contracts').update({ status: 'cancelled' }).eq('order_id', selectedOrder.id);
+
+      // 3. Liberar Producto (Perfiles)
+      if (releaseAccount) {
+        // Asumiendo que el ID del perfil está ligado a la orden o credenciales
+        await supabase.from('account_profiles')
+          .update({ assigned_customer_id: null, is_active: false })
+          .eq('assigned_customer_id', selectedOrder.customerId);
+      }
+
+      // 4. Eliminar evento de calendario (requiere implementación de búsqueda y eliminación)
+      // Nota: Esto depende de cómo se guardó el ID del evento originalmente. 
+      // Si guardamos el evento en la BD, aquí usaríamos su ID para borrarlo.
+      
+      // 5. Lógica existente de actualización de orden y balance
+      if (refundMethod === 'grpay_wallet' && selectedOrder.customerId && onUpdateCustomerBalance) {
+        onUpdateCustomerBalance(selectedOrder.customerId, finalAmount);
+      }
+
+      const updatedCredentials = releaseAccount ? undefined : selectedOrder.credentials;
+
+      const refundDetails = {
+        refundDate: new Date().toISOString(),
+        amountUsd: finalAmount,
+        amountBs,
+        reason: effectiveReason,
+        refundMethod,
+        beneficiaryName: beneficiaryName.trim() || selectedOrder.customerName,
+        beneficiaryDocId: beneficiaryDocId.trim() || undefined,
+        targetBank: refundMethod === 'grpay_wallet' ? 'Wallet Zeny Interna' : targetBank.trim(),
+        targetAccountOrPhone: refundMethod === 'grpay_wallet' ? `Saldo acreditado a ${selectedOrder.customerEmail}` : targetAccountOrPhone.trim(),
+        transactionReference: transactionReference.trim() || (refundMethod === 'grpay_wallet' ? `Zeny-REF-${selectedOrder.id}` : 'PENDIENTE'),
+        accountReleased: releaseAccount,
+        processedBy: 'Gregori Izquierdo (Admin)',
+        notes: adminNotes.trim() || undefined
+      };
+
+      const updatedOrder: Order = {
+        ...selectedOrder,
+        status: 'rejected',
+        rejectionReason: `DEVOLUCIÓN Y REVERSO: ${effectiveReason} ($${finalAmount.toFixed(2)} USD / Bs. ${amountBs.toFixed(2)} vía ${
+          refundMethod === 'grpay_wallet' ? 'Wallet Zeny' : targetBank
+        } - Ref: ${refundDetails.transactionReference})`,
+        refundDetails,
+        credentials: updatedCredentials
+      };
+
+      onUpdateOrder(updatedOrder);
+
+      if (onLogAudit) {
+        onLogAudit({
+          actor: 'Gregori Izquierdo (Admin)',
+          action: 'PROCESAR_REVERSO_DEVOLUCION',
+          description: `Reverso de $${finalAmount.toFixed(2)} USD procesado para Pedido #${selectedOrder.id}. Motivo: ${effectiveReason}.`,
+          severity: 'warning',
+        });
+      }
+
+      setRefundSuccessMessage(`¡Reverso de $${finalAmount.toFixed(2)} USD procesado exitosamente!`);
+      setTimeout(() => {
+        setRefundSuccessMessage(null);
+        setSelectedOrder(null);
+        handleOpenMessageModal(updatedOrder);
+      }, 1200);
+
+    } catch (error) {
+      console.error('Error processing refund:', error);
+      alert('Error al procesar la devolución. Revisa la consola.');
+    } finally {
+      setIsProcessing(false);
     }
-
-    setIsProcessing(false);
-    setRefundSuccessMessage(`¡Reverso de $${finalAmount.toFixed(2)} USD procesado exitosamente para ${selectedOrder.customerName}!`);
-
-    // Prepare message modal
-    setTimeout(() => {
-      setRefundSuccessMessage(null);
-      setSelectedOrder(null);
-      handleOpenMessageModal(updatedOrder);
-    }, 1200);
   };
 
   // Build the message based on order and checkboxes
@@ -304,7 +321,7 @@ export const AdminRefundManager: React.FC<AdminRefundManagerProps> = ({
               Gestión Integral de Reversos & Devoluciones
             </h2>
             <p className="text-rose-200/80 text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-              Registra los datos bancarios de reintegro al cliente, reintegra saldo en Wallet GRPAY o transferencia, libera perfiles al inventario y genera comprobantes editables para WhatsApp y Telegram con registro en Bitácora.
+              Registra los datos bancarios de reintegro al cliente, reintegra saldo en Wallet Zeny o transferencia, libera perfiles al inventario y genera comprobantes editables para WhatsApp y Telegram con registro en Bitácora.
             </p>
           </div>
 
@@ -534,7 +551,7 @@ export const AdminRefundManager: React.FC<AdminRefundManagerProps> = ({
                   onChange={(e) => setRefundMethod(e.target.value as any)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-slate-50"
                 >
-                  <option value="grpay_wallet">Acreditación Inmediata en Saldo Wallet GRPAY</option>
+                  <option value="grpay_wallet">Acreditación Inmediata en Saldo Wallet Zeny</option>
                   <option value="bank_transfer">Transferencia Bancaria / Pago Móvil / Zelle / Binance</option>
                   <option value="cash">Efectivo en Tienda / Oficina</option>
                 </select>

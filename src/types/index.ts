@@ -52,16 +52,6 @@ export interface AnnouncementBannerConfig {
   badgeText?: string; // e.g. '🔥 OFERTAS 2026'
 }
 
-export interface WhatsAppApiConfig {
-  enabled: boolean;
-  provider: 'cloud_api' | 'baileys' | 'wppconnect' | 'custom_webhook';
-  apiUrl: string;
-  apiToken: string;
-  phoneNumberId?: string;
-  instanceName?: string;
-  status: 'connected' | 'disconnected' | 'testing';
-}
-
 export interface TelegramBotCustomCommand {
   command: string;
   description: string;
@@ -84,7 +74,6 @@ export interface AppBrandingConfig {
   telegramBotUsername?: string;
   telegramBotCommands?: TelegramBotCustomCommand[];
   announcementBanner?: AnnouncementBannerConfig;
-  whatsappApiConfig?: WhatsAppApiConfig;
   // Visual Editor & Layout Configuration
   heroTitle?: string;
   heroTitleGradient?: string;
@@ -209,7 +198,8 @@ export interface CustomerUser {
   isSeniorCitizen?: boolean;
   isTrustClient?: boolean;
   notes?: string;
-  grpayBalance: number; // 1 GRPAY = 1.00 USD
+  zenyBalance?: number; // 1 Zeny = 1.00 USD
+  grpayBalance?: number; // Compatibility alias
   createdAt: string;
   lastLogin?: string;
 }
@@ -219,7 +209,8 @@ export interface WalletTopup {
   customerId: string;
   customerName: string;
   customerEmail: string;
-  amountGRPAY: number; // Amount in GRPAY (USD equivalent)
+  amountZenyPoints?: number; // Amount in ZenyPoints (USD equivalent)
+  amountZeny?: number; // Compatibility alias
   amountPaid: number;  // Amount paid in the payment currency
   currency: 'USD' | 'BS';
   paymentMethodId: string;

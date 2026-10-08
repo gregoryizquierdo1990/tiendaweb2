@@ -64,7 +64,7 @@ export const Hero: React.FC<HeroProps> = ({
   const heroGradient = branding?.heroTitleGradient || 'diseño claro y precio justo';
   const heroSubtitle =
     branding?.heroSubtitle ||
-    'Perfiles privados con PIN y cuentas completas en 4K Ultra HD. Paga con Pago Móvil a tasa oficial BCV, Binance Pay, Cuenta en EEUU (Zelle/ACH), Airtm, Pichincha Ecuador, Wally, Zinli, UglyCash, TDC Banesco Conecta o saldo GRPAY.';
+    'Perfiles privados con PIN y cuentas completas en 4K Ultra HD. Paga con Pago Móvil a tasa oficial BCV, Binance Pay, Cuenta en EEUU (Zelle/ACH), Airtm, Pichincha Ecuador, Wally, Zinli, UglyCash, TDC Banesco Conecta o saldo Zeny.';
 
   return (
     <section
@@ -76,25 +76,12 @@ export const Hero: React.FC<HeroProps> = ({
 
       <div className={`mx-auto px-4 sm:px-6 lg:px-8 ${branding?.containerMaxWidth || 'max-w-7xl'}`}>
         <div className={`${alignmentClass} mb-8 sm:mb-10`}>
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100/80 text-indigo-700 text-xs font-semibold mb-4">
-            <Zap className="w-3.5 h-3.5 text-indigo-600" />
-            <span>{badgeText}</span>
-          </div>
 
           <h1 className={`${titleSizeClass} font-extrabold text-slate-900 tracking-tight leading-tight`}>
-            {heroTitle}{' '}
-            <span
-              className="text-transparent bg-clip-text bg-gradient-to-r"
-              style={{
-                backgroundImage: `linear-gradient(to right, ${branding?.primaryColor || '#4f46e5'}, ${branding?.secondaryColor || '#8b5cf6'})`
-              }}
-            >
-              {heroGradient}
-            </span>
+            {heroTitle} {heroGradient}
           </h1>
           <div className="mt-4 w-full max-w-sm mx-auto overflow-hidden rounded-full bg-indigo-600 shadow-sm">
-            <div className="animate-marquee whitespace-nowrap text-white text-xs font-bold px-3 py-1">
+            <div className="animate-marquee whitespace-nowrap text-white text-xs font-bold px-3 py-2">
               Promociones con pagos en Billetera
             </div>
           </div>
@@ -103,19 +90,23 @@ export const Hero: React.FC<HeroProps> = ({
             {heroSubtitle}
           </p>
 
+          <div className="mt-4 inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full text-indigo-700 text-xs font-bold font-mono shadow-sm">
+            <span>1 ZenyPoint = $1.00 USD</span>
+          </div>
+
           {/* Quick trust metrics */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-xs font-medium text-slate-500">
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Garantía 100% de reemplazo</span>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-sm font-semibold text-slate-700 p-4 bg-slate-100 rounded-2xl border border-slate-200">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              <span>100% Garantia</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Zap className="w-4 h-4 text-amber-500" />
-              <span>Activación en 15 - 30 minutos</span>
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-amber-500" />
+              <span>Activacion Directa</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Headphones className="w-4 h-4 text-indigo-600" />
-              <span>Soporte por WhatsApp 24/7</span>
+            <div className="flex items-center gap-2">
+              <Headphones className="w-5 h-5 text-indigo-600" />
+              <span>Soporte por WhatsApp 7 Dias</span>
             </div>
           </div>
         </div>

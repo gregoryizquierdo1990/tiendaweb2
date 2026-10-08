@@ -113,7 +113,7 @@ export const PlatformBotWidget: React.FC<PlatformBotWidgetProps> = ({
           }
         };
       } else if (lower.includes('metodo') || lower.includes('pago') || lower.includes('pago movil') || lower.includes('binance') || lower.includes('zinli') || lower.includes('transferencia')) {
-        botResponse = 'Aceptamos Pago Móvil (Banesco, Mercantil, Venezuela), Zinli, Binance Pay USDT, PayPal, Zelle y saldo GRPAY. Puedes ver los números de cuenta en la pestaña "Métodos de pago".';
+        botResponse = 'Aceptamos Pago Móvil (Banesco, Mercantil, Venezuela), Zinli, Binance Pay USDT, PayPal, Zelle y saldo Zeny. Puedes ver los números de cuenta en la pestaña "Métodos de pago".';
         quickAction = {
           label: 'Ver Cuentas Bancarias',
           action: () => setActiveTab('metodos')
@@ -125,9 +125,9 @@ export const PlatformBotWidget: React.FC<PlatformBotWidgetProps> = ({
           action: () => setActiveTab('catalogo')
         };
       } else if (lower.includes('grpay') || lower.includes('wallet') || lower.includes('saldo')) {
-        botResponse = 'GRPAY es nuestra moneda interna. 1 GRPAY equivale a 1 USD o 1 USDT. Puedes abonar saldo y pagar o renovar al instante sin esperar confirmaciones bancarias.';
+        botResponse = 'Zeny es nuestra moneda interna. 1 Zeny equivale a 1 USD o 1 USDT. Puedes abonar saldo y pagar o renovar al instante sin esperar confirmaciones bancarias.';
         quickAction = {
-          label: activeCustomer ? 'Ver Mi Saldo GRPAY' : 'Iniciar Sesión',
+          label: activeCustomer ? 'Ver Mi Saldo Zeny' : 'Iniciar Sesión',
           action: () => {
             setIsOpen(false);
             if (activeCustomer) onOpenCustomerPortal();
@@ -727,12 +727,12 @@ export const PlatformBotWidget: React.FC<PlatformBotWidgetProps> = ({
 
                     <div className="p-3 rounded-xl bg-slate-900 text-white flex items-center justify-between">
                       <div>
-                        <span className="text-[10px] text-slate-400 block">Saldo GRPAY Disponible</span>
+                        <span className="text-[10px] text-slate-400 block">Saldo Zeny Disponible</span>
                         <strong className="text-emerald-400 text-base font-extrabold font-mono">
                           {formatGrpay(activeCustomer.grpayBalance)}
                         </strong>
                       </div>
-                      <span className="text-[10px] text-slate-300">1 GRPAY = 1 USD</span>
+                      <span className="text-[10px] text-slate-300">1 Zeny = 1 USD</span>
                     </div>
 
                     <div className="pt-2">
@@ -757,7 +757,7 @@ export const PlatformBotWidget: React.FC<PlatformBotWidgetProps> = ({
                     <div>
                       <h4 className="font-bold text-slate-900 text-xs">Aún no has iniciado sesión</h4>
                       <p className="text-[11px] text-slate-500 mt-1">
-                        Accede con tu correo para ver tus claves de acceso, saldo GRPAY o renovar tus pantallas.
+                        Accede con tu correo para ver tus claves de acceso, saldo Zeny o renovar tus pantallas.
                       </p>
                     </div>
                     <button
@@ -810,10 +810,10 @@ export const PlatformBotWidget: React.FC<PlatformBotWidgetProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleSendMessage('¿Cómo funciona la moneda GRPAY?')}
+                    onClick={() => handleSendMessage('¿Cómo funciona la moneda Zeny?')}
                     className="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-semibold transition cursor-pointer"
                   >
-                    🪙 ¿Qué es GRPAY?
+                    🪙 ¿Qué es Zeny?
                   </button>
                   <button
                     type="button"

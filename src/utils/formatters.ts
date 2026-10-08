@@ -8,8 +8,9 @@ export function formatCurrency(amount: number, currency: CurrencyCode): string {
   return `$${amount.toFixed(2)} USD`;
 }
 
-export function formatGrpay(amount: number): string {
-  return `${amount.toFixed(2)} GRPAY`;
+export function formatGrpay(amount?: number | null): string {
+  const safe = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
+  return `${safe.toFixed(2)} Zeny`;
 }
 
 export function generateOrderId(): string {
@@ -193,7 +194,7 @@ export function buildWhatsAppReminderUrl(order: Order): string {
 
 Hola *${order.customerName}*, te informamos que tu suscripción a *${order.productName}* (#${order.id}) vencerá el día *${expFormatted}* (mañana).
 
-Si deseas renovar sobre tu mismo perfil y no perder tu configuración ni historial, por favor respóndenos a este mensaje o ingresa en https://gregoryizquierdo.xyz para renovar con tus métodos de pago habituales o tu saldo GRPAY.
+Si deseas renovar sobre tu mismo perfil y no perder tu configuración ni historial, por favor respóndenos a este mensaje o ingresa en https://gregoryizquierdo.xyz para renovar con tus métodos de pago habituales o tu saldo Zeny.
 
 ¡Quedamos atentos para mantener tu servicio activo!`;
 
@@ -223,7 +224,7 @@ export function buildWhatsAppPaymentUrl(order: Order, storePhoneNumber: string =
 • *Total:* ${formatCurrency(order.total, order.currency)}
 • *Método:* ${order.paymentMethodName}
 • *Referencia/Comprobante:* ${order.referenceNumber || 'Adjunto comprobante'}
-${order.paidWithGrpay ? '• *Pago con Saldo GRPAY Wallet*' : ''}
+${order.paidWithGrpay ? '• *Pago con Saldo Zeny Wallet*' : ''}
 
 👤 *Mis Datos:*
 • *Nombre:* ${order.customerName}
@@ -238,17 +239,17 @@ Por favor conciliar mi pago y entregar mis credenciales de acceso. ¡Gracias!`;
 
 export function buildWhatsAppTopupUrl(topup: any, storePhoneNumber: string = '584141234567'): string {
   const cleanPhone = storePhoneNumber.replace(/[^0-9]/g, '');
-  const message = `👋 Hola Gregori, solicité una recarga de saldo *GRPAY* en mi cuenta de *Gregori Izquierdo Streaming*!
+  const message = `👋 Hola Gregori, solicité una recarga de saldo *Zeny* en mi cuenta de *Gregori Izquierdo Streaming*!
 
 💳 *Detalles de Recarga:*
 • *ID Recarga:* #${topup.id}
 • *Cliente:* ${topup.customerName} (${topup.customerEmail})
-• *Monto GRPAY:* ${formatGrpay(topup.amountGRPAY)}
+• *Monto Zeny:* ${formatGrpay(topup.amountZeny)}
 • *Monto Transferido:* ${formatCurrency(topup.amountPaid, topup.currency)}
 • *Método:* ${topup.paymentMethodName}
 • *Referencia:* ${topup.referenceNumber}
 
-Por favor validar la entrada y acreditar el saldo en mi wallet GRPAY para mis compras. ¡Gracias!`;
+Por favor validar la entrada y acreditar el saldo en mi wallet Zeny para mis compras. ¡Gracias!`;
 
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 }

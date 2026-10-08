@@ -1,28 +1,12 @@
 import React, { useState } from 'react';
 import {
   Send,
-  MessageSquare,
   Mail,
   Users,
   Smartphone,
-  Share2,
   Sparkles,
   Megaphone,
-  CheckCircle2,
-  ExternalLink,
-  Copy,
-  Check,
-  Globe,
-  Tv,
-  FileText,
-  Plus,
-  Trash2,
-  Building,
-  ShieldCheck,
-  Radio,
-  Calendar,
-  Clock,
-  Eye
+  Radio
 } from 'lucide-react';
 import { CustomerUser } from '../types';
 
@@ -31,26 +15,17 @@ interface AdminMarketingManagerProps {
   onShowNotification: (type: 'success' | 'error' | 'warning' | 'info', msg: string) => void;
 }
 
-interface ScheduledStatus {
-  id: string;
-  platform: 'whatsapp' | 'telegram';
-  title: string;
-  content: string;
-  scheduledTime: string;
-  status: 'pending' | 'published';
-}
-
 export const AdminMarketingManager: React.FC<AdminMarketingManagerProps> = ({
   customers,
   onShowNotification
 }) => {
-  const [subTab, setSubTab] = useState<'campaigns' | 'telegram_channels' | 'status_scheduler'>('campaigns');
+  const [subTab, setSubTab] = useState<'campaigns' | 'telegram_channels'>('campaigns');
 
   // Campaigns state
   const [campaignChannel, setCampaignChannel] = useState<'whatsapp' | 'telegram' | 'email'>('whatsapp');
   const [campaignSubject, setCampaignSubject] = useState('🔥 ¡Promoción Especial de Streaming 4K!');
   const [campaignMessage, setCampaignMessage] = useState(
-    'Hola {nombre}! Aprovecha nuestros combos 4K Ultra HD con garantía total y recarga inmediata por Pago Móvil o GRPAY. ¡Visítanos ya!'
+    'Hola {nombre}! Aprovecha nuestros combos 4K Ultra HD con garantía total y recarga inmediata por Pago Móvil o Zeny. ¡Visítanos ya!'
   );
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
@@ -61,30 +36,6 @@ export const AdminMarketingManager: React.FC<AdminMarketingManagerProps> = ({
   const [channelTopic, setChannelTopic] = useState('Promociones, Cuentas 4K y Sorteos Oficiales');
   const [promoPostText, setPromoPostText] = useState('🌟 ¡NUEVO COMBO DISPONIBLE! Netflix + Disney+ por sólo $5 al mes. ¡Entrega inmediata!');
   const [isPostingChannel, setIsPostingChannel] = useState(false);
-
-  // Status Scheduler state
-  const [scheduledStatuses, setScheduledStatuses] = useState<ScheduledStatus[]>([
-    {
-      id: 'stat-1',
-      platform: 'whatsapp',
-      title: 'Estado Mañana: Oferta Pago Móvil BCV',
-      content: '¡Tasa oficial BCV actualizada! Paga tus cuentas de streaming al mejor cambio.',
-      scheduledTime: '2026-10-02T08:00',
-      status: 'pending'
-    },
-    {
-      id: 'stat-2',
-      platform: 'telegram',
-      title: 'Historia Telegram: Sorteo fin de semana',
-      content: 'Participa por 1 mes gratis de Max Streaming Global compartiendo nuestro canal.',
-      scheduledTime: '2026-10-03T18:30',
-      status: 'pending'
-    }
-  ]);
-  const [newStatusPlatform, setNewStatusPlatform] = useState<'whatsapp' | 'telegram'>('whatsapp');
-  const [newStatusTitle, setNewStatusTitle] = useState('');
-  const [newStatusContent, setNewStatusContent] = useState('');
-  const [newStatusTime, setNewStatusTime] = useState('');
 
   const handleToggleSelectAll = () => {
     if (selectAll) {
@@ -130,32 +81,6 @@ export const AdminMarketingManager: React.FC<AdminMarketingManagerProps> = ({
     }, 1200);
   };
 
-  const handleAddScheduledStatus = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStatusTitle || !newStatusContent || !newStatusTime) {
-      onShowNotification('warning', 'Completa todos los campos para programar el estado.');
-      return;
-    }
-    const item: ScheduledStatus = {
-      id: `stat-${Date.now()}`,
-      platform: newStatusPlatform,
-      title: newStatusTitle,
-      content: newStatusContent,
-      scheduledTime: newStatusTime,
-      status: 'pending'
-    };
-    setScheduledStatuses([item, ...scheduledStatuses]);
-    setNewStatusTitle('');
-    setNewStatusContent('');
-    setNewStatusTime('');
-    onShowNotification('success', `¡Estado para ${newStatusPlatform.toUpperCase()} programado con éxito!`);
-  };
-
-  const handleDeleteStatus = (id: string) => {
-    setScheduledStatuses(prev => prev.filter(s => s.id !== id));
-    onShowNotification('info', 'Estado programado eliminado.');
-  };
-
   return (
     <div className="p-6 space-y-6 animate-fadeIn">
       {/* Header */}
@@ -167,7 +92,7 @@ export const AdminMarketingManager: React.FC<AdminMarketingManagerProps> = ({
           </div>
           <h2 className="text-xl font-black">Centro de Difusión & Redes Sociales</h2>
           <p className="text-xs text-slate-300">
-            Gestiona campañas con usuarios seleccionados 1 por 1, administra canales de Telegram y programa estados automáticos.
+            Gestiona campañas con usuarios seleccionados 1 por 1 y administra comunidades y canales de Telegram.
           </p>
         </div>
 
@@ -190,15 +115,6 @@ export const AdminMarketingManager: React.FC<AdminMarketingManagerProps> = ({
           >
             <Radio className="w-3.5 h-3.5" />
             <span>Comunidad & Canal Telegram</span>
-          </button>
-          <button
-            onClick={() => setSubTab('status_scheduler')}
-            className={`px-4 py-2 rounded-xl transition cursor-pointer flex items-center gap-2 ${
-              subTab === 'status_scheduler' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Programador de Estados</span>
           </button>
         </div>
       </div>
@@ -420,142 +336,6 @@ export const AdminMarketingManager: React.FC<AdminMarketingManagerProps> = ({
 
             <div className="p-3.5 bg-sky-950/80 border border-sky-500/30 rounded-2xl text-[11px] text-sky-200">
               📌 <strong>Canal Activo:</strong> {channelName} ({channelTopic})
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SUB-TAB 3: PROGRAMADOR DE ESTADOS (WHATSAPP & TELEGRAM) */}
-      {subTab === 'status_scheduler' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Add Status Form */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 text-xs">
-            <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-indigo-600" />
-              <span>Programar Nuevo Estado / Historia</span>
-            </h3>
-
-            <form onSubmit={handleAddScheduledStatus} className="space-y-3">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Plataforma:</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setNewStatusPlatform('whatsapp')}
-                    className={`p-2.5 rounded-xl border font-bold transition cursor-pointer ${
-                      newStatusPlatform === 'whatsapp' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    WhatsApp Status
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewStatusPlatform('telegram')}
-                    className={`p-2.5 rounded-xl border font-bold transition cursor-pointer ${
-                      newStatusPlatform === 'telegram' ? 'bg-sky-600 text-white border-sky-600' : 'bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    Telegram Story
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Título / Campaña:</label>
-                <input
-                  type="text"
-                  required
-                  value={newStatusTitle}
-                  onChange={(e) => setNewStatusTitle(e.target.value)}
-                  placeholder="Ej. Promoción Fin de Semana"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Contenido del Estado:</label>
-                <textarea
-                  rows={3}
-                  required
-                  value={newStatusContent}
-                  onChange={(e) => setNewStatusContent(e.target.value)}
-                  placeholder="Texto o llamado a la acción..."
-                  className="w-full p-3 rounded-xl border border-slate-300 text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Fecha y Hora Programada:</label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={newStatusTime}
-                  onChange={(e) => setNewStatusTime(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Programar Publicación</span>
-              </button>
-            </form>
-          </div>
-
-          {/* Scheduled Statuses Queue */}
-          <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="text-sm font-black text-slate-900 flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-indigo-600" />
-                <span>Cola de Estados Programados ({scheduledStatuses.length})</span>
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono">Ejecución Automática</span>
-            </h3>
-
-            <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
-              {scheduledStatuses.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-12">No hay estados programados en la cola.</p>
-              ) : (
-                scheduledStatuses.map((st) => (
-                  <div
-                    key={st.id}
-                    className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs transition hover:border-slate-300"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                          st.platform === 'whatsapp' ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-100 text-sky-800'
-                        }`}>
-                          {st.platform.toUpperCase()}
-                        </span>
-                        <strong className="text-slate-900">{st.title}</strong>
-                      </div>
-                      <p className="text-slate-600">{st.content}</p>
-                      <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-indigo-500" />
-                        <span>Programado para: {new Date(st.scheduledTime).toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
-                        Pendiente
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteStatus(st.id)}
-                        className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                        title="Eliminar Estado"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
             </div>
           </div>
         </div>

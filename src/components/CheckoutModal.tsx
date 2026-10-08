@@ -104,7 +104,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     : finalPrice;
 
   const hasEnoughGrpay = Boolean(
-    customerUser && customerUser.grpayBalance >= priceUsd
+    customerUser && (customerUser.grpayBalance || 0) >= priceUsd
   );
 
   const selectedMethod =
@@ -204,8 +204,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             }
           : undefined,
         paymentMethodId: payWithGrpay ? 'wallet-grpay' : selectedMethod.id,
-        paymentMethodName: payWithGrpay ? 'Saldo GRPAY Wallet' : selectedMethod.name,
-        referenceNumber: payWithGrpay ? `GRPAY-AUTO-${orderId}` : referenceNumber.trim(),
+        paymentMethodName: payWithGrpay ? 'Saldo Zeny Wallet' : selectedMethod.name,
+        referenceNumber: payWithGrpay ? `Zeny-AUTO-${orderId}` : referenceNumber.trim(),
         receiptImage: receiptPreview || undefined,
         customerNotes: customerNotes.trim() || undefined,
         status: payWithGrpay ? 'confirmed' : 'pending_reconciliation',
@@ -218,7 +218,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               pin: Math.floor(1000 + Math.random() * 9000).toString(),
               startDate,
               expirationDate,
-              instructions: 'Tu cuenta ha sido activada automáticamente con tu saldo GRPAY.'
+              instructions: 'Tu cuenta ha sido activada automáticamente con tu saldo Zeny.'
             }
           : undefined,
         syncedToSheets: false
@@ -263,7 +263,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
 
           <h2 className="text-2xl font-bold text-slate-900">
-            {completedOrder.paidWithGrpay ? '¡Compra Exitosa con GRPAY!' : '¡Pedido Registrado con Éxito!'}
+            {completedOrder.paidWithGrpay ? '¡Compra Exitosa con Zeny!' : '¡Pedido Registrado con Éxito!'}
           </h2>
           <p className="text-slate-600 text-sm mt-1">
             {completedOrder.paidWithGrpay
@@ -292,7 +292,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <p>
                 • <strong>Total:</strong>{' '}
                 {completedOrder.paidWithGrpay
-                  ? `${priceUsd} GRPAY (Saldo Wallet)`
+                  ? `${priceUsd} Zeny (Saldo Wallet)`
                   : formatCurrency(completedOrder.total, completedOrder.currency)}
               </p>
               <p>• <strong>Método:</strong> {completedOrder.paymentMethodName}</p>
@@ -349,7 +349,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 Pasarela de Pago Manual
               </h2>
               <p className="text-xs text-slate-500">
-                Paga vía transferencia o utiliza tu saldo de la wallet GRPAY
+                Paga vía transferencia o utiliza tu saldo de la wallet Zeny
               </p>
             </div>
           </div>
@@ -483,7 +483,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           )}
 
-          {/* GRPAY Wallet Fast Option (If logged in) */}
+          {/* Zeny Wallet Fast Option (If logged in) */}
           {customerUser ? (
             <div
               onClick={() => {
@@ -504,7 +504,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-900">
-                      Pagar con mi Saldo GRPAY Wallet
+                      Pagar con mi Saldo Zeny Wallet
                     </span>
                     <span className="px-1.5 py-0.2 rounded bg-indigo-200 text-indigo-900 text-[10px] font-bold">
                       Activación Inmediata
@@ -516,8 +516,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       {formatGrpay(customerUser.grpayBalance)}
                     </strong>
                     {hasEnoughGrpay
-                      ? ` (Te quedarán ${(customerUser.grpayBalance - priceUsd).toFixed(2)} GRPAY)`
-                      : ` (Requiere ${priceUsd} GRPAY - Saldo insuficiente)`}
+                      ? ` (Te quedarán ${((customerUser.grpayBalance || 0) - priceUsd).toFixed(2)} Zeny)`
+                      : ` (Requiere ${priceUsd} Zeny - Saldo insuficiente)`}
                   </div>
                 </div>
               </div>
@@ -533,7 +533,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           ) : (
             <div className="p-3 rounded-2xl bg-indigo-50/60 border border-indigo-100 flex items-center justify-between text-xs">
               <span className="text-indigo-900">
-                ¿Tienes saldo en tu <strong>Wallet GRPAY</strong>? Inicia sesión para pagar al instante.
+                ¿Tienes saldo en tu <strong>Wallet Zeny</strong>? Inicia sesión para pagar al instante.
               </span>
               <button
                 type="button"
@@ -587,7 +587,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </span>
               </div>
 
-              {/* If NOT paying with GRPAY, show manual payment methods */}
+              {/* If NOT paying with Zeny, show manual payment methods */}
               {!payWithGrpay && (
                 <>
                   {/* Section 2: Payment Method Choice */}
@@ -799,7 +799,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   ) : payWithGrpay ? (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      <span>Confirmar Compra con {priceUsd} GRPAY</span>
+                      <span>Confirmar Compra con {priceUsd} Zeny</span>
                     </>
                   ) : (
                     <>

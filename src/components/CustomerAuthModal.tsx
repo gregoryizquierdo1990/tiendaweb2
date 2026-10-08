@@ -151,8 +151,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               </h2>
               <p className="text-xs text-slate-500">
                 {isRegisterMode
-                  ? 'Gestiona tus suscripciones y tu wallet GRPAY'
-                  : 'Ingresa para ver tus compras y saldo GRPAY'}
+                  ? 'Gestiona tus suscripciones y tu wallet Zeny'
+                  : 'Ingresa para ver tus compras y saldo ZenyPoints'}
               </p>
             </div>
           </div>
@@ -170,55 +170,6 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
           <form onSubmit={handleSubmit} className="space-y-4">
             {isRegisterMode && (
               <>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Tipo de Cuenta en la Plataforma *
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setRole('cliente')}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                        role === 'cliente'
-                          ? 'bg-indigo-50 border-indigo-500 text-indigo-700 ring-1 ring-indigo-500'
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <User className="w-3.5 h-3.5" />
-                      <span>Soy Cliente Final</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRole('vendedor')}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                        role === 'vendedor'
-                          ? 'bg-purple-50 border-purple-500 text-purple-700 ring-1 ring-purple-500'
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
-                      <span>Soy Vendedor / Revendedor</span>
-                    </button>
-                  </div>
-                </div>
-
-                {role === 'vendedor' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Código de Vendedor / Identificador (Opcional)
-                    </label>
-                    <input
-                      type="text"
-                      value={sellerCode}
-                      onChange={(e) => setSellerCode(e.target.value)}
-                      placeholder="Ej. VEND-03 o GREGORI-VIP"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-purple-50/30 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                    <p className="text-[10px] text-purple-600 mt-1">
-                      Te identificará como vendedor autorizado para asignarte ventas en la conciliación.
-                    </p>
-                  </div>
-                )}
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">

@@ -1,705 +1,354 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   ShieldCheck,
   Lock,
-  User,
-  Key,
   AlertCircle,
-  Plus,
-  Edit2,
-  Trash2,
-  Check,
-  Smartphone,
-  Send,
-  Mail,
-  Copy,
   CheckCircle2,
-  Clock,
+  Sparkles,
   ArrowRight,
-  RefreshCw,
-  MessageSquare,
-  QrCode,
-  HelpCircle,
-  KeyRound
+  KeyRound,
+  ShieldAlert,
+  ExternalLink
 } from 'lucide-react';
+import { googleSignIn, setCachedAccessToken, decodeGoogleJwt } from '../services/googleAuth';
+import firebaseConfig from '../../firebase-applet-config.json';
 
-interface StaffUser {
-  id: string;
-  name: string;
-  username: string;
-  password?: string;
-  role: 'admin' | 'operator';
-}
-
-interface AdminLoginModalProps {
+export interface AdminLoginModalProps {
   onClose: () => void;
   onLoginSuccess: (adminProfile: { id: string; username: string; name: string }) => void;
-  staffMembers: StaffUser[];
-  onAddStaff: (staff: StaffUser) => void;
-  onUpdateStaffPassword: (staffId: string, newPass: string) => void;
-  onDeleteStaff: (staffId: string) => void;
 }
-
-export type AuthMethodOption = 'google_authenticator' | 'whatsapp' | 'telegram' | 'email' | 'security_question';
 
 export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   onClose,
-  onLoginSuccess,
-  staffMembers,
-  onAddStaff,
-  onUpdateStaffPassword,
-  onDeleteStaff
+  onLoginSuccess
 }) => {
-  const [step, setStep] = useState<'credentials' | '2fa'>('credentials');
-  const [usernameInput, setUsernameInput] = useState('');
-  const [passwordInput, setPasswordInput] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [showStaffManager, setShowStaffManager] = useState(false);
+  const [isPopupBlocked, setIsPopupBlocked] = useState(false);
+  const [isNetworkIssue, setIsNetworkIssue] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [showManualToken, setShowManualToken] = useState(false);
+  const [manualToken, setManualToken] = useState('');
+  const gisButtonRef = useRef<HTMLDivElement>(null);
 
-  // Active Admin for 2FA
-  const [currentAdminProfile, setCurrentAdminProfile] = useState<{
-    id: string;
-    username: string;
-    name: string;
-    authMethod: AuthMethodOption;
-    googleAuthSecret?: string;
-    securityQuestion?: string;
-    securityAnswer?: string;
-    phone?: string;
-    email?: string;
-  } | null>(null);
+  const AUTHORIZED_ADMIN_EMAIL = 'emprendimientogregoryizquierdo@gmail.com';
 
-  // 2FA state
-  const [otpCode, setOtpCode] = useState('');
-  const [enteredOtp, setEnteredOtp] = useState('');
-  const [selectedMethod, setSelectedMethod] = useState<AuthMethodOption>('google_authenticator');
-  const [securityAnswerInput, setSecurityAnswerInput] = useState('');
-  const [showQrModal, setShowQrModal] = useState(false);
-  const [otpSentToast, setOtpSentToast] = useState(false);
-  const [copiedOtp, setCopiedOtp] = useState(false);
-  const [copiedSecret, setCopiedSecret] = useState(false);
-  const [countdown, setCountdown] = useState(60);
-
-  // New staff form
-  const [newStaffName, setNewStaffName] = useState('');
-  const [newStaffUser, setNewStaffUser] = useState('');
-  const [newStaffPass, setNewStaffPass] = useState('');
-  const [newStaffRole, setNewStaffRole] = useState<'admin' | 'operator'>('admin');
-
-  // Reset password modal state
-  const [resettingStaffId, setResettingStaffId] = useState<string | null>(null);
-  const [newResetPass, setNewResetPass] = useState('');
-
-  // Generate OTP and start countdown for WhatsApp / Telegram / Email
-  const generateAndSendOtp = (method: AuthMethodOption) => {
-    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setOtpCode(newCode);
-    setEnteredOtp('');
-    setSelectedMethod(method);
-    setCountdown(60);
-
-    const messageText = `🔐 *Código de Seguridad 2FA - Gregori Izquierdo Streaming*\n\nTu código de verificación para ingresar al Panel Pro de Administración es: *${newCode}*\n\n⚠️ Este código vence en 5 minutos. No lo compartas con nadie.`;
-
-    if (method === 'whatsapp') {
-      const adminPhone = currentAdminProfile?.phone?.replace(/\D/g, '') || '584241983648';
-      const url = `https://wa.me/${adminPhone}?text=${encodeURIComponent(messageText)}`;
-      window.open(url, '_blank');
-    } else if (method === 'telegram') {
-      const url = `https://t.me/share/url?url=${encodeURIComponent('https://gregoryizquierdo.xyz')}&text=${encodeURIComponent(messageText)}`;
-      window.open(url, '_blank');
-    }
-
-    setOtpSentToast(true);
-    setTimeout(() => setOtpSentToast(false), 3000);
-  };
-
+  // Intentar inicializar Google Identity Services de forma nativa en el botón embebido
   useEffect(() => {
-    if (step === '2fa' && countdown > 0 && selectedMethod !== 'google_authenticator' && selectedMethod !== 'security_question') {
-      const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [step, countdown, selectedMethod]);
-
-  const handleCredentialsSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-
-    const cleanUser = usernameInput.trim().toLowerCase();
-    const cleanPass = passwordInput.trim();
-
-    // Check stored master admins in localStorage
-    let storedAdmins: any[] = [];
     try {
-      const raw = localStorage.getItem('streamsync_master_admins_v1');
-      if (raw) storedAdmins = JSON.parse(raw);
-    } catch (e) {
-      console.error(e);
-    }
+      const google = (window as any).google;
+      if (google?.accounts?.id && firebaseConfig.oAuthClientId && gisButtonRef.current) {
+        google.accounts.id.initialize({
+          client_id: firebaseConfig.oAuthClientId,
+          callback: (response: any) => {
+            if (response.credential) {
+              const payload = decodeGoogleJwt(response.credential);
+              const email = (payload?.email || '').trim().toLowerCase();
+              if (email === AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
+                onLoginSuccess({
+                  id: 'admin-maxter',
+                  username: 'maxter',
+                  name: payload?.name || 'Gregory Izquierdo'
+                });
+              } else {
+                setErrorMessage(
+                  `Acceso denegado: La cuenta Google (${email || 'desconocida'}) no coincide con el administrador autorizado (${AUTHORIZED_ADMIN_EMAIL}).`
+                );
+              }
+            }
+          }
+        });
 
-    const foundAdmin = storedAdmins.find(
-      (a: any) =>
-        a.username.toLowerCase() === cleanUser &&
-        (a.password === cleanPass || cleanPass === 'maxter' || cleanPass === 'nolimits.10')
-    );
-
-    if (foundAdmin) {
-      setCurrentAdminProfile(foundAdmin);
-      setSelectedMethod(foundAdmin.authMethod || 'google_authenticator');
-      setStep('2fa');
-      if (foundAdmin.authMethod !== 'google_authenticator' && foundAdmin.authMethod !== 'security_question') {
-        generateAndSendOtp(foundAdmin.authMethod);
+        gisButtonRef.current.innerHTML = '';
+        google.accounts.id.renderButton(gisButtonRef.current, {
+          theme: 'filled_black',
+          size: 'large',
+          width: '100%',
+          text: 'signin_with',
+          shape: 'pill'
+        });
       }
-      return;
+    } catch (e) {
+      console.warn('No se pudo inicializar botón GIS embebido:', e);
     }
+  }, [onLoginSuccess]);
 
-    // Supreme Master Admin: maxter / root (Bypasses 2FA entirely with zero limitations)
-    if (cleanUser === 'maxter' && cleanPass === 'root') {
-      onLoginSuccess({ id: 'admin-maxter', username: 'maxter', name: 'Gregory Izquierdo (Master)' });
-      return;
-    }
+  const handleGoogleAdminLogin = async () => {
+    setErrorMessage(null);
+    setIsPopupBlocked(false);
+    setIsNetworkIssue(false);
+    setIsGoogleLoading(true);
 
-    // Default Master Admin fallback
-    if (cleanUser === 'maxter' && (cleanPass === 'maxter' || cleanPass === 'nolimits.10')) {
-      const defaultMaxter = {
+    try {
+      // Usar modo admin ligero (solo perfil y email)
+      const res = await googleSignIn({ forAdminOnly: true });
+      if (!res || !res.user) {
+        throw new Error('No se pudo verificar la autenticación con Google.');
+      }
+
+      const userEmail = (res.user.email || '').trim().toLowerCase();
+
+      // Verificar si coincide con el administrador autorizado
+      if (!userEmail || userEmail !== AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
+        setErrorMessage(
+          `Acceso denegado: La cuenta Google "${userEmail || 'desconocida'}" no está autorizada. Administrador único registrado: ${AUTHORIZED_ADMIN_EMAIL}.`
+        );
+        setIsGoogleLoading(false);
+        return;
+      }
+
+      // Login exitoso con Google verificado
+      const adminName = res.user.displayName || 'Gregory Izquierdo';
+      onLoginSuccess({
         id: 'admin-maxter',
         username: 'maxter',
-        name: 'Gregory Izquierdo',
-        authMethod: 'google_authenticator' as AuthMethodOption,
-        googleAuthSecret: 'JBSWY3DPEHPK3PXP',
-        securityQuestion: '¿Cuál es el nombre de tu primera mascota?',
-        securityAnswer: 'Max',
-        phone: '+584241983648',
-        email: 'emprendimientogregoryizquierdo@gmail.com'
-      };
-      setCurrentAdminProfile(defaultMaxter);
-      setSelectedMethod('google_authenticator');
-      setStep('2fa');
-      return;
+        name: adminName
+      });
+    } catch (err: any) {
+      console.warn('Aviso durante autenticación Google Admin:', err?.message || err);
+
+      const errStr = String(err?.message || '').toLowerCase();
+      const errCode = String(err?.code || '').toLowerCase();
+
+      const blocked =
+        errCode.includes('popup-blocked') ||
+        errCode.includes('popup_blocked') ||
+        errStr.includes('popup') ||
+        errStr.includes('bloqueada') ||
+        errStr.includes('blocked');
+
+      const netFail =
+        errCode.includes('network-request-failed') ||
+        errStr.includes('network-request-failed') ||
+        errStr.includes('network');
+
+      if (blocked) {
+        setIsPopupBlocked(true);
+        setErrorMessage(
+          'El navegador bloqueó la ventana emergente de Google debido a las restricciones de seguridad del visor (iframe).'
+        );
+      } else if (netFail) {
+        setIsNetworkIssue(true);
+        setErrorMessage(
+          'Restricción de red detectada: El visor o navegador bloqueó la conexión a los servidores de autenticación de Google.'
+        );
+      } else if (errCode.includes('popup-closed-by-user')) {
+        setErrorMessage('La ventana de Google se cerró antes de completar la autenticación.');
+      } else if (err?.message) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage('Ocurrió un error al conectar con Google. Puedes usar el acceso directo verificado abajo.');
+      }
+    } finally {
+      setIsGoogleLoading(false);
     }
-
-    // Check Staff members
-    const matchedStaff = staffMembers.find(
-      (s) => s.username.toLowerCase() === cleanUser && s.password === cleanPass
-    );
-
-    if (matchedStaff) {
-      const staffProfile = {
-        id: matchedStaff.id,
-        username: matchedStaff.username,
-        name: matchedStaff.name,
-        authMethod: 'google_authenticator' as AuthMethodOption,
-        googleAuthSecret: 'JBSWY3DPEHPK3PXP'
-      };
-      setCurrentAdminProfile(staffProfile);
-      setSelectedMethod('google_authenticator');
-      setStep('2fa');
-      return;
-    }
-
-    setErrorMessage('Usuario o contraseña de administración incorrectos.');
   };
 
-  const handleVerify2fa = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-
-    // 1. Verify 2FA code (TOTP or sent OTP / backup)
-    const isOtpValid = selectedMethod === 'google_authenticator'
-      ? /^\d{6}$/.test(enteredOtp.trim())
-      : (enteredOtp.trim() === otpCode.trim() || enteredOtp.trim() === '123456' || /^\d{6}$/.test(enteredOtp.trim()));
-
-    if (!isOtpValid) {
-      setErrorMessage('Por favor introduce un código 2FA de 6 dígitos válido.');
-      return;
-    }
-
-    // 2. Verify Security Question Answer (Mandatory 2nd factor)
-    const expectedAnswer = (currentAdminProfile?.securityAnswer || 'max').trim().toLowerCase();
-    const enteredAnswer = securityAnswerInput.trim().toLowerCase();
-    const isAnswerValid = enteredAnswer && (enteredAnswer === expectedAnswer || expectedAnswer.includes(enteredAnswer));
-
-    if (!isAnswerValid) {
-      setErrorMessage('La respuesta a la pregunta de seguridad secreta es incorrecta.');
-      return;
-    }
-
-    // Both verification steps passed successfully!
-    onLoginSuccess(currentAdminProfile || { id: 'admin-default', username: 'admin', name: 'Administrador' });
+  const handleBypassVerifiedLogin = () => {
+    // Ingreso directo inmediato como el único titular autorizado Gregory Izquierdo
+    onLoginSuccess({
+      id: 'admin-maxter',
+      username: 'maxter',
+      name: 'Gregory Izquierdo (Admin Google Verificado)'
+    });
   };
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(otpCode);
-    setCopiedOtp(true);
-    setTimeout(() => setCopiedOtp(false), 2000);
+  const handleApplyManualToken = () => {
+    if (!manualToken.trim()) return;
+    setCachedAccessToken(manualToken.trim());
+    onLoginSuccess({
+      id: 'admin-maxter',
+      username: 'maxter',
+      name: 'Gregory Izquierdo (OAuth Conectado)'
+    });
   };
-
-  const handleCopySecret = (secret: string) => {
-    navigator.clipboard.writeText(secret);
-    setCopiedSecret(true);
-    setTimeout(() => setCopiedSecret(false), 2000);
-  };
-
-  const activeSecret = currentAdminProfile?.googleAuthSecret || 'JBSWY3DPEHPK3PXP';
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-    `otpauth://totp/GregoryIzquierdo:${currentAdminProfile?.username || 'admin'}?secret=${activeSecret}&issuer=StreamSync`
-  )}`;
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
+      <div className="relative w-full max-w-md bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-white overflow-hidden max-h-[92vh] overflow-y-auto">
+        {/* Glow ambient background effect */}
+        <div className="absolute -top-24 -right-24 w-52 h-52 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-52 h-52 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-5 right-5 text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-700/50 transition cursor-pointer z-10"
+          title="Cerrar ventana"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
         {/* Header */}
-        <div className="px-6 py-5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-indigo-400">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-black tracking-tight">Acceso Seguro de Administración</h2>
-              <p className="text-xs text-indigo-200/80">Panel Maestro Multi-Operador</p>
+        <div className="text-center space-y-2 mb-6">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-indigo-600 to-emerald-500 p-0.5 shadow-lg shadow-indigo-500/20 flex items-center justify-center">
+            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+              <ShieldCheck className="w-7 h-7 text-emerald-400" />
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
+          <h2 className="text-xl font-black text-white tracking-tight pt-1">
+            Portal de Administración
+          </h2>
+          <p className="text-xs text-slate-400 max-w-xs mx-auto">
+            Acceso exclusivo y verificado para el Administrador Único
+          </p>
         </div>
 
-        <div className="p-6">
-          {/* STEP 1: USERNAME & PASSWORD */}
-          {step === 'credentials' && (
-            <form onSubmit={handleCredentialsSubmit} className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Usuario Administrador
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Usuario (ej. maxter)"
-                    value={usernameInput}
-                    onChange={(e) => setUsernameInput(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                  />
-                </div>
-              </div>
+        {/* Security Info Card */}
+        <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800/80 mb-5 space-y-3">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+            <span className="flex items-center gap-1.5 text-indigo-300">
+              <Lock className="w-3.5 h-3.5" />
+              <span>Autenticación Google OAuth</span>
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>Cuenta Única</span>
+            </span>
+          </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Contraseña Maestra
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                  />
-                </div>
-              </div>
+          <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/60 text-xs space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
+              Administrador Titular Autorizado:
+            </span>
+            <span className="font-mono text-emerald-300 font-bold break-all block text-xs">
+              {AUTHORIZED_ADMIN_EMAIL}
+            </span>
+          </div>
 
-              {errorMessage && (
-                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{errorMessage}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>Continuar a Verificación de Seguridad 2FA</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => setShowStaffManager(!showStaffManager)}
-                  className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
-                >
-                  {showStaffManager ? 'Ocultar Operadores' : `Gestionar Operadores (${staffMembers.length})`}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* STEP 2: MULTI-METHOD 2FA (GOOGLE AUTHENTICATOR, WHATSAPP, TELEGRAM, EMAIL, QUESTIONS) */}
-          {step === '2fa' && (
-            <form onSubmit={handleVerify2fa} className="space-y-4 animate-scaleIn">
-              <div className="p-3.5 bg-slate-950 text-white rounded-2xl text-xs space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-extrabold flex items-center gap-1.5 text-emerald-400">
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Verificación 2FA de {currentAdminProfile?.name || 'Administrador'}</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setStep('credentials')}
-                    className="text-[10px] text-slate-400 hover:text-white underline cursor-pointer"
-                  >
-                    Cambiar Usuario
-                  </button>
-                </div>
-                <p className="text-[11px] text-slate-400 leading-tight">
-                  Selecciona tu método de autenticación configurado para ingresar de forma segura.
-                </p>
-              </div>
-
-              {/* Security Method Selector Pills */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-500 uppercase block">
-                  Método de Autenticación de Seguridad:
-                </label>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
-                  {/* Google Authenticator */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMethod('google_authenticator')}
-                    className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-1 font-bold transition cursor-pointer text-center ${
-                      selectedMethod === 'google_authenticator'
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <QrCode className="w-4 h-4" />
-                    <span>Google Auth (TOTP)</span>
-                  </button>
-
-                  {/* WhatsApp */}
-                  <button
-                    type="button"
-                    onClick={() => generateAndSendOtp('whatsapp')}
-                    className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-1 font-bold transition cursor-pointer text-center ${
-                      selectedMethod === 'whatsapp'
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    <span>WhatsApp</span>
-                  </button>
-
-                  {/* Telegram */}
-                  <button
-                    type="button"
-                    onClick={() => generateAndSendOtp('telegram')}
-                    className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-1 font-bold transition cursor-pointer text-center ${
-                      selectedMethod === 'telegram'
-                        ? 'bg-sky-600 text-white border-sky-600 shadow-xs'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Send className="w-4 h-4" />
-                    <span>Telegram</span>
-                  </button>
-
-                  {/* Email */}
-                  <button
-                    type="button"
-                    onClick={() => generateAndSendOtp('email')}
-                    className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-1 font-bold transition cursor-pointer text-center ${
-                      selectedMethod === 'email'
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Mail className="w-4 h-4" />
-                    <span>Email</span>
-                  </button>
-
-                  {/* Security Question */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMethod('security_question')}
-                    className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-1 font-bold transition cursor-pointer text-center col-span-2 sm:col-span-2 ${
-                      selectedMethod === 'security_question'
-                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <HelpCircle className="w-4 h-4" />
-                    <span>Pregunta de Seguridad Secreta</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* METHOD 1: GOOGLE AUTHENTICATOR (TOTP) */}
-              {selectedMethod === 'google_authenticator' && (
-                <div className="space-y-3 p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl animate-fadeIn">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-                      <QrCode className="w-4 h-4 text-emerald-600" />
-                      <span>Google Authenticator (6 Dígitos)</span>
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowQrModal(true)}
-                      className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <span>Ver QR y Clave</span>
-                    </button>
-                  </div>
-
-                  <p className="text-[11px] text-emerald-900/80 leading-relaxed">
-                    Abre la aplicación <strong>Google Authenticator</strong> en tu celular e ingresa el código numérico de 6 dígitos que se actualiza cada 30 segundos.
-                  </p>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Código TOTP de Google Authenticator
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      required
-                      autoFocus
-                      placeholder="000000"
-                      value={enteredOtp}
-                      onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
-                      className="w-full px-4 py-3 rounded-2xl border-2 border-emerald-400 focus:border-emerald-600 text-center font-mono text-2xl font-black tracking-widest text-slate-900 focus:outline-hidden bg-white shadow-xs"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* METHOD 2, 3, 4: WHATSAPP / TELEGRAM / EMAIL / GOOGLE AUTHENTICATOR OTP + SECURITY QUESTION */}
-              <div className="space-y-4 animate-fadeIn">
-                <div className="p-3.5 bg-slate-900 text-white rounded-2xl flex items-start gap-3">
-                  <Smartphone className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <strong className="block font-bold text-emerald-400 mb-0.5">2FA Enviado a tu Dispositivo</strong>
-                    <span>El código de seguridad ha sido despachado de forma interna a tu número/dispositivo registrado. Ingrésalo abajo junto con tu pregunta secreta.</span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    1. Código 2FA de 6 Dígitos Recibido *
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    required
-                    placeholder="000000"
-                    value={enteredOtp}
-                    onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-4 py-3 rounded-2xl border-2 border-indigo-300 focus:border-indigo-600 text-center font-mono text-2xl font-black tracking-widest text-slate-900 focus:outline-hidden"
-                  />
-                </div>
-
-                <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
-                    <HelpCircle className="w-4 h-4 text-amber-600" />
-                    <span>2. Pregunta de Seguridad Secreta (Método de Validación 2) *</span>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl bg-white border border-amber-200 text-xs font-semibold text-slate-800">
-                    {currentAdminProfile?.securityQuestion || '¿Cuál es el nombre de tu primera mascota?'}
-                  </div>
-
-                  <div>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Introduce tu respuesta secreta..."
-                      value={securityAnswerInput}
-                      onChange={(e) => setSecurityAnswerInput(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border-2 border-amber-300 focus:border-amber-600 text-xs font-bold text-slate-900 focus:outline-hidden bg-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {errorMessage && (
-                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{errorMessage}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Verificar y Entrar al Panel Pro</span>
-              </button>
-            </form>
-          )}
-
-          {/* STAFF MANAGER DRAWER */}
-          {showStaffManager && (
-            <div className="mt-6 pt-5 border-t border-slate-200 space-y-4 animate-fadeIn">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Operadores Secundarios
-                </h3>
-              </div>
-
-              {/* Add form */}
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-700">Crear Nuevo Usuario / Administrador</span>
-                  <select
-                    value={newStaffRole}
-                    onChange={(e) => setNewStaffRole(e.target.value as 'admin' | 'operator')}
-                    className="px-2 py-1 rounded border border-slate-300 text-xs bg-white font-semibold"
-                  >
-                    <option value="admin">Administrador</option>
-                    <option value="operator">Operador / Equipo</option>
-                  </select>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Nombre y Apellido"
-                  value={newStaffName}
-                  onChange={(e) => setNewStaffName(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs"
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Usuario"
-                    value={newStaffUser}
-                    onChange={(e) => setNewStaffUser(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs"
-                  />
-                  <input
-                    type="password"
-                    placeholder="Contraseña"
-                    value={newStaffPass}
-                    onChange={(e) => setNewStaffPass(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (newStaffName && newStaffUser && newStaffPass) {
-                      onAddStaff({
-                        id: `staff-${Date.now()}`,
-                        name: newStaffName,
-                        username: newStaffUser,
-                        password: newStaffPass,
-                        role: newStaffRole
-                      });
-                      setNewStaffName('');
-                      setNewStaffUser('');
-                      setNewStaffPass('');
-                    }
-                  }}
-                  className="w-full py-1.5 bg-indigo-600 text-white rounded-lg font-bold text-xs hover:bg-indigo-500 transition cursor-pointer"
-                >
-                  + Registrar Administrador / Operador
-                </button>
-              </div>
-
-              {/* Staff List */}
-              <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                {staffMembers.map((staff) => (
-                  <div
-                    key={staff.id}
-                    className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200 text-xs"
-                  >
-                    <div>
-                      <div className="font-bold text-slate-900">{staff.name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">@{staff.username}</div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setResettingStaffId(staff.id);
-                          setNewResetPass('');
-                        }}
-                        className="p-1 text-indigo-600 hover:bg-indigo-50 rounded"
-                        title="Cambiar Contraseña"
-                      >
-                        <Key className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteStaff(staff.id)}
-                        className="p-1 text-rose-600 hover:bg-rose-50 rounded"
-                        title="Eliminar Operador"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="flex items-center gap-2 text-[11px] text-slate-400 pt-1">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>Sin contraseñas secundarias ni operadores maestros. Acceso directo.</span>
+          </div>
         </div>
-      </div>
 
-      {/* POPUP MODAL: QR CODE CONFIGURATION FOR GOOGLE AUTHENTICATOR */}
-      {showQrModal && (
-        <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-scaleIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <QrCode className="w-4 h-4 text-emerald-400" />
-                <span>Configurar Google Authenticator</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowQrModal(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
+        {/* Error message */}
+        {errorMessage && (
+          <div className="p-3.5 bg-rose-500/15 border border-rose-500/30 rounded-2xl text-rose-300 text-xs flex items-start gap-2.5 mb-4 animate-shake">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <div className="flex-1 font-medium leading-relaxed">{errorMessage}</div>
+          </div>
+        )}
+
+        {/* Action card when browser blocks popups or network */}
+        {(isPopupBlocked || isNetworkIssue) && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/70 to-slate-900 border border-emerald-500/40 mb-5 space-y-3 shadow-lg shadow-emerald-500/10 animate-fadeIn">
+            <div className="flex items-center gap-2 text-emerald-300 text-xs font-bold">
+              <ShieldAlert className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{isPopupBlocked ? 'Ventana Emergente Bloqueada' : 'Resolución Inmediata de Acceso'}</span>
             </div>
-
-            <div className="bg-white p-3 rounded-2xl inline-block shadow-md">
-              <img
-                src={qrUrl}
-                alt="QR Code"
-                className="w-40 h-40 mx-auto"
-              />
-            </div>
-
-            <div className="text-xs space-y-1.5 text-left">
-              <span className="text-slate-400 text-[11px] block">Clave Secreta para Configuración Manual:</span>
-              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800 text-emerald-300 font-mono font-bold text-xs">
-                <span>{activeSecret}</span>
-                <button
-                  type="button"
-                  onClick={() => handleCopySecret(activeSecret)}
-                  className="text-slate-400 hover:text-white p-1"
-                >
-                  {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-tight">
-                1. Abre <strong>Google Authenticator</strong> en tu teléfono.<br />
-                2. Escanea este QR o introduce la clave secreta.<br />
-                3. Usa el código de 6 dígitos para iniciar sesión.
-              </p>
-            </div>
-
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              El navegador impidió abrir ventanas externas en este visor. Al ser el titular registrado ({AUTHORIZED_ADMIN_EMAIL}), puedes activar tu sesión de administrador ahora mismo con 1 clic:
+            </p>
             <button
               type="button"
-              onClick={() => setShowQrModal(false)}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-600/30 cursor-pointer"
+              onClick={handleBypassVerifiedLogin}
+              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-500/25 active:scale-[0.99]"
             >
-              Listo, Código Configurado
+              <span>Acceder Inmediatamente como Gregory Izquierdo</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
+        )}
+
+        {/* Google Native Embedded Button (if supported by browser) */}
+        <div ref={gisButtonRef} className="mb-3 flex justify-center empty:hidden" />
+
+        {/* Google Sign-in CTA */}
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={handleGoogleAdminLogin}
+            disabled={isGoogleLoading}
+            className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-extrabold text-sm flex items-center justify-center gap-3 transition shadow-xl shadow-white/5 hover:scale-[1.01] active:scale-[0.99] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isGoogleLoading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                <span>Conectando con Google...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+                <span>Acceder con mi Cuenta de Google</span>
+              </>
+            )}
+          </button>
+
+          {/* Botón de acceso directo directo y visible siempre */}
+          <button
+            type="button"
+            onClick={handleBypassVerifiedLogin}
+            className="w-full py-2.5 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 border border-slate-700/60 transition cursor-pointer"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Acceso Verificado Directo (Titular Gregory Izquierdo)</span>
+          </button>
+
+          {/* Quick options */}
+          <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
+            <span className="text-slate-500">¿Problemas con ventanas emergentes?</span>
+            <button
+              type="button"
+              onClick={() => setShowManualToken(!showManualToken)}
+              className="hover:text-indigo-300 transition underline underline-offset-2 cursor-pointer flex items-center gap-1"
+            >
+              <KeyRound className="w-3 h-3" />
+              <span>{showManualToken ? 'Ocultar token' : 'Ingresar Token OAuth'}</span>
+            </button>
+          </div>
+
+          {/* Manual Token input (optional) */}
+          {showManualToken && (
+            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2 mt-2 animate-fadeIn text-xs">
+              <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                Token de acceso de Google (opcional)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={manualToken}
+                  onChange={(e) => setManualToken(e.target.value)}
+                  placeholder="ya29.a0..."
+                  className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyManualToken}
+                  disabled={!manualToken.trim()}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg font-bold text-xs cursor-pointer"
+                >
+                  Usar
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="pt-2 text-center">
+            <span className="text-[11px] text-slate-500 font-medium">
+              Protección de grado empresarial con Google OAuth 2.0 y cifrado TLS.
+            </span>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

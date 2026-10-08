@@ -173,24 +173,6 @@ export const INTEGRATIONS_LIST: IntegrationItem[] = [
 
   // Aplicaciones de Terceros
   {
-    id: 'whatsapp_cloud',
-    name: 'WhatsApp Cloud API / Bot Mensajería',
-    category: 'third_party',
-    badge: 'Recomendada',
-    icon: MessageSquare,
-    description: 'Envío directo de credenciales de acceso, avisos de corte 1 día antes y códigos de seguridad 2FA directamente al WhatsApp del cliente.',
-    features: [
-      'Envío con 1 solo clic mediante wa.me o automatizado por API',
-      'Plantillas oficiales preconfiguradas con datos dinámicos',
-      'Soporte para múltiples líneas de operadores'
-    ],
-    status: 'ready_to_connect',
-    setupSteps: [
-      'Configurar Token de Meta for Developers o activar enlace directo wa.me',
-      'Ingresar número oficial de soporte (+584241983648)'
-    ]
-  },
-  {
     id: 'telegram_bot',
     name: 'Telegram Bot API (@gregory_streaming_bot)',
     category: 'third_party',
@@ -301,9 +283,7 @@ export const AdminIntegrationsCatalogModal: React.FC<AdminIntegrationsCatalogMod
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [calendarStatusMsg, setCalendarStatusMsg] = useState<string | null>(null);
 
-  // WhatsApp & Telegram Custom Config State
-  const [whatsappPhone, setWhatsappPhone] = useState('+584241983648');
-  const [whatsappToken, setWhatsappToken] = useState('');
+  // Telegram & Webhook Custom Config State
   const [telegramToken, setTelegramToken] = useState('7128938192:AAH93910dkas92');
   const [telegramChatId, setTelegramChatId] = useState('-10023819283');
   const [webhookUrl, setWebhookUrl] = useState('https://hook.eu1.make.com/gregory-streaming-events');
@@ -323,7 +303,7 @@ export const AdminIntegrationsCatalogModal: React.FC<AdminIntegrationsCatalogMod
         setStatusMessage('¡Sesión de Google iniciada con éxito! Permisos concedidos para Sheets, Drive, Contacts y Calendar.');
       }
     } catch (err: any) {
-      console.error(err);
+      console.warn('Aviso de inicio de sesión Google:', err);
       setStatusMessage(`Aviso: ${err.message || 'Error al abrir ventana de Google'}. Puedes ingresar el token directamente abajo si el navegador bloqueó la ventana.`);
       setShowManualTokenInput(true);
     } finally {
@@ -976,45 +956,7 @@ export const AdminIntegrationsCatalogModal: React.FC<AdminIntegrationsCatalogMod
               </div>
             )}
 
-            {/* INTEGRATION 4: WHATSAPP CLOUD API */}
-            {selectedIntegration.id === 'whatsapp_cloud' && (
-              <div className="space-y-4 text-xs">
-                <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
-                  <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Número Oficial WhatsApp:</label>
-                    <input
-                      type="text"
-                      value={whatsappPhone}
-                      onChange={(e) => setWhatsappPhone(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Token de Acceso Meta Cloud API (Opcional si usas wa.me):</label>
-                    <input
-                      type="text"
-                      placeholder="EAAGm0PX4ZC5..."
-                      value={whatsappToken}
-                      onChange={(e) => setWhatsappToken(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
-                    />
-                  </div>
-                </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    const msg = encodeURIComponent('Prueba de conexión exitosa desde la plataforma de Gregory Streaming.');
-                    window.open(`https://wa.me/${whatsappPhone.replace(/\D/g, '')}?text=${msg}`, '_blank');
-                    setStatusMessage('¡Prueba de WhatsApp iniciada en nueva pestaña!');
-                  }}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-md"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  <span>Probar Envío de Mensaje por WhatsApp</span>
-                </button>
-              </div>
-            )}
 
             {/* INTEGRATION 5: TELEGRAM BOT */}
             {selectedIntegration.id === 'telegram_bot' && (
