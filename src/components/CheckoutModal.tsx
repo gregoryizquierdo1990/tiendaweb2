@@ -194,8 +194,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         paymentMethodId: payWithGrpay ? 'wallet-grpay' : selectedMethod.id,
         paymentMethodName: payWithGrpay ? 'Saldo Zeny Wallet' : selectedMethod.name,
         referenceNumber: payWithGrpay ? `Zeny-AUTO-${orderId}` : referenceNumber.trim(),
-        receiptImage: receiptPreview || undefined,
-        customerNotes: customerNotes.trim() || undefined,
         status: payWithGrpay ? 'confirmed' : 'pending_reconciliation',
         paidWithGrpay: payWithGrpay,
         credentials: payWithGrpay
@@ -211,6 +209,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           : undefined,
         syncedToSheets: false
       };
+
+      if (receiptPreview) newOrder.receiptImage = receiptPreview;
+      if (customerNotes.trim()) newOrder.customerNotes = customerNotes.trim();
 
       if (product.allowInstallments && paymentCondition === 'cuotas') {
         newOrder.installmentPlan = {
