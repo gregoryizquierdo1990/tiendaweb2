@@ -191,18 +191,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         total: effectivePrice,
         currency,
         paymentCondition: product.allowInstallments ? paymentCondition : 'contado',
-        installmentPlan: product.allowInstallments && paymentCondition === 'cuotas'
-          ? {
-              totalAmountUsd: priceUsd,
-              downPaymentUsd,
-              installmentAmountUsd,
-              numberOfInstallments: totalInstallments,
-              intervalDays,
-              paidCount: 1,
-              status: 'in_progress',
-              nextDueDate: nextDueDateObj.toISOString().split('T')[0]
-            }
-          : undefined,
         paymentMethodId: payWithGrpay ? 'wallet-grpay' : selectedMethod.id,
         paymentMethodName: payWithGrpay ? 'Saldo Zeny Wallet' : selectedMethod.name,
         referenceNumber: payWithGrpay ? `Zeny-AUTO-${orderId}` : referenceNumber.trim(),
@@ -223,6 +211,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           : undefined,
         syncedToSheets: false
       };
+
+      if (product.allowInstallments && paymentCondition === 'cuotas') {
+        newOrder.installmentPlan = {
+          totalAmountUsd: priceUsd,
+          downPaymentUsd: downPaymentUsd,
+          installmentAmountUsd: installmentAmountUsd,
+          numberOfInstallments: totalInstallments,
+          intervalDays: intervalDays,
+          paidCount: 1,
+          status: 'in_progress',
+          nextDueDate: nextDueDateObj.toISOString().split('T')[0]
+        };
+      }
 
       await onSubmitOrder(newOrder, payWithGrpay);
 
