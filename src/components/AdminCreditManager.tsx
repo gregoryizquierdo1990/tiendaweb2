@@ -206,7 +206,7 @@ export const AdminCreditManager: React.FC<AdminCreditManagerProps> = ({
       currency: 'USD',
       paymentMethodId: 'credit_manual',
       paymentMethodName: 'Entrega a Crédito (Confianza)',
-      referenceNumber: `CRED-${creditDueDate.replace(/-/g, '')}`,
+      referenceNumber: `CRED-${(creditDueDate || '').replace(/-/g, '')}`,
       status: 'confirmed',
       paymentCondition: 'credito',
       creditDueDate,

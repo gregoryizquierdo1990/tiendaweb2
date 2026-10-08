@@ -390,7 +390,7 @@ export const AdminIntegrationsCatalogModal: React.FC<AdminIntegrationsCatalogMod
         id: `imported-${Math.random().toString(36).substr(2, 9)}`,
         name: c.name,
         phone: c.phone || 'N/A',
-        email: c.email || `${c.name.toLowerCase().replace(/\s+/g, '')}@import.com`,
+        email: (c.email || '') || `${(c.name || '').toLowerCase().replace(/\s+/g, '')}@import.com`,
         grpayBalance: 0,
         createdAt: new Date().toISOString(),
         role: 'cliente' as const,
