@@ -1,0 +1,147 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Catalogo de productos y servicios de streaming",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "duration": { "type": "string" },
+        "price_usd": { "type": "number" },
+        "price_bs": { "type": "number" },
+        "account_type": { "type": "string" },
+        "description": { "type": "string" },
+        "image_url": { "type": "string" },
+        "stock": { "type": "integer" },
+        "is_stock_manual": { "type": "boolean" },
+        "manual_stock": { "type": "integer" }
+      },
+      "required": ["id", "name", "category"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Pedidos de suscripciones realizados por los clientes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "customerName": { "type": "string" },
+        "product": { "type": "object" },
+        "priceUsd": { "type": "number" },
+        "priceBs": { "type": "number" },
+        "status": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "referenceNumber": { "type": "string" },
+        "accountCredentials": { "type": "object" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "customerEmail", "status"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Perfiles de usuarios clientes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string" },
+        "zenyBalance": { "type": "number" },
+        "isSuspended": { "type": "boolean" }
+      },
+      "required": ["id", "email"]
+    },
+    "WalletTopup": {
+      "title": "WalletTopup",
+      "description": "Solicitudes de recargas de saldo de billetera Zeny",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "amountZenyPoints": { "type": "number" },
+        "referenceNumber": { "type": "string" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "customerEmail", "amountZenyPoints", "status"]
+    },
+    "Incident": {
+      "title": "Incident",
+      "description": "Reporte de incidencias y soporte técnico",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "subject": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "customerEmail", "subject", "status"]
+    },
+    "PaymentMethod": {
+      "title": "PaymentMethod",
+      "description": "Metodos de pago disponibles para los clientes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "bank_name": { "type": "string" },
+        "doc_id": { "type": "string" },
+        "phone": { "type": "string" },
+        "payment_instructions": { "type": "string" },
+        "currency": { "type": "string" },
+        "is_active": { "type": "boolean" }
+      },
+      "required": ["id", "name"]
+    },
+    "Branding": {
+      "title": "Branding",
+      "description": "Configuracion de marca y estilo de la plataforma",
+      "type": "object",
+      "properties": {
+        "projectName": { "type": "string" },
+        "slogan": { "type": "string" },
+        "primaryColor": { "type": "string" },
+        "secondaryColor": { "type": "string" },
+        "heroTitle": { "type": "string" }
+      },
+      "required": ["projectName"]
+    }
+  },
+  "firestore": {
+    "products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Catalogo de productos streaming"
+    },
+    "orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Pedidos de clientes"
+    },
+    "customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Perfiles y balances de clientes"
+    },
+    "wallet_topups/{topupId}": {
+      "schema": { "$ref": "#/entities/WalletTopup" },
+      "description": "Solicitudes de recargas de saldo"
+    },
+    "incidents/{incidentId}": {
+      "schema": { "$ref": "#/entities/Incident" },
+      "description": "Reporte de incidencias y soporte"
+    },
+    "payment_methods/{methodId}": {
+      "schema": { "$ref": "#/entities/PaymentMethod" },
+      "description": "Metodos de pago configurados"
+    },
+    "config/branding": {
+      "schema": { "$ref": "#/entities/Branding" },
+      "description": "Ajustes de marca de la aplicacion"
+    }
+  }
+}

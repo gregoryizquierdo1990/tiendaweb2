@@ -1,6 +1,6 @@
 {
-  "summary":  "Robust Bidirectional Supabase Sync & Control Panel Plan. Outlines the strategy to fix customer synchronization bugs, merge local and remote data structures, and introduce a gorgeous Connection Status & Manual Sync dashboard in the Admin section.",
-  "updatedAt":  "2026-10-08T14:29:22.582902431Z",
+  "summary":  "Plan de implementación para la integración de Firebase Firestore para lograr sincronización bidireccional en tiempo real de productos, pedidos, clientes y configuraciones entre todos los dispositivos y la web publicada gregoryizquierdo.xyz.",
+  "updatedAt":  "2026-10-08T16:11:41.829077993Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

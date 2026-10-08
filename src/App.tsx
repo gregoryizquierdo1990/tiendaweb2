@@ -26,6 +26,16 @@ import { DEFAULT_MESSAGE_TEMPLATES, DOMAIN_OFFICIAL, DEFAULT_ACTION_MAPPING } fr
 import { logAuditEvent } from './services/auditLogger';
 import { useAppStore } from './store/useAppStore';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
+import { 
+  initRealtimeFirestoreSync, 
+  syncCustomerToFirestore, 
+  syncOrderToFirestore, 
+  syncWalletTopupToFirestore, 
+  syncIncidentToFirestore,
+  syncProductToFirestore,
+  deleteProductFromFirestore,
+  seedFirestoreIfEmpty
+} from './services/firestoreService';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { InvoiceViewer } from './components/InvoiceViewer';
 import { registerServiceWorker, sendPushNotification } from './utils/pushNotifications';
@@ -186,78 +196,17 @@ export default function App() {
   const [isDbLoaded, setIsDbLoaded] = useState(false);
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
 
-  // 1. Fetch initial state on boot from Express server-side DB
+  // Bidirectional real-time cloud synchronization via Firebase Firestore
   useEffect(() => {
-    const fetchCloudDb = async () => {
-      try {
-        const res = await fetch('/api/db');
-        if (res.ok) {
-          const data = await res.json();
-          if (data && Object.keys(data).length > 0) {
-            if (data.products) setProducts(data.products);
-            if (data.branding) setBranding(data.branding);
-            if (data.paymentMethods) setPaymentMethods(data.paymentMethods);
-            if (data.orders) setOrders(data.orders);
-            if (data.customers) setCustomerUsers(data.customers);
-            if (data.walletTopups) setWalletTopups(data.walletTopups);
-            if (data.incidents) setIncidents(data.incidents);
-            if (data.faqItems) setFaqItems(data.faqItems);
-            if (data.bcvRate) setBcvRate(data.bcvRate);
-          }
-        }
-      } catch (err) {
-        console.warn('Notice loading database from server:', err);
-      } finally {
-        setIsDbLoaded(true);
-      }
+    setIsCloudSyncing(true);
+    const unsubscribeFirestore = initRealtimeFirestoreSync();
+    setIsDbLoaded(true);
+    setIsCloudSyncing(false);
+
+    return () => {
+      unsubscribeFirestore();
     };
-    fetchCloudDb();
   }, []);
-
-  // 2. Automatically save state back to cloud when it changes (after initial load has finished)
-  useEffect(() => {
-    if (!isDbLoaded) return;
-    
-    const saveCloudDb = async () => {
-      setIsCloudSyncing(true);
-      try {
-        await fetch('/api/db', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            products,
-            branding,
-            paymentMethods,
-            orders,
-            customers: customerUsers,
-            walletTopups,
-            incidents,
-            faqItems,
-            bcvRate
-          })
-        });
-      } catch (err) {
-        console.warn('Notice saving database to server:', err);
-      } finally {
-        setIsCloudSyncing(false);
-      }
-    };
-
-    // Debounce saving to cloud by 1 second to prevent spamming server on fast consecutive edits
-    const timer = setTimeout(saveCloudDb, 1000);
-    return () => clearTimeout(timer);
-  }, [
-    isDbLoaded,
-    products,
-    branding,
-    paymentMethods,
-    orders,
-    customerUsers,
-    walletTopups,
-    incidents,
-    faqItems,
-    bcvRate
-  ]);
 
   // Escuchar navegación del navegador (atrás/adelante o cambios de URL directa)
   useEffect(() => {
@@ -553,528 +502,22 @@ export default function App() {
   }, [loadLiveBcvRate]);
 
   const handleSupabaseSyncError = useCallback((err: any, context: string) => {
-    console.warn(`Notice loading ${context} from Supabase:`, err);
-    const errMsg = err?.message || String(err);
-    if (errMsg.includes('PGRST205') || errMsg.includes('Could not find') || errMsg.includes('schema cache')) {
-      setSupabaseSchemaError(`Error en ${context}: ${errMsg}`);
-    }
-  }, [setSupabaseSchemaError]);
+    console.warn(`Notice in ${context}:`, err);
+  }, []);
 
-  // Pre-flight check to verify that all required tables exist in Supabase
   const verifySupabaseSchema = useCallback(async (): Promise<boolean> => {
-    if (!isSupabaseConfigured) return false;
-    
-    // Check critical tables
-    const tablesToCheck = ['customers', 'products', 'payment_methods'];
-    try {
-      await Promise.all(
-        tablesToCheck.map(async (table) => {
-          const { error } = await supabase.from(table).select('id').limit(1);
-          if (error) {
-            const errMsg = error.message || '';
-            if (error.code === 'PGRST205' || errMsg.includes('Could not find') || errMsg.includes('does not exist')) {
-              throw new Error(`La tabla "${table}" no ha sido inicializada en Supabase.`);
-            }
-          }
-        })
-      );
-      setSupabaseSchemaError(null);
-      return true;
-    } catch (err: any) {
-      console.warn('Pre-flight Supabase schema verification notice:', err);
-      setSupabaseSchemaError(err.message || String(err));
-      return false;
-    }
-  }, [setSupabaseSchemaError]);
+    return true;
+  }, []);
 
-  // Load and bidirectionally sync database tables with Supabase on startup
+  // Load and bidirectionally sync database tables with Firestore on startup
   const syncDatabaseWithSupabase = useCallback(async () => {
-    if (!isSupabaseConfigured) return;
-    
-    // Validate schema is initialized before full synchronization to prevent cache errors
-    const isSchemaValid = await verifySupabaseSchema();
-    if (!isSchemaValid) {
-      console.warn('Aborting Supabase bidirectional sync: DB tables are not created yet.');
-      return;
-    }
-    
-    // 1. Products
     try {
-      const { data: dbProducts, error } = await supabase.from('products').select('*');
-      if (error) throw error;
-      
-      const mappedProducts = dbProducts ? dbProducts.map((db: any) => {
-        const old: any = products.find((p) => p.id === db.id) || {};
-        return {
-          tagline: '',
-          features: [],
-          screens: 1,
-          warrantyMonths: 1,
-          color: '#4f46e5',
-          accentBg: '',
-          ...old,
-          id: db.id,
-          name: db.name,
-          category: db.category || 'cat-netflix',
-          brand: db.category ? db.category.replace('cat-', '') : 'netflix',
-          prices: {
-            ...(old.prices || {}),
-            [db.duration || '30 Días']: {
-              USD: Number(db.price_usd || 0),
-              BS: Number(db.price_bs || 0)
-            }
-          },
-          defaultDuration: db.duration || '30 Días',
-          accountType: db.account_type || 'Pantalla Privada',
-          description: db.description || '',
-          logo: db.image_url || old.logo || '',
-          stock: Number(db.stock ?? 10),
-          isStockManual: Boolean(db.is_stock_manual),
-          manualStock: Number(db.manual_stock ?? 10),
-          inStock: Number(db.stock ?? 10) > 0
-        };
-      }) : [];
-
-      // Bidirectional merge
-      const mergedProducts = [...products];
-      const productsToUpsert: any[] = [];
-      
-      for (const rp of mappedProducts) {
-        const localIdx = mergedProducts.findIndex(lp => lp.id === rp.id);
-        if (localIdx === -1) {
-          mergedProducts.push(rp);
-        } else {
-          mergedProducts[localIdx] = { ...mergedProducts[localIdx], ...rp };
-        }
-      }
-      
-      for (const lp of products) {
-        const existsRemote = mappedProducts.some(rp => rp.id === lp.id);
-        if (!existsRemote) {
-          productsToUpsert.push(lp);
-        }
-      }
-
-      setProducts(mergedProducts);
-
-      if (productsToUpsert.length > 0) {
-        for (const prod of productsToUpsert) {
-          await supabase.from('products').upsert({
-            id: prod.id,
-            name: prod.name,
-            category: prod.category,
-            price_usd: prod.prices[prod.defaultDuration]?.USD || 0,
-            price_bs: prod.prices[prod.defaultDuration]?.BS || 0,
-            duration: prod.defaultDuration,
-            account_type: prod.accountType,
-            description: prod.description,
-            image_url: prod.logo,
-            stock: prod.stock,
-            is_stock_manual: prod.isStockManual,
-            manual_stock: prod.manualStock
-          });
-        }
-      }
-    } catch (err) {
-      handleSupabaseSyncError(err, 'productos');
+      await seedFirestoreIfEmpty();
+      showNotification('success', 'Base de datos Firestore sincronizada en tiempo real.');
+    } catch (err: any) {
+      console.warn('Notice seeding Firestore:', err);
     }
-
-    // 2. Customers
-    try {
-      const { data: dbCustomers, error } = await supabase.from('customers').select('*');
-      if (error) throw error;
-      
-      const mappedCustomers = dbCustomers ? dbCustomers.map((db: any) => ({
-        id: db.id,
-        name: db.name,
-        email: db.email,
-        phone: db.phone || '',
-        role: db.role || 'cliente',
-        zenyBalance: Number(db.zeny_balance || 0),
-        grpayBalance: Number(db.zeny_balance || 0),
-        isSuspended: Boolean(db.is_suspended),
-        createdAt: db.created_at || new Date().toISOString()
-      })) : [];
-
-      // Bidirectional merge
-      const mergedCustomers = [...customerUsers];
-      const customersToUpsert: any[] = [];
-      
-      for (const rc of mappedCustomers) {
-        const localIdx = mergedCustomers.findIndex(lc => lc.id === rc.id || (lc.email && rc.email.toLowerCase() === rc.email.toLowerCase()));
-        if (localIdx === -1) {
-          mergedCustomers.push(rc);
-        } else {
-          mergedCustomers[localIdx] = {
-            ...mergedCustomers[localIdx],
-            ...rc,
-            zenyBalance: Math.max(mergedCustomers[localIdx].zenyBalance || 0, rc.zenyBalance || 0),
-            grpayBalance: Math.max(mergedCustomers[localIdx].grpayBalance || 0, rc.grpayBalance || 0)
-          };
-        }
-      }
-      
-      for (const lc of customerUsers) {
-        const existsRemote = mappedCustomers.some(rc => rc.id === lc.id || (rc.email && rc.email.toLowerCase() === lc.email.toLowerCase()));
-        if (!existsRemote) {
-          customersToUpsert.push(lc);
-        }
-      }
-
-      setCustomerUsers(mergedCustomers);
-      
-      if (activeCustomer) {
-        const fresh = mergedCustomers.find(c => c.id === activeCustomer.id || c.email === activeCustomer.email);
-        if (fresh) {
-          setActiveCustomer(fresh);
-        }
-      }
-
-      if (customersToUpsert.length > 0) {
-        for (const cust of customersToUpsert) {
-          await supabase.from('customers').upsert({
-            id: cust.id,
-            name: cust.name,
-            email: cust.email,
-            phone: cust.phone,
-            role: cust.role || 'cliente',
-            zeny_balance: cust.zenyBalance ?? cust.grpayBalance ?? 0,
-            is_suspended: Boolean(cust.isSuspended)
-          });
-        }
-      }
-    } catch (err) {
-      handleSupabaseSyncError(err, 'clientes');
-    }
-
-    // 3. Payment Methods
-    try {
-      const { data: dbMethods, error } = await supabase.from('payment_methods').select('*');
-      if (error) throw error;
-      
-      const mappedMethods = dbMethods ? dbMethods.map((db: any) => {
-        const old: any = paymentMethods.find((p) => p.id === db.id) || {};
-        return {
-          shortName: db.bank_name || '',
-          category: 'pago_movil' as any,
-          holderName: db.bank_name || '',
-          accountNumber: db.phone || db.doc_id || '',
-          accountTypeLabel: 'Cuenta Corriente',
-          acceptedCurrencies: [db.currency || 'USD'] as any,
-          ...old,
-          id: db.id,
-          name: db.name,
-          instructions: db.payment_instructions || old.instructions || '',
-          active: Boolean(db.is_active ?? true)
-        };
-      }) : [];
-
-      // Bidirectional merge
-      const mergedMethods = [...paymentMethods];
-      const methodsToUpsert: any[] = [];
-      
-      for (const rm of mappedMethods) {
-        const localIdx = mergedMethods.findIndex(lm => lm.id === rm.id);
-        if (localIdx === -1) {
-          mergedMethods.push(rm);
-        } else {
-          mergedMethods[localIdx] = { ...mergedMethods[localIdx], ...rm };
-        }
-      }
-      
-      for (const lm of paymentMethods) {
-        const existsRemote = mappedMethods.some(rm => rm.id === lm.id);
-        if (!existsRemote) {
-          methodsToUpsert.push(lm);
-        }
-      }
-
-      setPaymentMethods(mergedMethods);
-
-      if (methodsToUpsert.length > 0) {
-        for (const pm of methodsToUpsert) {
-          await supabase.from('payment_methods').upsert({
-            id: pm.id,
-            name: pm.name,
-            bank_name: pm.holderName || pm.shortName || '',
-            doc_id: pm.accountNumber || '',
-            phone: pm.accountNumber || '',
-            payment_instructions: pm.instructions || '',
-            currency: pm.acceptedCurrencies?.[0] || 'USD',
-            is_active: pm.active
-          });
-        }
-      }
-    } catch (err) {
-      handleSupabaseSyncError(err, 'métodos de pago');
-    }
-
-    // 4. FAQ Items
-    try {
-      const { data: dbFaq, error } = await supabase.from('faq_items').select('*');
-      if (error) throw error;
-      
-      const mappedFaq = dbFaq ? dbFaq.map((db: any) => ({
-        id: db.id,
-        category: db.category || 'General',
-        question: db.question || '',
-        answer: db.answer || '',
-        order: db.sort_order ?? 1
-      })) : [];
-
-      // Bidirectional merge
-      const mergedFaq = [...faqItems];
-      const faqToUpsert: any[] = [];
-      
-      for (const rf of mappedFaq) {
-        const localIdx = mergedFaq.findIndex(lf => lf.id === rf.id);
-        if (localIdx === -1) {
-          mergedFaq.push(rf);
-        } else {
-          mergedFaq[localIdx] = { ...mergedFaq[localIdx], ...rf };
-        }
-      }
-      
-      for (const lf of faqItems) {
-        const existsRemote = mappedFaq.some(rf => rf.id === lf.id);
-        if (!existsRemote) {
-          faqToUpsert.push(lf);
-        }
-      }
-
-      setFaqItems(mergedFaq);
-
-      if (faqToUpsert.length > 0) {
-        for (const f of faqToUpsert) {
-          await supabase.from('faq_items').upsert({
-            id: f.id,
-            category: f.category,
-            question: f.question,
-            answer: f.answer,
-            sort_order: f.order
-          });
-        }
-      }
-    } catch (err) {
-      handleSupabaseSyncError(err, 'FAQ');
-    }
-
-    // 5. Wallet Topups
-    try {
-      const { data: dbTopups, error } = await supabase.from('wallet_topups').select('*');
-      if (error) throw error;
-      
-      const mappedTopups = dbTopups ? dbTopups.map((db: any) => ({
-        id: db.id,
-        customerId: 'cust-gregory',
-        customerName: 'Cliente Zeny',
-        customerEmail: db.customer_email || 'test@cliente.com',
-        amountZenyPoints: Number(db.amount_usd || 0),
-        amountZeny: Number(db.amount_usd || 0),
-        amountPaid: Number(db.amount_usd || 0),
-        currency: 'USD' as const,
-        paymentMethodId: 'pm-zeny',
-        paymentMethodName: 'Zeny Balance',
-        referenceNumber: db.reference || 'N/A',
-        status: 'approved' as const,
-        createdAt: db.created_at || new Date().toISOString()
-      })) : [];
-
-      // Bidirectional merge
-      const mergedTopups = [...walletTopups];
-      const topupsToUpsert: any[] = [];
-      
-      for (const rt of mappedTopups) {
-        const localIdx = mergedTopups.findIndex(lt => lt.id === rt.id);
-        if (localIdx === -1) {
-          mergedTopups.push(rt);
-        } else {
-          mergedTopups[localIdx] = { ...mergedTopups[localIdx], ...rt };
-        }
-      }
-      
-      for (const lt of walletTopups) {
-        const existsRemote = mappedTopups.some(rt => rt.id === lt.id);
-        if (!existsRemote) {
-          topupsToUpsert.push(lt);
-        }
-      }
-
-      setWalletTopups(mergedTopups);
-
-      if (topupsToUpsert.length > 0) {
-        for (const w of topupsToUpsert) {
-          await supabase.from('wallet_topups').upsert({
-            id: w.id,
-            customer_email: w.customerEmail,
-            amount_usd: w.amountZenyPoints ?? w.amountZeny ?? w.amountPaid ?? 0,
-            reference: w.referenceNumber,
-            notes: `Abono Zeny - Estado: ${w.status}`
-          });
-        }
-      }
-    } catch (err) {
-      handleSupabaseSyncError(err, 'abonos wallet');
-    }
-
-    // 6. Franchises
-    try {
-      const { data: dbFranchises, error } = await supabase.from('franchises').select('*');
-      if (error) throw error;
-      
-      const mappedFranchises = dbFranchises ? dbFranchises.map((db: any) => ({
-        id: db.id,
-        businessName: db.business_name,
-        ownerName: db.owner_name,
-        phone: db.phone || '',
-        telegramUser: db.telegram_user || '',
-        email: db.email || '',
-        customDomain: db.custom_domain || '',
-        walletCustomName: db.wallet_custom_name || 'ZenyPay',
-        monthlyFeeUsd: Number(db.monthly_fee_usd || 0),
-        subscriptionStatus: db.subscription_status || 'active',
-        status: db.status || 'active',
-        creditDueDate: db.credit_due_date || '',
-        lastPaymentDate: db.last_payment_date || '',
-        availableMasterBalanceUsd: Number(db.available_master_balance_usd || 0),
-        notes: db.notes || '',
-        extraAddonsMonthlyUsd: Number(db.extra_addons_monthly_usd || 0),
-        isResellerNetworkActive: Boolean(db.is_reseller_network_active),
-        createdAt: db.created_at || new Date().toISOString()
-      })) : [];
-
-      // Bidirectional merge
-      const mergedFranchises = [...franchises];
-      const franchisesToUpsert: any[] = [];
-      
-      for (const rf of mappedFranchises) {
-        const localIdx = mergedFranchises.findIndex(lf => lf.id === rf.id);
-        if (localIdx === -1) {
-          mergedFranchises.push(rf);
-        } else {
-          mergedFranchises[localIdx] = { ...mergedFranchises[localIdx], ...rf };
-        }
-      }
-      
-      for (const lf of franchises) {
-        const existsRemote = mappedFranchises.some(rf => rf.id === lf.id);
-        if (!existsRemote) {
-          franchisesToUpsert.push(lf);
-        }
-      }
-
-      setFranchises(mergedFranchises);
-
-      if (franchisesToUpsert.length > 0) {
-        for (const f of franchisesToUpsert) {
-          await supabase.from('franchises').upsert({
-            id: f.id,
-            business_name: f.businessName,
-            owner_name: f.ownerName,
-            phone: f.phone,
-            telegram_user: f.telegramUser,
-            email: f.email,
-            custom_domain: f.customDomain,
-            wallet_custom_name: f.walletCustomName || 'ZenyPay',
-            monthly_fee_usd: f.monthlyFeeUsd || 0,
-            subscription_status: f.subscriptionStatus || 'active',
-            status: f.status || 'active',
-            credit_due_date: f.creditDueDate,
-            last_payment_date: f.lastPaymentDate,
-            available_master_balance_usd: f.availableMasterBalanceUsd || 0,
-            notes: f.notes,
-            extra_addons_monthly_usd: f.extraAddonsMonthlyUsd || 0,
-            is_reseller_network_active: Boolean(f.isResellerNetworkActive)
-          });
-        }
-      }
-    } catch (err) {
-      handleSupabaseSyncError(err, 'franquicias');
-    }
-
-    // 7. Franchise Topups
-    try {
-      const { data: dbFranchiseTopups, error } = await supabase.from('franchise_topups').select('*');
-      if (error) throw error;
-      
-      const mappedFranchiseTopups = dbFranchiseTopups ? dbFranchiseTopups.map((db: any) => ({
-        id: db.id,
-        franchiseId: db.franchise_id,
-        franchiseName: db.franchise_name || '',
-        franchisePhone: db.franchise_phone || '',
-        franchiseTelegram: db.franchise_telegram || '',
-        targetCustomerName: db.target_customer_name || '',
-        targetCustomerId: db.target_customer_id || '',
-        amountUsd: Number(db.amount_usd || 0),
-        amountBs: Number(db.amount_bs || 0),
-        paymentMethod: db.payment_method || '',
-        referenceNumber: db.reference_number || '',
-        screenshotImage: db.screenshot_image || '',
-        notes: db.notes || '',
-        status: db.status || 'pending',
-        createdAt: db.created_at || new Date().toISOString(),
-        reviewedAt: db.reviewed_at || '',
-        reviewedBy: db.reviewed_by || '',
-        rejectionReason: db.rejection_reason || ''
-      })) : [];
-
-      // Bidirectional merge
-      const mergedFranchiseTopups = [...franchiseTopups];
-      const franchiseTopupsToUpsert: any[] = [];
-      
-      for (const rft of mappedFranchiseTopups) {
-        const localIdx = mergedFranchiseTopups.findIndex(lft => lft.id === rft.id);
-        if (localIdx === -1) {
-          mergedFranchiseTopups.push(rft);
-        } else {
-          mergedFranchiseTopups[localIdx] = { ...mergedFranchiseTopups[localIdx], ...rft };
-        }
-      }
-      
-      for (const lft of franchiseTopups) {
-        const existsRemote = mappedFranchiseTopups.some(rft => rft.id === lft.id);
-        if (!existsRemote) {
-          franchiseTopupsToUpsert.push(lft);
-        }
-      }
-
-      setFranchiseTopups(mergedFranchiseTopups);
-
-      if (franchiseTopupsToUpsert.length > 0) {
-        for (const ft of franchiseTopupsToUpsert) {
-          await supabase.from('franchise_topups').upsert({
-            id: ft.id,
-            franchise_id: ft.franchiseId,
-            franchise_name: ft.franchiseName,
-            franchise_phone: ft.franchisePhone,
-            franchise_telegram: ft.franchiseTelegram,
-            target_customer_name: ft.targetCustomerName,
-            target_customer_id: ft.targetCustomerId,
-            amount_usd: ft.amountUsd,
-            amount_bs: ft.amountBs,
-            payment_method: ft.paymentMethod,
-            reference_number: ft.referenceNumber,
-            screenshot_image: ft.screenshotImage,
-            notes: ft.notes,
-            status: ft.status,
-            reviewed_at: ft.reviewedAt,
-            reviewed_by: ft.reviewedBy,
-            rejection_reason: ft.rejectionReason
-          });
-        }
-      }
-    } catch (err) {
-      handleSupabaseSyncError(err, 'abonos franquicias');
-    }
-  }, [
-    products, setProducts,
-    customerUsers, setCustomerUsers, activeCustomer, setActiveCustomer,
-    paymentMethods, setPaymentMethods,
-    faqItems, setFaqItems,
-    walletTopups, setWalletTopups,
-    franchises, setFranchises,
-    franchiseTopups, setFranchiseTopups
-  ]);
+  }, []);
 
   useEffect(() => {
     if (paymentMethods.length === 0) {
@@ -1082,109 +525,6 @@ export default function App() {
     }
     syncDatabaseWithSupabase();
   }, []);
-
-  // Synchronize product stocks automatically from Supabase (matching brand/platform against parent accounts / account profiles)
-  const syncProductStocksFromSupabase = useCallback(async () => {
-    if (!isSupabaseConfigured) return;
-    try {
-      // 1. Fetch parent accounts & account profiles & products from Supabase
-      const { data: dbProducts, error: prodErr } = await supabase.from('products').select('*');
-      const { data: dbParentAccounts, error: parentErr } = await supabase.from('parent_accounts').select('*');
-      const { data: dbProfiles, error: profErr } = await supabase.from('account_profiles').select('*');
-
-      if (prodErr || parentErr || profErr) {
-        console.warn('Notice loading Supabase inventories for stock calculation:', prodErr || parentErr || profErr);
-        return;
-      }
-
-      // 2. Loop through each product and compute dynamic stock
-      const updatedProducts = products.map((prod) => {
-        // Find matching Supabase record for this product to check override
-        const dbProd = dbProducts?.find((dbp) => dbp.id === prod.id);
-        const isManual = dbProd ? Boolean(dbProd.is_stock_manual) : Boolean(prod.isStockManual);
-        const mStock = dbProd?.manual_stock ?? prod.manualStock ?? 10;
-
-        if (isManual) {
-          return {
-            ...prod,
-            isStockManual: true,
-            manualStock: mStock,
-            stock: mStock,
-            inStock: mStock > 0
-          };
-        }
-
-        // Automatic mode: Sum of unassigned active profiles of matching platform/brand
-        const matchingParentAccs = dbParentAccounts?.filter(
-          (pa) => pa.platform && pa.platform.toLowerCase() === prod.brand.toLowerCase()
-        ) || [];
-
-        let calculatedStock = 0;
-        if (matchingParentAccs.length > 0) {
-          matchingParentAccs.forEach((pa) => {
-            const linkedProfiles = dbProfiles?.filter((prof) => prof.parent_account_id === pa.id) || [];
-            // If profiles are loaded in DB, count how many have no assigned_customer and are active
-            if (linkedProfiles.length > 0) {
-              const freeProfiles = linkedProfiles.filter(
-                (prof) => (!prof.assigned_customer || prof.assigned_customer.trim() === '') && prof.is_active !== false
-              );
-              calculatedStock += freeProfiles.length;
-            } else {
-              // Fallback to max_slots minus active_slots if no profiles are inserted yet
-              const maxS = pa.max_slots ?? 5;
-              const actS = pa.active_slots ?? 0;
-              calculatedStock += Math.max(0, maxS - actS);
-            }
-          });
-        }
-
-        return {
-          ...prod,
-          isStockManual: false,
-          manualStock: mStock,
-          stock: calculatedStock,
-          inStock: calculatedStock > 0
-        };
-      });
-
-      // 3. Compare with current products state; if changed, update local and write back to Supabase
-      let hasChanges = false;
-      const finalProducts = products.map((oldProd) => {
-        const nextProd = updatedProducts.find((np) => np.id === oldProd.id);
-        if (nextProd && (nextProd.stock !== oldProd.stock || nextProd.isStockManual !== oldProd.isStockManual || nextProd.manualStock !== oldProd.manualStock)) {
-          hasChanges = true;
-          return nextProd;
-        }
-        return oldProd;
-      });
-
-      if (hasChanges) {
-        setProducts(finalProducts);
-        // Write the calculated stock back to Supabase products table
-        for (const prod of finalProducts) {
-          await supabase.from('products').upsert({
-            id: prod.id,
-            name: prod.name,
-            category: prod.category,
-            price_usd: prod.prices[prod.defaultDuration]?.USD || 0,
-            stock: prod.stock,
-            is_stock_manual: prod.isStockManual,
-            manual_stock: prod.manualStock
-          });
-        }
-      }
-    } catch (err) {
-      console.warn('Notice computing dynamic product stocks from Supabase:', err);
-    }
-  }, [products, setProducts]);
-
-  useEffect(() => {
-    // Initial sync
-    syncProductStocksFromSupabase();
-    // Poll every 15 seconds to ensure store catalog stock matches live DB perfectly
-    const interval = setInterval(syncProductStocksFromSupabase, 15000);
-    return () => clearInterval(interval);
-  }, [syncProductStocksFromSupabase]);
 
   // Persist states to localStorage
   useEffect(() => {
@@ -1557,6 +897,7 @@ export default function App() {
 
   const handleSubmitIncident = async (newIncident: IncidentReport) => {
     setIncidents((prev) => [newIncident, ...prev]);
+    await syncIncidentToFirestore(newIncident);
     showNotification('success', `¡Reporte de falla #${newIncident.id} enviado exitosamente!`);
 
     // Sync to Google Sheets if connected
@@ -1656,6 +997,7 @@ export default function App() {
       localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(next));
       return next;
     });
+    syncProductToFirestore(updatedProduct);
     showNotification('success', `Tarjeta "${updatedProduct.name}" actualizada con éxito.`);
   };
 
@@ -1665,6 +1007,7 @@ export default function App() {
       localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(next));
       return next;
     });
+    syncProductToFirestore(newProduct);
     showNotification('success', `Servicio "${newProduct.name}" añadido al catálogo.`);
   };
 
@@ -1674,6 +1017,7 @@ export default function App() {
       localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(next));
       return next;
     });
+    deleteProductFromFirestore(productId);
     showNotification('info', 'Servicio eliminado del catálogo.');
   };
 
@@ -1770,6 +1114,7 @@ export default function App() {
     };
     setCustomerUsers((prev) => [created, ...prev]);
     setActiveCustomer(created);
+    await syncCustomerToFirestore(created);
     showNotification('success', `¡Bienvenido a Gregori Izquierdo Streaming, ${created.name}!`);
     return created;
   };
@@ -1790,9 +1135,11 @@ export default function App() {
       setCustomerUsers((prev) =>
         prev.map((u) => (u.id === activeCustomer.id ? updatedUser : u))
       );
+      await syncCustomerToFirestore(updatedUser);
     }
 
     setOrders((prev) => [order, ...prev]);
+    await syncOrderToFirestore(order);
 
     // Log to audit bitácora
     logAuditEvent({
@@ -1959,6 +1306,7 @@ export default function App() {
       return;
     }
     setWalletTopups((prev) => [topup, ...prev]);
+    await syncWalletTopupToFirestore(topup);
     showNotification('success', 'Solicitud de recarga enviada. En espera de confirmación.');
   };
 
@@ -2125,6 +1473,7 @@ export default function App() {
   // Admin saves manual customer (3era edad o frecuente)
   const handleSaveManualCustomer = (newCustomer: CustomerUser, proceedToCredit?: boolean) => {
     setCustomerUsers((prev) => [newCustomer, ...prev]);
+    syncCustomerToFirestore(newCustomer);
     showNotification('success', `¡Cliente ${newCustomer.name} guardado en la base de datos!`);
     if (proceedToCredit) {
       setIsAdminOpen(true);

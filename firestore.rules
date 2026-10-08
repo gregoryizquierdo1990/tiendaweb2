@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for data integrity & validation
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // --- Products Collection ---
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update: if hasRequiredFields(['id', 'name']) && 
+                            request.resource.data.id is string && 
+                            request.resource.data.name is string;
+      allow delete: if true;
+    }
+
+    // --- Payment Methods Collection ---
+    match /payment_methods/{methodId} {
+      allow read: if true;
+      allow create, update: if hasRequiredFields(['id', 'name']) &&
+                            request.resource.data.id is string;
+      allow delete: if true;
+    }
+
+    // --- Customers Collection ---
+    match /customers/{customerId} {
+      allow read: if true;
+      allow create, update: if hasRequiredFields(['id', 'name']) &&
+                            request.resource.data.id is string &&
+                            request.resource.data.name is string;
+      allow delete: if true;
+    }
+
+    // --- Orders Collection ---
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create, update: if hasRequiredFields(['id', 'total', 'status']) &&
+                            request.resource.data.id is string &&
+                            request.resource.data.total is number;
+      allow delete: if true;
+    }
+
+    // --- Wallet Topups Collection ---
+    match /wallet_topups/{topupId} {
+      allow read: if true;
+      allow create, update: if hasRequiredFields(['id', 'amount', 'status']) &&
+                            request.resource.data.id is string &&
+                            request.resource.data.amount is number;
+      allow delete: if true;
+    }
+
+    // --- Incidents Collection ---
+    match /incidents/{incidentId} {
+      allow read: if true;
+      allow create, update: if hasRequiredFields(['id', 'status']) &&
+                            request.resource.data.id is string;
+      allow delete: if true;
+    }
+
+    // --- Global Configuration (Branding, BCV Rate, FAQ) ---
+    match /config/{configDocId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // --- Operational & Financial Collections ---
+    match /expenses/{expenseId} {
+      allow read, write: if true;
+    }
+
+    match /franchises/{franchiseId} {
+      allow read, write: if true;
+    }
+
+    match /purchases/{purchaseId} {
+      allow read, write: if true;
+    }
+
+    match /admins/{adminId} {
+      allow read, write: if true;
+    }
+  }
+}

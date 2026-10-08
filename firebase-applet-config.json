@@ -3,6 +3,7 @@
   "appId": "1:146612234845:web:c0c2b5ecda71af2afd7bb4",
   "apiKey": "AIzaSyCdwtL3I3JXErTAdqKXIKBcx36g3nIjPiM",
   "authDomain": "tactical-codex-mxjsq.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-remixremixstream-2a045232-b2ff-41e9-8058-06726e81b415",
   "storageBucket": "tactical-codex-mxjsq.firebasestorage.app",
   "messagingSenderId": "146612234845",
   "measurementId": "",

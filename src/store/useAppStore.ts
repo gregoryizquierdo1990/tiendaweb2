@@ -7,95 +7,124 @@ import {
 import { 
   INITIAL_PRODUCTS, INITIAL_PAYMENT_METHODS, INITIAL_CUSTOMERS 
 } from '../data/defaultCatalog';
-import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
+import { 
+  isSyncingFromFirestore,
+  syncProductToFirestore,
+  deleteProductFromFirestore,
+  syncOrderToFirestore,
+  syncCustomerToFirestore,
+  syncWalletTopupToFirestore,
+  syncIncidentToFirestore,
+  syncPaymentMethodToFirestore,
+  deletePaymentMethodFromFirestore,
+  syncBrandingToFirestore,
+  syncBcvRateToFirestore,
+  syncFaqToFirestore,
+  syncExpenseToFirestore,
+  syncFranchiseToFirestore,
+  syncPurchaseToFirestore
+} from '../services/firestoreService';
 
-// Helper mappers for bidirectional Supabase synchronization
-const mapStoreProductToDb = (p: any) => ({
-  id: p.id,
-  name: p.name,
-  category: p.category,
-  price_usd: p.prices?.[p.defaultDuration]?.USD || 0,
-  price_bs: p.prices?.[p.defaultDuration]?.BS || 0,
-  duration: p.defaultDuration,
-  account_type: p.accountType,
-  description: p.description,
-  image_url: p.logo || '',
-  stock: p.stock,
-  is_stock_manual: p.isStockManual,
-  manual_stock: p.manualStock
-});
-
-const mapStoreCustomerToDb = (c: any) => ({
-  id: c.id,
-  name: c.name,
-  email: c.email,
-  phone: c.phone,
-  role: c.role || 'cliente',
-  zeny_balance: c.zenyBalance ?? c.grpayBalance ?? 0,
-  is_suspended: Boolean(c.isSuspended)
-});
-
-const mapStorePaymentMethodToDb = (p: any) => ({
-  id: p.id,
-  name: p.name,
-  bank_name: p.holderName || p.shortName || '',
-  doc_id: p.docId || p.accountNumber || '',
-  phone: p.phone || p.accountNumber || '',
-  payment_instructions: p.instructions || '',
-  currency: p.acceptedCurrencies?.[0] || 'USD',
-  is_active: p.active ?? p.isActive ?? true
-});
-
-const mapStoreFaqToDb = (f: any) => ({
-  id: f.id,
-  category: f.category,
-  question: f.question,
-  answer: f.answer,
-  sort_order: f.order
-});
-
-const mapStoreWalletTopupToDb = (w: any) => ({
-  id: w.id,
-  customer_email: w.customerEmail,
-  amount_usd: w.amountZenyPoints ?? w.amountZeny ?? w.amountPaid ?? 0,
-  reference: w.referenceNumber,
-  notes: `Abono Zeny - Estado: ${w.status}`
-});
-
-const mapStoreFranchiseToDb = (f: any) => ({
-  id: f.id,
-  business_name: f.businessName,
-  owner_name: f.ownerName,
-  phone: f.phone,
-  telegram_user: f.telegramUser,
-  email: f.email,
-  custom_domain: f.customDomain,
-  wallet_custom_name: f.walletCustomName || 'ZenyPay',
-  monthly_fee_usd: f.monthlyFeeUsd || 0,
-  subscription_status: f.subscriptionStatus || 'active',
-  status: f.status || 'active',
-  credit_due_date: f.creditDueDate,
-  last_payment_date: f.lastPaymentDate,
-  available_master_balance_usd: f.availableMasterBalanceUsd || 0,
-  notes: f.notes,
-  extra_addons_monthly_usd: f.extraAddonsMonthlyUsd || 0,
-  is_reseller_network_active: Boolean(f.isResellerNetworkActive)
-});
-
-// Resilient upsert with exponential backoff retries for direct writing
-const upsertWithRetry = async (table: string, data: any, retries = 3, delay = 1000): Promise<any> => {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const { error } = await supabase.from(table).upsert(data);
-      if (error) throw error;
-      return; // Success
-    } catch (err) {
-      console.warn(`[Supabase Retry] Attempt ${attempt} failed for table ${table}:`, err);
-      if (attempt === retries) throw err;
-      await new Promise(res => setTimeout(res, delay * attempt)); // exponential delay
+const syncProductsList = (oldList: Product[], newList: Product[]) => {
+  if (isSyncingFromFirestore) return;
+  newList.forEach(p => {
+    const oldP = oldList.find(o => o.id === p.id);
+    if (!oldP || JSON.stringify(oldP) !== JSON.stringify(p)) {
+      syncProductToFirestore(p);
     }
-  }
+  });
+  oldList.forEach(o => {
+    if (!newList.some(n => n.id === o.id)) {
+      deleteProductFromFirestore(o.id);
+    }
+  });
 };
+
+const syncOrdersList = (oldList: Order[], newList: Order[]) => {
+  if (isSyncingFromFirestore) return;
+  newList.forEach(o => {
+    const oldO = oldList.find(prev => prev.id === o.id);
+    if (!oldO || JSON.stringify(oldO) !== JSON.stringify(o)) {
+      syncOrderToFirestore(o);
+    }
+  });
+};
+
+const syncCustomersList = (oldList: CustomerUser[], newList: CustomerUser[]) => {
+  if (isSyncingFromFirestore) return;
+  newList.forEach(c => {
+    const oldC = oldList.find(prev => prev.id === c.id);
+    if (!oldC || JSON.stringify(oldC) !== JSON.stringify(c)) {
+      syncCustomerToFirestore(c);
+    }
+  });
+};
+
+const syncTopupsList = (oldList: WalletTopup[], newList: WalletTopup[]) => {
+  if (isSyncingFromFirestore) return;
+  newList.forEach(t => {
+    const oldT = oldList.find(prev => prev.id === t.id);
+    if (!oldT || JSON.stringify(oldT) !== JSON.stringify(t)) {
+      syncWalletTopupToFirestore(t);
+    }
+  });
+};
+
+const syncIncidentsList = (oldList: IncidentReport[], newList: IncidentReport[]) => {
+  if (isSyncingFromFirestore) return;
+  newList.forEach(i => {
+    const oldI = oldList.find(prev => prev.id === i.id);
+    if (!oldI || JSON.stringify(oldI) !== JSON.stringify(i)) {
+      syncIncidentToFirestore(i);
+    }
+  });
+};
+
+const syncPaymentMethodsList = (oldList: PaymentMethod[], newList: PaymentMethod[]) => {
+  if (isSyncingFromFirestore) return;
+  newList.forEach(p => {
+    const oldP = oldList.find(prev => prev.id === p.id);
+    if (!oldP || JSON.stringify(oldP) !== JSON.stringify(p)) {
+      syncPaymentMethodToFirestore(p);
+    }
+  });
+  oldList.forEach(o => {
+    if (!newList.some(n => n.id === o.id)) {
+      deletePaymentMethodFromFirestore(o.id);
+    }
+  });
+};
+
+const syncExpensesList = (oldList: ExpenseItem[], newList: ExpenseItem[]) => {
+  if (isSyncingFromFirestore) return;
+  newList.forEach(e => {
+    const oldE = oldList.find(prev => prev.id === e.id);
+    if (!oldE || JSON.stringify(oldE) !== JSON.stringify(e)) {
+      syncExpenseToFirestore(e);
+    }
+  });
+};
+
+const syncFranchisesList = (oldList: FranchiseTenant[], newList: FranchiseTenant[]) => {
+  if (isSyncingFromFirestore) return;
+  newList.forEach(f => {
+    const oldF = oldList.find(prev => prev.id === f.id);
+    if (!oldF || JSON.stringify(oldF) !== JSON.stringify(f)) {
+      syncFranchiseToFirestore(f);
+    }
+  });
+};
+
+const syncPurchasesList = (oldList: SupplierPurchase[], newList: SupplierPurchase[]) => {
+  if (isSyncingFromFirestore) return;
+  newList.forEach(p => {
+    const oldP = oldList.find(prev => prev.id === p.id);
+    if (!oldP || JSON.stringify(oldP) !== JSON.stringify(p)) {
+      syncPurchaseToFirestore(p);
+    }
+  });
+};
+
 
 
 interface AppState {
@@ -251,6 +280,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const products = typeof val === 'function' ? (val as any)(state.products) : val;
       localStorage.setItem('streamsync_products_v2', JSON.stringify(products));
+      syncProductsList(state.products, products);
       return { products };
     });
   },
@@ -258,6 +288,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const orders = typeof val === 'function' ? (val as any)(state.orders) : val;
       localStorage.setItem('streamsync_orders_v2', JSON.stringify(orders));
+      syncOrdersList(state.orders, orders);
       return { orders };
     });
   },
@@ -265,6 +296,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const customers = typeof val === 'function' ? (val as any)(state.customers) : val;
       localStorage.setItem('streamsync_customers_v2', JSON.stringify(customers));
+      syncCustomersList(state.customers, customers);
       return { customers };
     });
   },
@@ -272,6 +304,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const activeCustomer = typeof val === 'function' ? (val as any)(state.activeCustomer) : val;
       localStorage.setItem('streamsync_current_customer_v2', JSON.stringify(activeCustomer));
+      if (activeCustomer && !isSyncingFromFirestore) {
+        syncCustomerToFirestore(activeCustomer);
+      }
       return { activeCustomer };
     });
   },
@@ -279,6 +314,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const walletTopups = typeof val === 'function' ? (val as any)(state.walletTopups) : val;
       localStorage.setItem('streamsync_topups_v2', JSON.stringify(walletTopups));
+      syncTopupsList(state.walletTopups, walletTopups);
       return { walletTopups };
     });
   },
@@ -286,6 +322,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const incidents = typeof val === 'function' ? (val as any)(state.incidents) : val;
       localStorage.setItem('streamsync_incidents_v2', JSON.stringify(incidents));
+      syncIncidentsList(state.incidents, incidents);
       return { incidents };
     });
   },
@@ -293,6 +330,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const franchises = typeof val === 'function' ? (val as any)(state.franchises) : val;
       localStorage.setItem('streamsync_franchises_v1', JSON.stringify(franchises));
+      syncFranchisesList(state.franchises, franchises);
       return { franchises };
     });
   },
@@ -300,6 +338,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const expenses = typeof val === 'function' ? (val as any)(state.expenses) : val;
       localStorage.setItem('gi_expenses_list_2026', JSON.stringify(expenses));
+      syncExpensesList(state.expenses, expenses);
       return { expenses };
     });
   },
@@ -307,6 +346,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const paymentMethods = typeof val === 'function' ? (val as any)(state.paymentMethods) : val;
       localStorage.setItem('streamsync_methods_v2', JSON.stringify(paymentMethods));
+      syncPaymentMethodsList(state.paymentMethods, paymentMethods);
       return { paymentMethods };
     });
   },
@@ -321,17 +361,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const faqItems = typeof val === 'function' ? (val as any)(state.faqItems) : val;
       localStorage.setItem('streamsync_faq_v1', JSON.stringify(faqItems));
+      if (!isSyncingFromFirestore) {
+        syncFaqToFirestore(faqItems);
+      }
       return { faqItems };
     });
   },
   setBcvRate: (bcvRate) => {
     localStorage.setItem('streamsync_bcv_rate_v2', JSON.stringify(bcvRate));
+    if (!isSyncingFromFirestore) {
+      syncBcvRateToFirestore(bcvRate);
+    }
     set({ bcvRate });
   },
   setPurchases: (val) => {
     set((state) => {
       const purchases = typeof val === 'function' ? (val as any)(state.purchases) : val;
       localStorage.setItem('streamsync_purchases_v2', JSON.stringify(purchases));
+      syncPurchasesList(state.purchases, purchases);
       return { purchases };
     });
   },
@@ -339,6 +386,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const branding = typeof val === 'function' ? (val as any)(state.branding) : val;
       localStorage.setItem('streamsync_branding_v1', JSON.stringify(branding));
+      if (!isSyncingFromFirestore) {
+        syncBrandingToFirestore(branding);
+      }
       return { branding };
     });
   },
