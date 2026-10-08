@@ -164,8 +164,6 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
       tagline: formTagline.trim(),
       description: formDescription.trim(),
       accountType: formAccountType,
-      discountPercent: formDiscountPercent > 0 ? formDiscountPercent : undefined,
-      badgeText: formBadgeText.trim() || undefined,
       screens: formScreens,
       warrantyMonths: formWarrantyMonths,
       inStock: formInStock,
@@ -180,6 +178,9 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
       features: formFeatures.length > 0 ? formFeatures : ['Garantía total de servicio'],
       prices: formattedPrices
     };
+
+    if (formDiscountPercent > 0) targetProduct.discountPercent = formDiscountPercent;
+    if (formBadgeText.trim()) targetProduct.badgeText = formBadgeText.trim();
 
     if (editingProduct) {
       onUpdateProduct(targetProduct);
