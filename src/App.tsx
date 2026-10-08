@@ -1176,14 +1176,19 @@ export default function App() {
     setOrders((prev) =>
       prev.map((o) => {
         if (o.id === orderId) {
-          const updatedOrder = {
+          const updatedOrder: Order = {
             ...o,
             status: newStatus,
             credentials: credentials || o.credentials,
-            rejectionReason: rejectionReason || o.rejectionReason,
             assignedSellerId: assignedSeller?.id || o.assignedSellerId,
             assignedSellerName: assignedSeller?.name || o.assignedSellerName
           };
+
+          if (rejectionReason && rejectionReason.trim()) {
+            updatedOrder.rejectionReason = rejectionReason.trim();
+          } else if (newStatus !== 'rejected') {
+            delete (updatedOrder as any).rejectionReason;
+          }
 
           // If order is confirmed or delivered, automatically generate internal invoice if not exists
           if (newStatus === 'confirmed' || newStatus === 'delivered') {
@@ -1223,6 +1228,17 @@ export default function App() {
                 signatureStamp: true
               };
               setInvoices(prevInv => [newInvoice, ...prevInv]);
+
+              try {
+                const STORAGE_INVOICES_KEY = 'GI_BILLING_INVOICES_2026';
+                const saved = localStorage.getItem(STORAGE_INVOICES_KEY);
+                const list: Invoice[] = saved ? JSON.parse(saved) : [];
+                if (!list.some(inv => inv.orderId === orderId)) {
+                  localStorage.setItem(STORAGE_INVOICES_KEY, JSON.stringify([newInvoice, ...list]));
+                }
+              } catch (e) {
+                console.error('Error saving invoice to local storage:', e);
+              }
             }
           }
 

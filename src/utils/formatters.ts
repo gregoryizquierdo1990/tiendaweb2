@@ -171,7 +171,8 @@ Recuerda que te avisaremos 1 día antes de tu fecha de corte para que no pierdas
 }
 
 export function buildWhatsAppCredentialsUrl(order: Order): string {
-  const cleanPhone = order.customerPhone.replace(/[^0-9]/g, '');
+  const digits = (order.customerPhone || '').replace(/[^0-9]/g, '');
+  const cleanPhone = digits.startsWith('58') ? digits : `58${digits.replace(/^0+/, '')}`;
   const message = buildFormattedCredentialsText(order);
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 }
@@ -182,7 +183,8 @@ export function buildTelegramCredentialsUrl(order: Order): string {
 }
 
 export function buildWhatsAppReminderUrl(order: Order): string {
-  const cleanPhone = order.customerPhone.replace(/[^0-9]/g, '');
+  const digits = (order.customerPhone || '').replace(/[^0-9]/g, '');
+  const cleanPhone = digits.startsWith('58') ? digits : `58${digits.replace(/^0+/, '')}`;
   const creds = order.credentials;
   const expFormatted = safeFormatDate(
     creds?.expirationDate,

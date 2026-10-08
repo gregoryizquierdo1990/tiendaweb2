@@ -228,7 +228,7 @@ export async function drainPendingSyncQueue(): Promise<void> {
       if (op.type === 'delete') {
         await deleteDoc(docRef);
       } else {
-        await setDoc(docRef, op.data);
+        await setDoc(docRef, sanitizeForFirestore(op.data));
       }
     } catch (err: any) {
       op.retries += 1;
@@ -281,6 +281,23 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.warn('Firestore Operation Notice: ', JSON.stringify(errInfo));
 }
 
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) return data;
+  if (Array.isArray(data)) {
+    return data.map((item) => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === 'object' && !(data instanceof Date)) {
+    const clean: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data as Record<string, any>)) {
+      if (value !== undefined) {
+        clean[key] = sanitizeForFirestore(value);
+      }
+    }
+    return clean as T;
+  }
+  return data;
+}
+
 // --- Resilient Writer Wrapper ---
 async function safeFirestoreWrite(collectionName: string, docId: string, type: 'set' | 'delete', data?: any) {
   if (isSyncingFromFirestore) return;
@@ -289,7 +306,7 @@ async function safeFirestoreWrite(collectionName: string, docId: string, type: '
   const isOnline = typeof navigator === 'undefined' || navigator.onLine;
 
   if (!isOnline || store.firestoreStatus === 'offline') {
-    enqueuePendingOperation(collectionName, docId, type, data);
+    enqueuePendingOperation(collectionName, docId, type, data !== undefined ? sanitizeForFirestore(data) : data);
     return;
   }
 
@@ -299,7 +316,8 @@ async function safeFirestoreWrite(collectionName: string, docId: string, type: '
     if (type === 'delete') {
       await deleteDoc(docRef);
     } else {
-      await setDoc(docRef, data);
+      const sanitized = data !== undefined ? sanitizeForFirestore(data) : data;
+      await setDoc(docRef, sanitized);
     }
     store.setLastSyncTimestamp(new Date().toLocaleTimeString());
     store.setConnectionError(null);

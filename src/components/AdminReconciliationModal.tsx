@@ -667,6 +667,8 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
   // Selected order for reconciliation modal
   const [reconcilingOrder, setReconcilingOrder] = useState<Order | null>(null);
   const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
+  const [isApprovedJustNow, setIsApprovedJustNow] = useState(false);
+  const [showRejectInput, setShowRejectInput] = useState(false);
   const [credUser, setCredUser] = useState('');
   const [credPass, setCredPass] = useState('');
   const [credPin, setCredPin] = useState('');
@@ -1005,6 +1007,8 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
 
   const handleOpenReconcile = (order: Order) => {
     setReconcilingOrder(order);
+    setIsApprovedJustNow(order.status === 'confirmed' || order.status === 'delivered');
+    setShowRejectInput(false);
     setCredUser(order.credentials?.accountUser || order.customerEmail);
     setCredPass(order.credentials?.accountPass || 'Streaming2026*');
     setCredPin(order.credentials?.pin || Math.floor(1000 + Math.random() * 9000).toString());
@@ -1045,7 +1049,16 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
         undefined,
         { id: assignedSellerId, name: assignedSellerName }
       );
-      setReconcilingOrder(null);
+
+      const updated: Order = {
+        ...reconcilingOrder,
+        status: 'confirmed',
+        credentials,
+        assignedSellerId,
+        assignedSellerName
+      };
+      setReconcilingOrder(updated);
+      setIsApprovedJustNow(true);
     } catch (err) {
       console.error('Error approving order:', err);
     } finally {
@@ -1063,6 +1076,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
         undefined,
         rejectionReason.trim() || 'Comprobante bancario no verificado o fondos insuficientes'
       );
+      setIsReconcileModalOpen(false);
       setReconcilingOrder(null);
     } catch (err) {
       console.error('Error rejecting order:', err);
@@ -5997,13 +6011,342 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
         )}
         
         {isReconcileModalOpen && reconcilingOrder && (
-          <div className="fixed inset-0 z-70 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-             <div className="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-lg space-y-4 animate-in fade-in">
-               <h3 className="font-extrabold text-slate-900 text-base">Conciliar Pedido #{reconcilingOrder.id}</h3>
-               {/* Aquí debería ir el contenido del formulario de conciliación que ya usas en las líneas 1025+ */}
-               <button onClick={() => { handleApproveOrder(); setIsReconcileModalOpen(false); }} className="bg-emerald-600 text-white px-4 py-2 rounded-xl">Aprobar Pedido</button>
-               <button onClick={() => setIsReconcileModalOpen(false)} className="bg-slate-200 px-4 py-2 rounded-xl">Cancelar</button>
-             </div>
+          <div className="fixed inset-0 z-70 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200">
+            <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto max-h-[92vh] flex flex-col">
+              {/* Header */}
+              <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0 border-b border-indigo-900/40">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shadow-inner">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-extrabold text-white">
+                        Conciliar Pedido #{reconcilingOrder.id}
+                      </h3>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        reconcilingOrder.status === 'confirmed' || isApprovedJustNow
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      }`}>
+                        {reconcilingOrder.status === 'confirmed' || isApprovedJustNow ? 'Aprobado / Conciliado' : 'Pendiente de Conciliación'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300">
+                      Cliente: <strong>{reconcilingOrder.customerName}</strong> ({reconcilingOrder.customerPhone})
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsReconcileModalOpen(false);
+                    setReconcilingOrder(null);
+                  }}
+                  className="p-1.5 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 overflow-y-auto space-y-5 flex-1">
+                {/* Banner when approved */}
+                {(isApprovedJustNow || reconcilingOrder.status === 'confirmed' || reconcilingOrder.status === 'delivered') && (
+                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 space-y-3 animate-in zoom-in-95">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <div>
+                        <h4 className="font-extrabold text-sm text-emerald-900">¡Pedido Aprobado y Conciliado!</h4>
+                        <p className="text-xs text-emerald-700">
+                          La factura interna se ha generado en segundo plano y el vencimiento se ha agendado en el calendario.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Quick Dispatch Buttons */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <a
+                        href={buildWhatsAppCredentialsUrl(reconcilingOrder)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center gap-2 shadow-sm transition hover:scale-[1.02] cursor-pointer"
+                        title="Abrir chat de WhatsApp para enviar credenciales al cliente"
+                      >
+                        <MessageCircle className="w-4 h-4 fill-white" />
+                        <span>Enviar Credenciales por WhatsApp 📲</span>
+                      </a>
+
+                      <a
+                        href={buildTelegramCredentialsUrl(reconcilingOrder)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition cursor-pointer"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Enviar por Telegram</span>
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(buildFormattedCredentialsText(reconcilingOrder));
+                          setCopiedMessage(true);
+                          setTimeout(() => setCopiedMessage(false), 2500);
+                        }}
+                        className="px-3.5 py-2.5 rounded-xl bg-white border border-emerald-300 text-emerald-800 font-bold text-xs flex items-center gap-1.5 shadow-2xs hover:bg-emerald-50 transition cursor-pointer"
+                      >
+                        {copiedMessage ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedMessage ? '¡Copiado!' : 'Copiar Texto'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsReconcileModalOpen(false);
+                          setReconcilingOrder(null);
+                          setActiveTab('billing_contracts');
+                        }}
+                        className="px-3.5 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer ml-auto"
+                      >
+                        <Receipt className="w-3.5 h-3.5" />
+                        <span>Ver Factura Emitida 🧾</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Resumen del Pago y Pedido */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs">
+                  <div>
+                    <span className="text-[11px] text-slate-500 font-bold block">Servicio Solicitado:</span>
+                    <span className="font-extrabold text-slate-900 text-sm">
+                      {reconcilingOrder.productName} ({reconcilingOrder.duration})
+                    </span>
+                    <div className="text-indigo-600 font-semibold text-[11px] mt-0.5">
+                      Tipo de cuenta: {reconcilingOrder.accountType}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] text-slate-500 font-bold block">Total Pagado:</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono font-black text-slate-900 text-base">
+                        ${reconcilingOrder.total.toFixed(2)} USD
+                      </span>
+                      {bcvRate > 0 && (
+                        <span className="text-slate-500 font-semibold text-[11px]">
+                          ≈ Bs. {(reconcilingOrder.total * bcvRate).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] text-slate-500 font-bold block">Método de Pago:</span>
+                    <span className="font-bold text-slate-800">{reconcilingOrder.paymentMethodName}</span>
+                    <div className="font-mono text-indigo-700 text-[11px]">
+                      Referencia: <strong>{reconcilingOrder.referenceNumber || 'Sin referencia'}</strong>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] text-slate-500 font-bold block">Datos de Contacto:</span>
+                    <div className="font-bold text-slate-800">{reconcilingOrder.customerPhone}</div>
+                    <div className="text-slate-500 truncate max-w-[200px]">{reconcilingOrder.customerEmail}</div>
+                  </div>
+
+                  {reconcilingOrder.receiptImage && (
+                    <div className="col-span-1 sm:col-span-2 pt-2 border-t border-slate-200 flex items-center justify-between">
+                      <span className="text-slate-600 font-bold flex items-center gap-1.5">
+                        <ImageIcon className="w-4 h-4 text-indigo-600" />
+                        <span>Comprobante de pago adjunto</span>
+                      </span>
+                      <a
+                        href={reconcilingOrder.receiptImage}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-bold text-xs border border-indigo-200 flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Ver Comprobante</span>
+                      </a>
+                    </div>
+                  )}
+
+                  {reconcilingOrder.customerNotes && (
+                    <div className="col-span-1 sm:col-span-2 p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl text-amber-900">
+                      <strong>Nota del cliente:</strong> {reconcilingOrder.customerNotes}
+                    </div>
+                  )}
+                </div>
+
+                {/* Formulario de Credenciales de Entrega */}
+                <div className="space-y-3 border-t border-slate-200 pt-4">
+                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Credenciales de la Cuenta de Streaming a Entregar</span>
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Correo / Usuario de Acceso *</label>
+                      <input
+                        type="text"
+                        value={credUser}
+                        onChange={(e) => setCredUser(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-500"
+                        placeholder="usuario@streaming.com"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Contraseña de la Cuenta *</label>
+                      <input
+                        type="text"
+                        value={credPass}
+                        onChange={(e) => setCredPass(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Clave2026*"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Nombre de Perfil / Pantalla</label>
+                      <input
+                        type="text"
+                        value={credProfile}
+                        onChange={(e) => setCredProfile(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Perfil 1 (Pablo)"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">PIN de Perfil (Si aplica)</label>
+                      <input
+                        type="text"
+                        value={credPin}
+                        onChange={(e) => setCredPin(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-500"
+                        placeholder="1234"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Fecha de Vencimiento / Corte *</label>
+                      <input
+                        type="date"
+                        value={credExpirationDate ? credExpirationDate.split('T')[0] : ''}
+                        onChange={(e) => setCredExpirationDate(`${e.target.value}T23:59:59.000Z`)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Asesor Responsable</label>
+                      <select
+                        value={assignedSellerId}
+                        onChange={(e) => {
+                          setAssignedSellerId(e.target.value);
+                          const seller = sellerOptions.find(s => s.id === e.target.value);
+                          if (seller) setAssignedSellerName(seller.name);
+                        }}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-indigo-500"
+                      >
+                        {sellerOptions.map(s => (
+                          <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="col-span-1 sm:col-span-2">
+                      <label className="block font-bold text-slate-700 mb-1">Reglas de Garantía e Instrucciones</label>
+                      <textarea
+                        rows={2}
+                        value={credInstructions}
+                        onChange={(e) => setCredInstructions(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Instrucciones para el cliente..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Rechazar pedido opcional */}
+                {showRejectInput && (
+                  <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs space-y-2 animate-in fade-in">
+                    <label className="block font-bold text-rose-900">Motivo del Rechazo del Pago:</label>
+                    <input
+                      type="text"
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Ej. Pago no cayó en cuenta / Referencia inválida"
+                      className="w-full px-3 py-2 rounded-xl border border-rose-300 text-xs bg-white"
+                    />
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowRejectInput(false)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 font-bold"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isProcessing}
+                        onClick={handleRejectOrder}
+                        className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-extrabold shadow-xs"
+                      >
+                        {isProcessing ? 'Procesando...' : 'Confirmar Rechazo'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                {!showRejectInput && reconcilingOrder.status === 'pending_reconciliation' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowRejectInput(true)}
+                    className="text-xs font-bold text-rose-600 hover:text-rose-800 transition cursor-pointer"
+                  >
+                    Rechazar Pago
+                  </button>
+                )}
+
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsReconcileModalOpen(false);
+                      setReconcilingOrder(null);
+                    }}
+                    className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs transition cursor-pointer"
+                  >
+                    {isApprovedJustNow ? 'Cerrar' : 'Cancelar'}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={handleApproveOrder}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-md transition hover:scale-[1.02] cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>
+                      {isProcessing
+                        ? 'Aprobando...'
+                        : isApprovedJustNow || reconcilingOrder.status === 'confirmed'
+                        ? 'Guardar Cambios de Credenciales'
+                        : 'Aprobar y Conciliar Pedido'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
           </div>
