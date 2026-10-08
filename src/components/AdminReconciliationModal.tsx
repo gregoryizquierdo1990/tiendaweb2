@@ -666,6 +666,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
 
   // Selected order for reconciliation modal
   const [reconcilingOrder, setReconcilingOrder] = useState<Order | null>(null);
+  const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
   const [credUser, setCredUser] = useState('');
   const [credPass, setCredPass] = useState('');
   const [credPin, setCredPin] = useState('');
@@ -1020,6 +1021,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
     setAssignedSellerName(order.assignedSellerName || 'Gregori Izquierdo (Principal)');
     setRejectionReason('');
     setCopiedMessage(false);
+    setIsReconcileModalOpen(true);
   };
 
   const handleApproveOrder = async () => {
@@ -5992,6 +5994,17 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
             onClose={() => setIsHandoverModalOpen(false)}
             bcvRate={bcvRate}
           />
+        )}
+        
+        {isReconcileModalOpen && reconcilingOrder && (
+          <div className="fixed inset-0 z-70 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+             <div className="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 w-full max-w-lg space-y-4 animate-in fade-in">
+               <h3 className="font-extrabold text-slate-900 text-base">Conciliar Pedido #{reconcilingOrder.id}</h3>
+               {/* Aquí debería ir el contenido del formulario de conciliación que ya usas en las líneas 1025+ */}
+               <button onClick={() => { handleApproveOrder(); setIsReconcileModalOpen(false); }} className="bg-emerald-600 text-white px-4 py-2 rounded-xl">Aprobar Pedido</button>
+               <button onClick={() => setIsReconcileModalOpen(false)} className="bg-slate-200 px-4 py-2 rounded-xl">Cancelar</button>
+             </div>
+          </div>
         )}
           </div>
         </div>
