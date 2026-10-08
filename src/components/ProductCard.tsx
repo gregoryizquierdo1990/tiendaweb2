@@ -141,7 +141,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {dur.replace(' meses', 'm').replace(' mes', 'm').replace(' días', 'd').replace(' día', 'd')}
+              {(dur || '').replace(' meses', 'm').replace(' mes', 'm').replace(' días', 'd').replace(' día', 'd')}
             </button>
           ))}
         </div>

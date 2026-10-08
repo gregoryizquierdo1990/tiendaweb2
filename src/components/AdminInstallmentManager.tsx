@@ -436,7 +436,7 @@ export const AdminInstallmentManager: React.FC<AdminInstallmentManagerProps> = (
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  {cat === 'todos' ? 'Todos' : cat.replace('_', ' ').toUpperCase()}
+                  {cat === 'todos' ? 'Todos' : (cat || '').replace('_', ' ').toUpperCase()}
                 </button>
               ))}
             </div>
