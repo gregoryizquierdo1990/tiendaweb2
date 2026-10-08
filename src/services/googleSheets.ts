@@ -579,7 +579,7 @@ export async function fetchOrdersFromSheet(
         productName: String(row[5] || 'Servicio Streaming'),
         accountType: (row[6] as any) || 'Perfil con PIN',
         duration: (row[7] as any) || '1 mes',
-        total: parseFloat(String(row[8] || '0').replace(/[^0-9.]/g, '')) || 0,
+        total: parseFloat(String(row[8] || '').replace(/[^0-9.]/g, '')) || 0,
         currency,
         paymentMethodId: 'pm-sheet',
         paymentMethodName: String(row[10] || 'Transferencia'),
