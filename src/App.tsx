@@ -2052,7 +2052,7 @@ export default function App() {
         target="_blank"
         rel="noopener noreferrer"
         title="Chatear con soporte por WhatsApp"
-        className="fixed bottom-6 right-6 z-40 p-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-200 hover:scale-105 transition-all flex items-center gap-2 group cursor-pointer"
+        className="hidden fixed bottom-6 right-6 z-40 p-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-200 hover:scale-105 transition-all flex items-center gap-2 group cursor-pointer"
       >
         <MessageCircle className="w-6 h-6" />
         <span className="max-w-0 overflow-hidden whitespace-nowrap group-hover:max-w-xs transition-all duration-300 text-xs font-bold pr-1">
