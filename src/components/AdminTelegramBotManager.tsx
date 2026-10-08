@@ -178,13 +178,13 @@ export const AdminTelegramBotManager: React.FC<AdminTelegramBotManagerProps> = (
           <div className="flex items-center gap-2 shrink-0">
             {botUsername ? (
               <a
-                href={`https://t.me/${botUsername.replace('@', '')}`}
+                href={`https://t.me/${(botUsername || '').replace('@', '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-4 py-2.5 rounded-2xl bg-blue-500 hover:bg-blue-400 text-white font-extrabold text-xs shadow-lg transition flex items-center gap-2"
               >
                 <Send className="w-4 h-4" />
-                <span>Abrir @{botUsername.replace('@', '')}</span>
+                <span>Abrir @{(botUsername || '').replace('@', '')}</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             ) : (
@@ -372,7 +372,7 @@ export const AdminTelegramBotManager: React.FC<AdminTelegramBotManagerProps> = (
                     <div className="flex sm:flex-col items-center gap-1.5 shrink-0">
                       <button
                         type="button"
-                        onClick={() => handleCopy(`${cmd.command.replace('/', '')} - ${cmd.description}`, cmd.command)}
+                        onClick={() => handleCopy(`${(cmd.command || '').replace('/', '')} - ${cmd.description}`, cmd.command)}
                         title="Copiar formato para @BotFather"
                         className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 cursor-pointer text-xs font-bold flex items-center gap-1"
                       >

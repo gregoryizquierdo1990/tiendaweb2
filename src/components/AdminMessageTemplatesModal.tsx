@@ -235,7 +235,7 @@ export const AdminMessageTemplatesModal: React.FC<AdminMessageTemplatesModalProp
                   Gestor de Plantillas & Asignador de Acciones
                 </h3>
                 <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-                  {DOMAIN_OFFICIAL.replace('https://', '')}
+                  {(DOMAIN_OFFICIAL || '').replace('https://', '')}
                 </span>
               </div>
               <p className="text-slate-300 text-xs">
