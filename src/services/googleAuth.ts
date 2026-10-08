@@ -228,11 +228,21 @@ export const googleSignIn = async (
         accessToken: cachedAccessToken
       };
     } catch (fbError: any) {
-      console.warn('Firebase signInWithPopup:', fbError?.code || fbError?.message);
+      const fbCode = String(fbError?.code || '');
+      if (fbCode === 'auth/popup-closed-by-user' || fbCode === 'auth/cancelled-popup-request') {
+        console.info('Ventana emergente de Google cerrada por el usuario.');
+      } else {
+        console.warn('Firebase signInWithPopup:', fbError?.code || fbError?.message);
+      }
       throw fbError;
     }
   } catch (error: any) {
-    console.error('Error de autenticación con Google:', error);
+    const code = String(error?.code || '');
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      console.info('Operación de Google Auth cancelada o ventana cerrada por el usuario.');
+    } else {
+      console.warn('Aviso de autenticación con Google:', error?.message || error);
+    }
     throw error;
   } finally {
     isSigningIn = false;

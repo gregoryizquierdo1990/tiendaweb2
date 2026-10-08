@@ -6,6 +6,12 @@ import { CheckoutModal } from './components/CheckoutModal';
 import { OrderTrackerModal } from './components/OrderTrackerModal';
 import { AdminReconciliationModal } from './components/AdminReconciliationModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
+import { AdminLoginPage } from './components/AdminLoginPage';
+import {
+  getActiveAdminSession,
+  clearAdminSession,
+  setAdminSession
+} from './config/adminCredentials';
 import { SheetsConnectModal } from './components/SheetsConnectModal';
 import { CustomerAuthModal } from './components/CustomerAuthModal';
 import { CustomerPortalModal } from './components/CustomerPortalModal';
@@ -156,12 +162,41 @@ export default function App() {
   } | null>(null);
   const [isTrackerOpen, setIsTrackerOpen] = useState(false);
   const [trackingOrderId, setTrackingOrderId] = useState<string>('');
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
+  
+  // Ruta activa de la aplicación y estado de sesión administrativa
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    return window.location.pathname.toLowerCase();
+  });
+
+  const [adminSession, setAdminSessionState] = useState(() => {
+    return getActiveAdminSession();
+  });
+
+  const [isAdminOpen, setIsAdminOpen] = useState(() => {
+    return window.location.pathname.toLowerCase().startsWith('/admin') && Boolean(getActiveAdminSession());
+  });
+  
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSheetsModalOpen, setIsSheetsModalOpen] = useState(false);
   const [isCustomerAuthOpen, setIsCustomerAuthOpen] = useState(false);
   const [isCustomerPortalOpen, setIsCustomerPortalOpen] = useState(false);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
+
+  // Escuchar navegación del navegador (atrás/adelante o cambios de URL directa)
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const path = window.location.pathname.toLowerCase();
+      setCurrentPath(path);
+      const activeSession = getActiveAdminSession();
+      setAdminSessionState(activeSession);
+      if (path.startsWith('/admin')) {
+        setIsAdminOpen(Boolean(activeSession));
+      }
+    };
+
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
+  }, []);
   const STORAGE_SUPPLIER_PURCHASES_KEY = 'streamsync_supplier_purchases_v1';
   // Purchases & Expenses
   const { purchases: supplierPurchases, setPurchases: setSupplierPurchases } = useAppStore();
@@ -493,6 +528,10 @@ export default function App() {
         }
       }
     } catch (err: any) {
+      const code = String(err?.code || '');
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        return;
+      }
       console.warn('Google Sign In notice:', err?.message || err);
       showNotification('error', 'No se pudo iniciar sesión con Google.');
     }
@@ -1468,6 +1507,41 @@ export default function App() {
     showNotification('success', `¡$${amountUsd.toFixed(2)} USD asignados a la billetera del cliente!`);
   };
 
+  // Navegación segura hacia el panel administrativo
+  const navigateToAdmin = () => {
+    window.history.pushState({}, '', '/admin');
+    setCurrentPath('/admin');
+    const session = getActiveAdminSession();
+    if (session) {
+      setIsAdminOpen(true);
+    }
+  };
+
+  // Navegación de vuelta a la tienda pública
+  const navigateToStore = () => {
+    window.history.pushState({}, '', '/');
+    setCurrentPath('/');
+    setIsAdminOpen(false);
+  };
+
+  // Manejador cuando el administrador se autentica satisfactoriamente en /admin
+  const handleAdminLoginSuccess = (session: any) => {
+    setAdminSessionState(session);
+    setIsAdminOpen(true);
+    window.history.pushState({}, '', '/admin');
+    setCurrentPath('/admin');
+    showNotification('success', `¡Bienvenido al Panel de Administración, ${session.name}!`);
+  };
+
+  // Cierre de sesión administrativo
+  const handleAdminLogout = () => {
+    clearAdminSession();
+    setAdminSessionState(null);
+    setIsAdminOpen(false);
+    showNotification('info', 'Sesión de administrador cerrada correctamente.');
+    navigateToStore();
+  };
+
   // Filter products for the store catalog
   const filteredProducts = products.filter((p) => {
     const matchesCategory =
@@ -1487,6 +1561,151 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/invoice/:invoiceId" element={<InvoiceViewer />} />
+
+        {/* RUTA PROTEGIDA DEDICADA DEL PANEL DE ADMINISTRACIÓN: /admin */}
+        <Route
+          path="/admin/*"
+          element={
+            adminSession ? (
+              <AdminReconciliationModal
+                orders={orders}
+                walletTopups={walletTopups}
+                customerUsers={customerUsers}
+                incidents={incidents}
+                paymentMethods={paymentMethods}
+                bcvRate={bcvRate}
+                onUpdateBcvRate={(newRate) => {
+                  setBcvRate(newRate);
+                  localStorage.setItem(STORAGE_BCV_KEY, newRate.toString());
+                  showNotification('success', `Tasa BCV actualizada a ${newRate} Bs/USD.`);
+                  logAuditEvent({
+                    actor: `${adminSession.name} (Admin)`,
+                    actorRole: 'admin',
+                    action: 'ACTUALIZAR_TASA_BCV',
+                    description: `Tasa BCV modificada a ${newRate} Bs/USD en el sistema.`,
+                    severity: 'info',
+                    metadata: { newRate }
+                  });
+                }}
+                sheetsState={sheetsState}
+                user={googleUser}
+                onClose={navigateToStore}
+                onSignInGoogle={handleSignInGoogle}
+                onSignOutGoogle={() => {
+                  handleSignOutGoogle();
+                  handleAdminLogout();
+                }}
+                onCreateNewSheet={handleCreateNewSheet}
+                onSelectExistingSheet={handleSelectExistingSheet}
+                onSyncWithSheets={handleSyncWithSheets}
+                onSyncCustomersToSheet={handleSyncCustomersToSheet}
+                onSyncReportsToSheet={handleSyncReportsToSheet}
+                onSyncIncidentsToSheet={handleSyncIncidentsToSheet}
+                onUpdateOrderStatus={handleUpdateOrderStatus}
+                onApproveTopup={handleApproveTopup}
+                onRejectTopup={handleRejectTopup}
+                onManualCreditGrpay={handleManualCreditGrpay}
+                onUpdateCustomerRole={handleUpdateCustomerRole}
+                onAddUserFromAdmin={handleAddUserFromAdmin}
+                onUpdateIncidentStatus={handleUpdateIncidentStatus}
+                onUpdatePaymentMethod={handleUpdatePaymentMethod}
+                onAddPaymentMethod={handleAddPaymentMethod}
+                onDeletePaymentMethod={handleDeletePaymentMethod}
+                onToggleSuspendCustomer={handleToggleSuspendCustomer}
+                availableDriveSheets={availableDriveSheets}
+                isLoadingDriveSheets={isLoadingDriveSheets}
+                onFetchDriveSheets={() => fetchDriveSheets()}
+                faqItems={faqItems}
+                products={products}
+                onUpdateProduct={handleUpdateProduct}
+                onUpdateProductsBulk={(updatedProducts) => {
+                  setProducts(updatedProducts);
+                  showNotification('success', 'Configuración de cuotas actualizada masivamente.');
+                }}
+                onUpdateOrder={(updatedOrder) => {
+                  setOrders((prev) => prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)));
+                  showNotification('success', `Pedido #${updatedOrder.id} actualizado.`);
+                }}
+                onAddProduct={handleAddProduct}
+                onDeleteProduct={handleDeleteProduct}
+                onUpdateFaq={(updated) => {
+                  setFaqItems(updated);
+                  showNotification('success', 'Preguntas frecuentes actualizadas.');
+                }}
+                onSendGift={handleSendGiftToCustomer}
+                onSyncFaq={async () => {
+                  if (!sheetsState.isConnected || !sheetsState.spreadsheetId || !googleUser) return;
+                  await syncFaqToSheet(googleUser.accessToken || '', sheetsState.spreadsheetId, faqItems);
+                  showNotification('success', 'Preguntas frecuentes sincronizadas en Google Sheets.');
+                }}
+                onSaveCreditOrder={handleSaveCreditOrder}
+                onUpdateCreditStatus={handleUpdateCreditStatus}
+                onUpdateCreditDueDate={handleUpdateCreditDueDate}
+                templates={templates}
+                onSaveTemplates={handleSaveTemplates}
+                onSyncMessageTemplates={handleSyncMessageTemplates}
+                onOpenAddCustomerModal={() => setIsAddManualCustomerOpen(true)}
+                actionMapping={actionMapping}
+                onSaveActionMapping={handleSaveActionMapping}
+                onRenewOrder={handleRenewOrder}
+                franchises={franchises}
+                franchiseTopups={franchiseTopups}
+                onUpdateFranchise={handleUpdateFranchise}
+                onAddFranchise={handleAddFranchise}
+                onApproveFranchiseTopup={handleApproveFranchiseTopup}
+                onRejectFranchiseTopup={handleRejectFranchiseTopup}
+                onCreateFranchiseTopupReport={handleCreateFranchiseTopupReport}
+                onAssignBalanceToCustomer={handleAssignBalanceToCustomer}
+                supplierPurchases={supplierPurchases}
+                onAddSupplierPurchase={(newPurchase) => {
+                  const added: SupplierPurchase = {
+                    ...newPurchase,
+                    id: `PUR-${Date.now()}`,
+                    createdAt: new Date().toISOString()
+                  };
+                  setSupplierPurchases([...supplierPurchases, added]);
+                }}
+                onUpdateSupplierPurchase={(upd) => {
+                  setSupplierPurchases(supplierPurchases.map((p) => (p.id === upd.id ? upd : p)));
+                }}
+                onDeleteSupplierPurchase={(id) => {
+                  setSupplierPurchases(supplierPurchases.filter((p) => p.id !== id));
+                }}
+                onUpdateSupplierCredentials={(id, newEmail, newPass) => {
+                  setSupplierPurchases(
+                    supplierPurchases.map((p) =>
+                      p.id === id
+                        ? {
+                            ...p,
+                            accountEmail: newEmail,
+                            accountPassword: newPass,
+                            lastCredentialsUpdate: new Date().toISOString()
+                          }
+                        : p
+                    )
+                  );
+                }}
+                branding={branding}
+                onSaveBranding={(newB) => setBranding(newB)}
+                onResetPassword={(userId) => {
+                  showNotification('success', `Contraseña actualizada para usuario: ${userId}`);
+                }}
+                expenses={expenses}
+                onAddExpense={handleAddExpense}
+                onUpdateExpense={handleUpdateExpense}
+                onDeleteExpense={handleDeleteExpense}
+              />
+            ) : (
+              <AdminLoginPage
+                onSuccess={handleAdminLoginSuccess}
+                onBackToStore={navigateToStore}
+                isStandalonePage={true}
+              />
+            )
+          }
+        />
+
+        {/* TIENDA PÚBLICA: www.gregoryizquierdo.xyz (Ruta Principal /) */}
         <Route path="*" element={
           <div
             className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col antialiased selection:bg-indigo-500 selection:text-white"
@@ -1507,7 +1726,6 @@ export default function App() {
                 setTrackingOrderId('');
                 setIsTrackerOpen(true);
               }}
-              onOpenAdminModal={() => setIsLoginModalOpen(true)}
               onOpenInstallModal={() => setIsIOSGuideOpen(true)}
               pendingOrdersCount={pendingOrdersCount}
               pendingTopupsCount={pendingTopupsCount}
@@ -1808,7 +2026,7 @@ export default function App() {
         />
       )}
 
-      {/* Admin Login Modal */}
+      {/* Modal de Acceso Rápido Admin (Redirige al entorno dedicado /admin) */}
       {isLoginModalOpen && (
         <AdminLoginModal
           onClose={() => setIsLoginModalOpen(false)}
@@ -1818,8 +2036,7 @@ export default function App() {
             localStorage.setItem(`streamsync_staff_session_token_${adminProfile.id}`, token);
             sessionStorage.setItem('streamsync_my_staff_session', token);
             localStorage.setItem('streamsync_active_logged_staff_id', adminProfile.id);
-            setIsAdminOpen(true);
-            showNotification('success', `¡Bienvenido, ${adminProfile.name}!`);
+            navigateToAdmin();
           }}
         />
       )}

@@ -5,6 +5,11 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
+/**
+ * Constructor de consultas encadenables para entornos de producción donde
+ * Supabase no está configurado en las variables de entorno de Vercel.
+ * Evita que la aplicación lance excepciones no capturadas al importar módulos.
+ */
 function createFallbackBuilder() {
   const handler: any = {
     select: () => handler,

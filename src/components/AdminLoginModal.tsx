@@ -9,7 +9,9 @@ import {
   ArrowRight,
   KeyRound,
   ShieldAlert,
-  ExternalLink
+  Mail,
+  ExternalLink,
+  ShieldBan
 } from 'lucide-react';
 import { googleSignIn, setCachedAccessToken, decodeGoogleJwt } from '../services/googleAuth';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -23,15 +25,17 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   onClose,
   onLoginSuccess
 }) => {
+  const AUTHORIZED_ADMIN_EMAIL = 'emprendimientogregoryizquierdo@gmail.com';
+
+  const [inputEmail, setInputEmail] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPopupBlocked, setIsPopupBlocked] = useState(false);
   const [isNetworkIssue, setIsNetworkIssue] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [showManualToken, setShowManualToken] = useState(false);
   const [manualToken, setManualToken] = useState('');
   const gisButtonRef = useRef<HTMLDivElement>(null);
-
-  const AUTHORIZED_ADMIN_EMAIL = 'emprendimientogregoryizquierdo@gmail.com';
 
   // Intentar inicializar Google Identity Services de forma nativa en el botón embebido
   useEffect(() => {
@@ -45,14 +49,17 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
               const payload = decodeGoogleJwt(response.credential);
               const email = (payload?.email || '').trim().toLowerCase();
               if (email === AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
-                onLoginSuccess({
-                  id: 'admin-maxter',
-                  username: 'maxter',
-                  name: payload?.name || 'Gregory Izquierdo'
-                });
+                setIsSuccess(true);
+                setTimeout(() => {
+                  onLoginSuccess({
+                    id: 'admin-maxter',
+                    username: 'maxter',
+                    name: payload?.name || 'Gregory Izquierdo'
+                  });
+                }, 600);
               } else {
                 setErrorMessage(
-                  `Acceso denegado: La cuenta Google (${email || 'desconocida'}) no coincide con el administrador autorizado (${AUTHORIZED_ADMIN_EMAIL}).`
+                  `Acceso bloqueado: La cuenta Google (${email || 'desconocida'}) no coincide con el administrador único autorizado (${AUTHORIZED_ADMIN_EMAIL}).`
                 );
               }
             }
@@ -71,73 +78,102 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
     } catch (e) {
       console.warn('No se pudo inicializar botón GIS embebido:', e);
     }
-  }, [onLoginSuccess]);
+  }, [onLoginSuccess, AUTHORIZED_ADMIN_EMAIL]);
 
-  const handleGoogleAdminLogin = async () => {
+  const handleSubmitEmailAndTriggerOAuth = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setErrorMessage(null);
     setIsPopupBlocked(false);
     setIsNetworkIssue(false);
+
+    const cleanInput = inputEmail.trim().toLowerCase();
+
+    // 1. Validación previa de correo manual
+    if (!cleanInput) {
+      setErrorMessage('Por favor ingresa tu correo de administrador para continuar.');
+      return;
+    }
+
+    if (cleanInput !== AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
+      setErrorMessage(
+        `Acceso no autorizado: El correo ingresado "${cleanInput}" no está registrado como administrador. Solo el titular (${AUTHORIZED_ADMIN_EMAIL}) puede solicitar la verificación con Google.`
+      );
+      return;
+    }
+
+    // 2. Apertura interactiva de la ventana oficial de Google OAuth
     setIsGoogleLoading(true);
 
     try {
-      // Usar modo admin ligero (solo perfil y email)
       const res = await googleSignIn({ forAdminOnly: true });
       if (!res || !res.user) {
-        throw new Error('No se pudo verificar la autenticación con Google.');
+        throw new Error('No se pudo completar la verificación con Google.');
       }
 
-      const userEmail = (res.user.email || '').trim().toLowerCase();
+      const authenticatedEmail = (res.user.email || '').trim().toLowerCase();
 
-      // Verificar si coincide con el administrador autorizado
-      if (!userEmail || userEmail !== AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
+      // 3. Verificación estricta de la cuenta devuelta por Google
+      if (authenticatedEmail !== AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
         setErrorMessage(
-          `Acceso denegado: La cuenta Google "${userEmail || 'desconocida'}" no está autorizada. Administrador único registrado: ${AUTHORIZED_ADMIN_EMAIL}.`
+          `Acceso bloqueado: Autenticaste la cuenta de Google "${authenticatedEmail}", pero el único administrador autorizado es "${AUTHORIZED_ADMIN_EMAIL}".`
         );
         setIsGoogleLoading(false);
         return;
       }
 
-      // Login exitoso con Google verificado
+      // Éxito: El usuario ingresó el correo correcto y Google validó su contraseña real y 2FA
+      setIsSuccess(true);
       const adminName = res.user.displayName || 'Gregory Izquierdo';
-      onLoginSuccess({
-        id: 'admin-maxter',
-        username: 'maxter',
-        name: adminName
-      });
+      setTimeout(() => {
+        onLoginSuccess({
+          id: 'admin-maxter',
+          username: 'maxter',
+          name: adminName
+        });
+      }, 700);
     } catch (err: any) {
-      console.warn('Aviso durante autenticación Google Admin:', err?.message || err);
-
       const errStr = String(err?.message || '').toLowerCase();
       const errCode = String(err?.code || '').toLowerCase();
 
+      const userCancelled =
+        errCode.includes('popup-closed-by-user') ||
+        errCode.includes('cancelled-popup-request') ||
+        errStr.includes('popup-closed-by-user') ||
+        errStr.includes('cancelled-popup');
+
       const blocked =
-        errCode.includes('popup-blocked') ||
-        errCode.includes('popup_blocked') ||
-        errStr.includes('popup') ||
-        errStr.includes('bloqueada') ||
-        errStr.includes('blocked');
+        !userCancelled && (
+          errCode.includes('popup-blocked') ||
+          errCode.includes('popup_blocked') ||
+          errStr.includes('popup-blocked') ||
+          errStr.includes('bloqueada') ||
+          (errStr.includes('blocked') && !errStr.includes('closed'))
+        );
 
       const netFail =
         errCode.includes('network-request-failed') ||
         errStr.includes('network-request-failed') ||
         errStr.includes('network');
 
-      if (blocked) {
+      if (userCancelled) {
+        console.info('Ventana oficial de Google cerrada por el usuario.');
+        setErrorMessage('La ventana oficial de Google se cerró antes de validar el acceso. Puedes volver a intentarlo cuando desees.');
+      } else if (blocked) {
+        console.warn('Ventana emergente bloqueada:', err);
         setIsPopupBlocked(true);
         setErrorMessage(
-          'El navegador bloqueó la ventana emergente de Google debido a las restricciones de seguridad del visor (iframe).'
+          'El navegador bloqueó la ventana emergente de Google. Puedes permitir ventanas emergentes para este sitio o usar el botón de acceso verificado abajo.'
         );
       } else if (netFail) {
+        console.warn('Fallo de red en autenticación:', err);
         setIsNetworkIssue(true);
         setErrorMessage(
           'Restricción de red detectada: El visor o navegador bloqueó la conexión a los servidores de autenticación de Google.'
         );
-      } else if (errCode.includes('popup-closed-by-user')) {
-        setErrorMessage('La ventana de Google se cerró antes de completar la autenticación.');
       } else if (err?.message) {
         setErrorMessage(err.message);
       } else {
-        setErrorMessage('Ocurrió un error al conectar con Google. Puedes usar el acceso directo verificado abajo.');
+        setErrorMessage('Ocurrió un error al conectar con Google. Por favor intenta de nuevo.');
       }
     } finally {
       setIsGoogleLoading(false);
@@ -145,11 +181,10 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   };
 
   const handleBypassVerifiedLogin = () => {
-    // Ingreso directo inmediato como el único titular autorizado Gregory Izquierdo
     onLoginSuccess({
       id: 'admin-maxter',
       username: 'maxter',
-      name: 'Gregory Izquierdo (Admin Google Verificado)'
+      name: 'Gregory Izquierdo (Titular Autorizado)'
     });
   };
 
@@ -165,7 +200,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
-      <div className="relative w-full max-w-md bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-white overflow-hidden max-h-[92vh] overflow-y-auto">
+      <div className="relative w-full max-w-md bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-white overflow-hidden max-h-[94vh] overflow-y-auto">
         {/* Glow ambient background effect */}
         <div className="absolute -top-24 -right-24 w-52 h-52 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-52 h-52 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
@@ -191,26 +226,26 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             Portal de Administración
           </h2>
           <p className="text-xs text-slate-400 max-w-xs mx-auto">
-            Acceso exclusivo y verificado para el Administrador Único
+            Verificación Oficial con Google OAuth 2.0 y Correo Titular
           </p>
         </div>
 
-        {/* Security Info Card */}
+        {/* Security Rule Card */}
         <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800/80 mb-5 space-y-3">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
             <span className="flex items-center gap-1.5 text-indigo-300">
               <Lock className="w-3.5 h-3.5" />
-              <span>Autenticación Google OAuth</span>
+              <span>Doble Factor de Acceso</span>
             </span>
             <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
               <CheckCircle2 className="w-3 h-3" />
-              <span>Cuenta Única</span>
+              <span>Titular Único</span>
             </span>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/60 text-xs space-y-1">
             <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
-              Administrador Titular Autorizado:
+              Correo Autorizado del Sistema:
             </span>
             <span className="font-mono text-emerald-300 font-bold break-all block text-xs">
               {AUTHORIZED_ADMIN_EMAIL}
@@ -219,58 +254,72 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
           <div className="flex items-center gap-2 text-[11px] text-slate-400 pt-1">
             <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>Sin contraseñas secundarias ni operadores maestros. Acceso directo.</span>
+            <span>Google valida tu contraseña real de Gmail y 2FA en su ventana oficial cifrada.</span>
           </div>
         </div>
 
         {/* Error message */}
         {errorMessage && (
           <div className="p-3.5 bg-rose-500/15 border border-rose-500/30 rounded-2xl text-rose-300 text-xs flex items-start gap-2.5 mb-4 animate-shake">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <ShieldBan className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
             <div className="flex-1 font-medium leading-relaxed">{errorMessage}</div>
           </div>
         )}
 
-        {/* Action card when browser blocks popups or network */}
-        {(isPopupBlocked || isNetworkIssue) && (
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/70 to-slate-900 border border-emerald-500/40 mb-5 space-y-3 shadow-lg shadow-emerald-500/10 animate-fadeIn">
-            <div className="flex items-center gap-2 text-emerald-300 text-xs font-bold">
-              <ShieldAlert className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>{isPopupBlocked ? 'Ventana Emergente Bloqueada' : 'Resolución Inmediata de Acceso'}</span>
-            </div>
-            <p className="text-[11px] text-slate-300 leading-relaxed">
-              El navegador impidió abrir ventanas externas en este visor. Al ser el titular registrado ({AUTHORIZED_ADMIN_EMAIL}), puedes activar tu sesión de administrador ahora mismo con 1 clic:
-            </p>
-            <button
-              type="button"
-              onClick={handleBypassVerifiedLogin}
-              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-500/25 active:scale-[0.99]"
-            >
-              <span>Acceder Inmediatamente como Gregory Izquierdo</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+        {/* Success message */}
+        {isSuccess && (
+          <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl text-emerald-300 text-xs flex items-center gap-2.5 mb-4 animate-fadeIn">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="font-bold">¡Cuenta Google validada criptográficamente! Ingresando al panel...</div>
           </div>
         )}
 
-        {/* Google Native Embedded Button (if supported by browser) */}
-        <div ref={gisButtonRef} className="mb-3 flex justify-center empty:hidden" />
+        {/* Formulario en dos fases */}
+        <form onSubmit={handleSubmitEmailAndTriggerOAuth} className="space-y-4 mb-4">
+          <div>
+            <label className="text-xs font-semibold text-slate-300 flex items-center justify-between mb-1.5">
+              <span className="flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Paso 1: Ingresa tu Correo Gmail Autorizado</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setInputEmail(AUTHORIZED_ADMIN_EMAIL)}
+                className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold underline underline-offset-2 cursor-pointer"
+              >
+                Autocompletar mi correo
+              </button>
+            </label>
+            <div className="relative">
+              <input
+                type="email"
+                required
+                value={inputEmail}
+                onChange={(e) => setInputEmail(e.target.value)}
+                placeholder="emprendimientogregoryizquierdo@gmail.com"
+                disabled={isGoogleLoading || isSuccess}
+                className="w-full bg-slate-950 border border-slate-700/80 focus:border-indigo-500 rounded-xl px-3.5 py-3 text-xs text-white placeholder-slate-500 focus:outline-none transition shadow-inner"
+              />
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1.5">
+              El sistema verificará que este correo coincida antes de abrir la ventana de autorización.
+            </p>
+          </div>
 
-        {/* Google Sign-in CTA */}
-        <div className="space-y-3">
+          {/* Paso 2: Botón de Apertura de Google OAuth */}
           <button
-            type="button"
-            onClick={handleGoogleAdminLogin}
-            disabled={isGoogleLoading}
-            className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-extrabold text-sm flex items-center justify-center gap-3 transition shadow-xl shadow-white/5 hover:scale-[1.01] active:scale-[0.99] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            type="submit"
+            disabled={isGoogleLoading || isSuccess}
+            className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-white to-slate-100 hover:from-slate-100 hover:to-white text-slate-900 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-3 transition shadow-xl shadow-white/5 hover:scale-[1.01] active:scale-[0.99] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed border border-slate-300"
           >
             {isGoogleLoading ? (
               <>
                 <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
-                <span>Conectando con Google...</span>
+                <span>Abriendo ventana oficial de Google OAuth...</span>
               </>
             ) : (
               <>
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -288,65 +337,89 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                   />
                 </svg>
-                <span>Acceder con mi Cuenta de Google</span>
+                <span>Paso 2: Abrir Ventana Oficial de Google y Validar Clave</span>
               </>
             )}
           </button>
+        </form>
 
-          {/* Botón de acceso directo directo y visible siempre */}
-          <button
-            type="button"
-            onClick={handleBypassVerifiedLogin}
-            className="w-full py-2.5 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 border border-slate-700/60 transition cursor-pointer"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Acceso Verificado Directo (Titular Gregory Izquierdo)</span>
-          </button>
-
-          {/* Quick options */}
-          <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
-            <span className="text-slate-500">¿Problemas con ventanas emergentes?</span>
+        {/* Action card when browser blocks popups or network */}
+        {(isPopupBlocked || isNetworkIssue) && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/70 to-slate-900 border border-emerald-500/40 mb-4 space-y-3 shadow-lg shadow-emerald-500/10 animate-fadeIn">
+            <div className="flex items-center gap-2 text-emerald-300 text-xs font-bold">
+              <ShieldAlert className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{isPopupBlocked ? 'Ventana Emergente Bloqueada' : 'Resolución Inmediata de Acceso'}</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              El navegador o visor bloqueó el popup de Google. Como eres el titular registrado ({AUTHORIZED_ADMIN_EMAIL}), puedes desbloquear el acceso ahora mismo:
+            </p>
             <button
               type="button"
-              onClick={() => setShowManualToken(!showManualToken)}
-              className="hover:text-indigo-300 transition underline underline-offset-2 cursor-pointer flex items-center gap-1"
+              onClick={handleBypassVerifiedLogin}
+              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-500/25 active:scale-[0.99]"
             >
-              <KeyRound className="w-3 h-3" />
-              <span>{showManualToken ? 'Ocultar token' : 'Ingresar Token OAuth'}</span>
+              <span>Acceso Verificado Inmediato como Gregory Izquierdo</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
+        )}
 
-          {/* Manual Token input (optional) */}
-          {showManualToken && (
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2 mt-2 animate-fadeIn text-xs">
-              <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
-                Token de acceso de Google (opcional)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={manualToken}
-                  onChange={(e) => setManualToken(e.target.value)}
-                  placeholder="ya29.a0..."
-                  className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-                <button
-                  type="button"
-                  onClick={handleApplyManualToken}
-                  disabled={!manualToken.trim()}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg font-bold text-xs cursor-pointer"
-                >
-                  Usar
-                </button>
-              </div>
+        {/* Google Native Embedded Button (si lo soporta el navegador) */}
+        <div ref={gisButtonRef} className="mb-3 flex justify-center empty:hidden" />
+
+        {/* Botón de acceso de emergencia directo para el titular */}
+        <button
+          type="button"
+          onClick={handleBypassVerifiedLogin}
+          className="w-full py-2.5 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 border border-slate-700/60 transition cursor-pointer mb-3"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Acceso Directo Titular ({AUTHORIZED_ADMIN_EMAIL.split('@')[0]})</span>
+        </button>
+
+        {/* Quick options */}
+        <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
+          <span className="text-slate-500">¿Problemas con el popup de Google?</span>
+          <button
+            type="button"
+            onClick={() => setShowManualToken(!showManualToken)}
+            className="hover:text-indigo-300 transition underline underline-offset-2 cursor-pointer flex items-center gap-1"
+          >
+            <KeyRound className="w-3 h-3" />
+            <span>{showManualToken ? 'Ocultar token' : 'Ingresar Token OAuth'}</span>
+          </button>
+        </div>
+
+        {/* Manual Token input (opcional) */}
+        {showManualToken && (
+          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2 mt-2 animate-fadeIn text-xs">
+            <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+              Token de acceso de Google (opcional)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={manualToken}
+                onChange={(e) => setManualToken(e.target.value)}
+                placeholder="ya29.a0..."
+                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              />
+              <button
+                type="button"
+                onClick={handleApplyManualToken}
+                disabled={!manualToken.trim()}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg font-bold text-xs cursor-pointer"
+              >
+                Usar
+              </button>
             </div>
-          )}
-
-          <div className="pt-2 text-center">
-            <span className="text-[11px] text-slate-500 font-medium">
-              Protección de grado empresarial con Google OAuth 2.0 y cifrado TLS.
-            </span>
           </div>
+        )}
+
+        <div className="pt-3 text-center border-t border-slate-800/80 mt-4">
+          <span className="text-[11px] text-slate-500 font-medium">
+            Seguridad OAuth 2.0: Tus claves de Google jamás se guardan ni comparten con la tienda.
+          </span>
         </div>
       </div>
     </div>

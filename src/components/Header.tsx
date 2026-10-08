@@ -24,9 +24,9 @@ interface HeaderProps {
   customerUser: CustomerUser | null;
   onOpenCustomerModal: () => void;
   onOpenCustomerAuth: () => void;
-  onOpenSheetsModal: () => void;
+  onOpenSheetsModal?: () => void;
   onOpenTrackerModal: () => void;
-  onOpenAdminModal: () => void;
+  onOpenAdminModal?: () => void;
   onOpenInstallModal?: () => void;
   pendingOrdersCount: number;
   pendingTopupsCount: number;
@@ -271,20 +271,23 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Admin Reconciliation Button */}
-            <button
-              type="button"
-              onClick={onOpenAdminModal}
-              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-300" />
-              <span className="hidden md:inline">Admin</span>
-              {(pendingOrdersCount > 0 || pendingTopupsCount > 0) && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950 animate-pulse">
-                  {pendingOrdersCount + pendingTopupsCount}
-                </span>
-              )}
-            </button>
+            {/* Admin Reconciliation Button (Oculto en tienda pública según preferencia de seguridad) */}
+            {onOpenAdminModal && (
+              <button
+                type="button"
+                onClick={onOpenAdminModal}
+                className="relative hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+                title="Acceso Administración"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-300" />
+                <span className="hidden md:inline">Admin</span>
+                {(pendingOrdersCount > 0 || pendingTopupsCount > 0) && (
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950 animate-pulse">
+                    {pendingOrdersCount + pendingTopupsCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* WhatsApp Support Button */}
             <a

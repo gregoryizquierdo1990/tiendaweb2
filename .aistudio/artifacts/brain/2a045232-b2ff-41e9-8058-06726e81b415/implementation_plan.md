@@ -1,110 +1,101 @@
-# Eliminación de Credenciales Maestras y Gestión de Operadores - Acceso Exclusivo Google
+# Arquitectura y Separación: Tienda Pública (`/`) y Panel de Administración (`/admin`)
 
-Este plan define la reestructuración del módulo de acceso administrativo para erradicar las credenciales maestras tradicionales de usuario/contraseña y el gestor de operadores, dejando una autenticación única, moderna y segura basada exclusivamente en el Botón Oficial de Google vinculado al correo del propietario (`emprendimientogregoryizquierdo@gmail.com`).
+Arquitectura de enrutamiento y autenticación para separar la experiencia del cliente final en `www.gregoryizquierdo.xyz` y confinar el acceso administrativo a la ruta protegida `www.gregoryizquierdo.xyz/admin` con credenciales maestras y verificación de respaldo con Google.
 
----
+## Decisiones Críticas Confirmadas
 
-## Decisiones Críticas Confirmadas por el Usuario
-
-> [!IMPORTANT]
-> Se han confirmado las siguientes decisiones clave durante la fase de aclaración interactiva:
-
-- **Acceso Exclusivo con Google**: La ventana emergente de acceso administrativo (`AdminLoginModal`) suprimirá por completo el formulario tradicional de usuario y contraseña, el flujo secundario de contraseñas de emergencia y el cajón de operadores. El acceso se realizará 100% mediante el botón oficial de Google.
-- **Tarjeta de Identidad Única en el Panel Contable**: En `AdminUserManager`, se eliminará el listado y reseteo de contraseñas maestras múltiples, presentando una tarjeta institucional clara del **Administrador Único Autorizado (Google Identity)** junto al directorio de clientes, vendedores y franquicias.
-- **Purga de Datos Residuales**: Se limpian del almacenamiento local (`localStorage`) y del estado de React los operadores secundarios (`staffMembers`) y credenciales maestras obsoletas (ej. `neron`), garantizando que ninguna sesión o clave residual tenga permisos de acceso.
+- **Estructura de Despliegue**: Misma aplicación SPA en Vercel con enrutamiento de ruta `/admin` protegida mediante reescrituras automáticas en `vercel.json`, evitando costos y complejidad de un segundo repositorio o registros DNS adicionales.
+- **Autenticación en `/admin`**: Pantalla de login dedicada con usuario y contraseña maestra configurable (por defecto `admin` / `maxter` con credencial personalizable) + botón de verificación de respaldo con Google OAuth (`emprendimientogregoryizquierdo@gmail.com`).
+- **Ocultamiento de Accesos en Tienda**: Se eliminan de la tienda pública todos los botones o enlaces al panel de administración (en Navbar y Footer). El acceso a la administración será 100% exclusivo para quien conozca y navegue directamente a `www.gregoryizquierdo.xyz/admin`.
 
 ---
 
-## 1. Visión General & Concepto Central
-
-- **Qué hace**: Convierte la puerta de enlace administrativa en un flujo sin fricción y de máxima seguridad corporativa: un solo clic en *"Continuar con Google como Administrador"*, validando de forma instantánea el correo emitido por el proveedor OAuth de Google.
-- **Audiencia / Persona**: Gregory Izquierdo como propietario y administrador supremo del sistema.
-- **Beneficio Principal**: Elimina el riesgo de filtración de contraseñas maestras estáticas, remueve la complejidad innecesaria de roles de operadores y centraliza la auditoría de seguridad directamente bajo la cuenta corporativa de Google.
-
----
-
-## 2. Experiencia de Usuario & Diseño Visual
-
-### Flujo de Acceso del Administrador
-1. El usuario hace clic en el botón de acceso administrativo (icono de escudo/candado en la cabecera o pie de página).
-2. Se despliega el modal `AdminLoginModal` con una estética sobria, limpia y profesional:
-   - Cabecera con degradado Slate/Indigo y distintivo de *Acceso Administrativo Verificado*.
-   - Botón central de **Google Sign-In** oficial con el isotipo a color de Google y etiqueta clara.
-   - Indicador tipográfico sutil de cuenta autorizada (`emprendimientogregoryizquierdo@gmail.com`).
-   - Sin campos de texto para usuario ni contraseña. Sin botones de operadores secundarios.
-3. Al pulsar el botón, se abre la ventana emergente oficial de Google Identity Services. Si la cuenta seleccionada coincide con el correo autorizado, se concede el token de sesión y se abre el panel de control inmediatamente con notificación de éxito.
-
-### Vista en el Panel Administrativo (`AdminUserManager`)
-- Se reemplaza la sección de tarjetas con contraseñas editables por una **Ficha de Seguridad del Administrador Supremo**:
-  - Estado: Activo y Protegido por Google OAuth.
-  - Correo Autorizado: `emprendimientogregoryizquierdo@gmail.com`.
-  - Teléfono Oficial de Contacto y soporte.
-  - Eliminación de los botones de "Cambiar Clave" o envío de credenciales maestras.
-- Se mantiene íntegro el directorio interactivo de clientes, vendedores, franquiciados y subfranquiciados con sus herramientas de edición.
-
----
-
-## 3. Decisiones de Producto & Trade-Offs
-
-- **Decisión 1: Eliminar completamente el flujo de contraseñas legacy en el login**
-  - *Enfoque*: El modal solo ofrece Google OAuth.
-  - *Razón*: Evita confusión en el usuario y elimina vulnerabilidades asociadas a contraseñas estáticas compartidas o guardadas en el código/navegador.
-- **Decisión 2: Supresión del gestor de operadores en `AdminLoginModal` y `App.tsx`**
-  - *Enfoque*: Remover los handlers `onAddStaff`, `onDeleteStaff`, `onUpdateStaffPassword` y el estado `staffMembers`.
-  - *Razón*: El negocio opera con un único administrador dueño; la existencia de operadores creaba ruido visual y complejidad innecesaria.
-- **Decisión 3: Preservar el directorio de usuarios de clientes y franquicias**
-  - *Enfoque*: Solo se remueve la sección de credenciales de administradores y operadores; el catálogo de clientes y franquiciados en `AdminUserManager` se conserva al 100%.
-
----
-
-## 4. Arquitectura Técnica & Estrategia de Datos
-
-### Diagrama del Sistema de Autenticación Unificado
+## 1. Visión General del Sistema
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    AdminLoginModal.tsx                       │
-│                                                              │
-│   ┌──────────────────────────────────────────────────────┐   │
-│   │       [ Continuar con Google como Administrador ]     │   │
-│   └──────────────────────────┬───────────────────────────┘   │
-└──────────────────────────────┼───────────────────────────────┘
-                               │ Click
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│                  services/googleAuth.ts                      │
-│            googleSignIn() -> Google Identity Services        │
-└──────────────────────────────┬───────────────────────────────┘
-                               │
-               ┌───────────────┴───────────────┐
-               ▼                               ▼
-       [ Correo Coincide ]             [ Correo Inválido ]
-  emprendimientogregoryizquierdo...                    │
-               │                                       ▼
-               ▼                         Muestra mensaje de error:
-   Genera Token de Sesión                "Acceso denegado: cuenta
-   y Notifica onLoginSuccess()            no autorizada"
-               │
-               ▼
-┌──────────────────────────────────────────────────────────────┐
-│                      App.tsx / Store                         │
-│   - setIsAdminOpen(true)                                     │
-│   - Guarda token de sesión del administrador único           │
-│   - Purgar 'streamsync_staff_members_v1' y 'staffMembers'    │
-└──────────────────────────────────────────────────────────────┘
+                 USUARIO CLIENTE                                PROPIETARIO / ADMIN
+                        │                                                │
+                        ▼                                                ▼
+              www.gregoryizquierdo.xyz                        www.gregoryizquierdo.xyz/admin
+                        │                                                │
+       ┌────────────────┴────────────────┐              ┌────────────────┴────────────────┐
+       │         TIENDA PÚBLICA          │              │        PORTAL ADMIN /ADMIN      │
+       │                                 │              │                                 │
+       │  • Catálogo streaming y combos  │              │  • Pantalla Login Dedicada      │
+       │  • Carrito y Checkout WhatsApp  │              │    - Usuario + Contraseña       │
+       │  • Seguimiento de Pedidos       │              │    - Respaldo Google OAuth      │
+       │  • Portal de Clientes           │              │  • Panel Integral de Gestión:   │
+       │  • Sin botones admin visibles   │              │    Órdenes, Finanzas, Gastos,   │
+       │                                 │              │    Conciliación, Sheets, Users  │
+       └─────────────────────────────────┘              └─────────────────────────────────┘
 ```
 
-### Acciones Concretas de Código tras Aprobación:
-1. **`src/components/AdminLoginModal.tsx`**:
-   - Remover los estados de formulario de contraseña (`username`, `password`, `errorMessage`, `step === 'credentials'` de inputs, `step === '2fa'`).
-   - Remover el acordeón/cajón `showStaffManager`, `newStaffName`, `newStaffUser`, `newStaffPass`, `newStaffRole`, `onAddStaff`, `onDeleteStaff`, `onUpdateStaffPassword`.
-   - Simplificar la interfaz al contenedor exclusivo del Botón Oficial de Google, con indicador de carga y badges tipográficos limpios.
-2. **`src/App.tsx`**:
-   - Eliminar el estado `staffMembers`, `handleAddStaff`, `handleUpdateStaffPassword`, `handleDeleteStaff`.
-   - Eliminar los props de operadores pasados a `AdminLoginModal`.
-   - Limpiar cualquier clave residual de operadores en `localStorage` al iniciar.
-3. **`src/components/AdminUserManager.tsx`**:
-   - Reemplazar la sección de edición de contraseñas de administradores maestros por una ficha única del Administrador Supremo autenticado por Google.
-   - Retirar los botones de reseteo de claves de administradores.
-4. **Verificación & Linting**:
-   - Ejecutar `lint_applet` y `compile_applet` para confirmar cero errores en la compilación de TypeScript y Vite.
+- **Público Objetivo**: 
+  - **Clientes**: Acceden a `www.gregoryizquierdo.xyz` con una experiencia limpia, rápida y comercial, sin elementos corporativos ni pantallas de inicio de sesión de operadores.
+  - **Administrador**: Ingresa a `www.gregoryizquierdo.xyz/admin` para gestionar pedidos, conciliar pagos, sincronizar Google Sheets y controlar finanzas.
+
+---
+
+## 2. Experiencia de Usuario y Flujos
+
+### Flujo 1: Navegación de Clientes (`/`)
+1. El cliente entra a `www.gregoryizquierdo.xyz`.
+2. Visualiza el catálogo, añade membresías al carrito, realiza pedidos y consulta el estado de sus pedidos.
+3. El navbar y footer solo muestran: Búsqueda, Moneda, Rastreo de pedido, Portal de cliente y WhatsApp. **Cero botones administrativos**.
+
+### Flujo 2: Acceso Administrativo (`/admin`)
+1. El administrador ingresa en la barra del navegador a `www.gregoryizquierdo.xyz/admin`.
+2. Si no ha iniciado sesión, se despliega una pantalla de acceso con diseño profesional de consola de operaciones.
+3. Permite ingresar con:
+   - **Usuario y contraseña maestra** (con opción de recordar sesión cifrada en storage seguro).
+   - **O verificación directa con cuenta Google autorizada** (`emprendimientogregoryizquierdo@gmail.com`).
+4. Al autenticarse, accede al panel de administración completo a pantalla completa con pestañas de gestión, reportes y métricas.
+5. Incluye botón de **"Ver Tienda"** para previsualizar la tienda y botón de **"Cerrar Sesión"**.
+
+---
+
+## 3. Decisiones Arquitectónicas y Técnicas
+
+- **Enrutador Ligero y Compatible con Vercel**:
+  - Implementación con detección reactiva de `window.location.pathname` (soporta `/admin` directo y navegación reactiva suave con `history.pushState`).
+  - `vercel.json` ya cuenta con `rewrites: [{"source": "/(.*)", "destination": "/"}]`, garantizando que refrescar o entrar directamente a `/admin` funcione de inmediato sin errores 404 ni necesidad de recargar servidores.
+- **Gestor de Sesión de Administrador**:
+  - Persistencia segura de sesión en `sessionStorage`/`localStorage` para mantener al administrador autenticado durante su jornada sin pedir la clave en cada recarga.
+  - Cierre de sesión inmediato al hacer clic en "Salir", redireccionando a la pantalla de login o a la tienda.
+- **Credenciales Maestras Configurables**:
+  - Módulo de configuración de credenciales de operador (`ADMIN_CREDENTIALS`) con valores por defecto seguros y posibilidad de cambiar la contraseña directamente desde el panel de administración.
+
+---
+
+## 4. Diagrama de Estados y Componentes
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                   App.tsx                                       │
+│                                                                                 │
+│   Ruta actual: window.location.pathname                                        │
+│   ├─ Es '/admin' o '/admin/*' ?                                                 │
+│   │    ├─ ¿Sesión Admin Activa?                                                 │
+│   │    │     ├─ SÍ ───► <AdminDashboardView /> (Panel completo de gestión)      │
+│   │    │     └─ NO ───► <AdminLoginView /> (Login Usuario/Clave + Google)       │
+│   │                                                                             │
+│   └─ Es '/' (Tienda Pública)                                                    │
+│        └──────────────► <PublicStoreView />                                     │
+│                         (Navbar limpio + Catálogo + Modales cliente)            │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 5. Plan de Ejecución Paso a Paso
+
+1. **Gestión de Enrutamiento y Rutas Limpias**:
+   - Crear hook o controlador de ruta (`useRoutePath` / listener de navegación) que detecte si la URL actual es `/admin` o `/`.
+   - Soporte para navegación interna suave (`navigateTo('/admin')` y `navigateTo('/')`).
+2. **Crear Vista de Portal de Administración (`AdminPortalPage.tsx`)**:
+   - Si no está autenticado: renderizar la pantalla de login de administrador con campos de usuario y contraseña + botón de Google OAuth.
+   - Si está autenticado: renderizar el panel de administración integrado con barra superior de navegación (volver a tienda, estado de conexión y cerrar sesión).
+3. **Limpieza de la Tienda Pública (`App.tsx`)**:
+   - Retirar los botones de administración del Navbar principal y del Footer de la tienda pública.
+4. **Verificación en Vercel y Guía de Despliegue**:
+   - Documentar los pasos exactos para que el cambio quede reflejado en Vercel y tu dominio `www.gregoryizquierdo.xyz` al hacer push.

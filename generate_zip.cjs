@@ -1,42 +1,52 @@
 const fs = require('fs');
 const path = require('path');
-const archiver = require('archiver');
+const AdmZip = require('adm-zip');
 
-const zipPath = path.join(__dirname, 'public', 'proyecto-gregory-izquierdo.zip');
-if (!fs.existsSync(path.dirname(zipPath))) {
-  fs.mkdirSync(path.dirname(zipPath), { recursive: true });
+const rootDir = __dirname;
+const zip = new AdmZip();
+
+const exclude = new Set([
+  'node_modules',
+  '.git',
+  '.aistudio',
+  'dist',
+  'project_backup.zip',
+  'proyecto-gregory-izquierdo.zip',
+  'public/proyecto-gregory-izquierdo.zip'
+]);
+
+function addFilesRecursively(currentPath, zipPathPrefix = '') {
+  const entries = fs.readdirSync(currentPath, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryName = entry.name;
+    if (exclude.has(entryName) || entryName.startsWith('.DS_Store')) {
+      continue;
+    }
+
+    const fullPath = path.join(currentPath, entryName);
+    const zipPath = zipPathPrefix ? `${zipPathPrefix}/${entryName}` : entryName;
+
+    if (entry.isDirectory()) {
+      addFilesRecursively(fullPath, zipPath);
+    } else {
+      zip.addLocalFile(fullPath, zipPathPrefix);
+    }
+  }
 }
 
-const output = fs.createWriteStream(zipPath);
-const archiverFunc = typeof archiver === 'function' ? archiver : (archiver.default || archiver);
-const archive = archiverFunc('zip', { zlib: { level: 9 } });
+console.log('Empaquetando archivos del proyecto...');
+addFilesRecursively(rootDir);
 
-output.on('close', function() {
-  console.log('ZIP generated successfully: ' + zipPath + ' (' + archive.pointer() + ' total bytes)');
-  // Also copy to root
-  fs.copyFileSync(zipPath, path.join(__dirname, 'proyecto-gregory-izquierdo.zip'));
-});
+const publicZipPath = path.join(rootDir, 'public', 'proyecto-gregory-izquierdo.zip');
+const rootZipPath = path.join(rootDir, 'proyecto-gregory-izquierdo.zip');
 
-archive.on('error', function(err) {
-  throw err;
-});
+if (!fs.existsSync(path.dirname(publicZipPath))) {
+  fs.mkdirSync(path.dirname(publicZipPath), { recursive: true });
+}
 
-archive.pipe(output);
+zip.writeZip(publicZipPath);
+zip.writeZip(rootZipPath);
 
-archive.glob('**/*', {
-  cwd: __dirname,
-  ignore: [
-    'node_modules/**',
-    '.git/**',
-    '.aistudio/**',
-    'dist/**',
-    'public/proyecto-gregory-izquierdo.zip',
-    'proyecto-gregory-izquierdo.zip',
-    'generate_zip.cjs',
-    'generate_zip.js',
-    'build_zip.js',
-    'app/**'
-  ]
-});
-
-archive.finalize();
+console.log('ZIP generado exitosamente en:');
+console.log('1. ' + publicZipPath);
+console.log('2. ' + rootZipPath);

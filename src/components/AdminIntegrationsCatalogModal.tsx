@@ -303,6 +303,11 @@ export const AdminIntegrationsCatalogModal: React.FC<AdminIntegrationsCatalogMod
         setStatusMessage('¡Sesión de Google iniciada con éxito! Permisos concedidos para Sheets, Drive, Contacts y Calendar.');
       }
     } catch (err: any) {
+      const code = String(err?.code || '');
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        setStatusMessage('Ventana de Google cerrada por el usuario.');
+        return;
+      }
       console.warn('Aviso de inicio de sesión Google:', err);
       setStatusMessage(`Aviso: ${err.message || 'Error al abrir ventana de Google'}. Puedes ingresar el token directamente abajo si el navegador bloqueó la ventana.`);
       setShowManualTokenInput(true);

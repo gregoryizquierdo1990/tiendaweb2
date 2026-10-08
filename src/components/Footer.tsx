@@ -95,15 +95,7 @@ export const Footer: React.FC<FooterProps> = ({
                   <span>Base de Datos Google Sheets</span>
                 </button>
               </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={onOpenAdmin}
-                  className="hover:text-indigo-600 transition cursor-pointer"
-                >
-                  Panel de Conciliación & Admin
-                </button>
-              </li>
+              {/* Enlace al panel admin 100% oculto de la vista pública, accesible únicamente visitando /admin */}
               <li>
                 <a
                   href="https://wa.me/573104567890?text=Hola,%20tengo%20una%20consulta%20sobre%20las%20cuentas%20de%20streaming"

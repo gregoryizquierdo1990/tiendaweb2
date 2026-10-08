@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para eliminar credenciales maestras y gestión de operadores, consolidando el acceso exclusivo con el botón de Google por correo autorizado.",
-  "updatedAt":  "2026-10-08T00:09:39.044164286Z",
+  "summary":  "Plan arquitectónico para separar la tienda pública (www.gregoryizquierdo.xyz) y el panel administrativo en la ruta protegida (/admin), con login dedicado de usuario/contraseña maestra, respaldo de Google OAuth y ocultamiento total de accesos administrativos en la tienda pública.",
+  "updatedAt":  "2026-10-08T01:18:13.709732679Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
