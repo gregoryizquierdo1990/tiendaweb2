@@ -843,7 +843,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
         : (contact.phones[0] || 'N/A');
       const mappedEmail = emailMappingSource === 'all'
         ? contact.emails.join(', ')
-        : (contact.emails[0] || `${mappedName.toLowerCase().replace(/\s+/g, '')}@import.com`);
+        : (contact.emails[0] || `${(mappedName || '').toLowerCase().replace(/\s+/g, '')}@import.com`);
 
       try {
         await onAddUserFromAdmin({
