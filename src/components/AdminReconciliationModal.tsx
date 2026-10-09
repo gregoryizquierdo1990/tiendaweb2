@@ -65,6 +65,8 @@ import { AdminIntegrationsCatalogModal } from './AdminIntegrationsCatalogModal';
 import { MarketingModule } from './MarketingModule';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminCategoryManager } from './AdminCategoryManager';
+import { INITIAL_PAYMENT_METHODS } from '../data/defaultCatalog';
+import { PaymentMethodFieldsDisplay } from './PaymentMethodFieldsDisplay';
 import { getAccessToken } from '../services/googleAuth';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { 
@@ -736,11 +738,24 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
   // Payment method edit state
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
   const [isNewPmModalOpen, setIsNewPmModalOpen] = useState(false);
+  const [pmViewMode, setPmViewMode] = useState<'table' | 'cards'>('table');
+  const [copiedPmId, setCopiedPmId] = useState<string | null>(null);
   const [newPmName, setNewPmName] = useState('');
   const [newPmType, setNewPmType] = useState<string>('pago_movil');
-  const [newPmHolder, setNewPmHolder] = useState('Emprendimiento Gregory Izquierdo');
+  const [newPmHolder, setNewPmHolder] = useState('Gregori Izquierdo');
   const [newPmAccount, setNewPmAccount] = useState('');
-  const [newPmInstructions, setNewPmInstructions] = useState('');
+  const [newPmInstructions, setNewPmInstructions] = useState('enviar comprobante de pago para conciliacion');
+  const [newPmBankName, setNewPmBankName] = useState('');
+  const [newPmBankCode, setNewPmBankCode] = useState('');
+  const [newPmPhone, setNewPmPhone] = useState('04242809333');
+  const [newPmDocId, setNewPmDocId] = useState('');
+  const [newPmEmail, setNewPmEmail] = useState('');
+  const [newPmAccountType, setNewPmAccountType] = useState('Ahorros');
+  const [newPmRouting, setNewPmRouting] = useState('');
+  const [newPmBankAddress, setNewPmBankAddress] = useState('');
+  const [newPmUserId, setNewPmUserId] = useState('');
+  const [newPmUsername, setNewPmUsername] = useState('');
+  const [newPmCurrency, setNewPmCurrency] = useState<'USD' | 'BS' | 'USDT'>('USD');
 
   const filteredOrders = orders.filter((o) => {
     const matchesStatus = statusFilter === 'all' ? true : o.status === statusFilter;
@@ -3400,141 +3415,550 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
         {/* Tab 6: Métodos de Pago */}
         {activeTab === 'methods' && (
           <div className="p-6 overflow-y-auto space-y-5 text-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-              <div>
-                <h3 className="text-sm font-black text-slate-900">
-                  Gestión & Configuración de Métodos de Pago
-                </h3>
+            {/* Header con estadísticas y controles */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-200 shadow-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+                    <CreditCard className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Tabla Oficial de Métodos de Pago (Pasarela Manual)
+                  </h3>
+                </div>
                 <p className="text-[11px] text-slate-500">
-                  Configura los métodos de cobro en Bolívares, USD y Criptomonedas para tus clientes y egresos.
+                  Configuración precisa con todos los campos especificados por método de pago para compras de clientes y conciliación administrativa.
                 </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold text-[10px] border border-indigo-100">
+                    {paymentMethods.length} Métodos Registrados
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-100">
+                    {paymentMethods.filter((m) => m.active).length} Activos
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 font-bold text-[10px] border border-amber-200 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    Campo Obligatorio: "enviar comprobante de pago para conciliacion"
+                  </span>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsNewPmModalOpen(true)}
-                className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Agregar Nuevo Método</span>
-              </button>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Botón Restablecer Métodos Oficiales */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('¿Deseas restablecer la tabla a los 9 Métodos Oficiales configurados (+ Wallet Zeny)?')) {
+                      INITIAL_PAYMENT_METHODS.forEach((officialMethod) => {
+                        onUpdatePaymentMethod(officialMethod);
+                      });
+                      alert('¡Métodos de pago restablecidos a los 9 oficiales con todos sus campos exactos!');
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                  title="Restablece los 9 métodos de pago con los datos exactos solicitados"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Restablecer Oficiales</span>
+                </button>
+
+                {/* Toggle Vista Tabla / Tarjetas */}
+                <div className="flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPmViewMode('table')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                      pmViewMode === 'table' ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    <span>Tabla</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPmViewMode('cards')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                      pmViewMode === 'cards' ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>Tarjetas</span>
+                  </button>
+                </div>
+
+                {/* Botón Agregar Nuevo */}
+                <button
+                  type="button"
+                  onClick={() => setIsNewPmModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Agregar Método</span>
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {paymentMethods.map((method) => {
-                const isEditing = editingMethod?.id === method.id;
-                return (
-                  <div key={method.id} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                    {isEditing ? (
-                      <div className="space-y-2 text-xs">
-                        <div>
-                          <label className="font-bold text-slate-700">Nombre del Método</label>
-                          <input
-                            type="text"
-                            value={editingMethod.name}
-                            onChange={(e) => setEditingMethod({ ...editingMethod, name: e.target.value })}
-                            className="w-full px-2 py-1 rounded border text-xs focus:ring-1 focus:ring-indigo-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="font-bold text-slate-700">Titular</label>
-                          <input
-                            type="text"
-                            value={editingMethod.holderName}
-                            onChange={(e) => setEditingMethod({ ...editingMethod, holderName: e.target.value })}
-                            className="w-full px-2 py-1 rounded border text-xs focus:ring-1 focus:ring-indigo-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="font-bold text-slate-700">Cuenta / Teléfono / ID</label>
-                          <input
-                            type="text"
-                            value={editingMethod.accountNumber}
-                            onChange={(e) => setEditingMethod({ ...editingMethod, accountNumber: e.target.value })}
-                            className="w-full px-2 py-1 rounded border font-mono text-xs focus:ring-1 focus:ring-indigo-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="font-bold text-slate-700">Instrucciones</label>
-                          <textarea
-                            rows={2}
-                            value={editingMethod.instructions}
-                            onChange={(e) => setEditingMethod({ ...editingMethod, instructions: e.target.value })}
-                            className="w-full px-2 py-1 rounded border text-xs focus:ring-1 focus:ring-indigo-500"
-                          />
-                        </div>
-                        <div className="flex justify-end gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => setEditingMethod(null)}
-                            className="px-2.5 py-1 rounded border text-xs"
-                          >
-                            Cancelar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onUpdatePaymentMethod(editingMethod);
-                              setEditingMethod(null);
-                            }}
-                            className="px-3 py-1 rounded bg-indigo-600 text-white font-bold text-xs"
-                          >
-                            Guardar
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col justify-between h-full">
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="font-black text-slate-900 text-sm flex items-center gap-1.5">
-                              <CreditCard className="w-4 h-4 text-indigo-500" />
-                              <span>{method.name}</span>
+            {pmViewMode === 'table' ? (
+              <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-xs">
+                <table className="w-full text-left text-[11px] border-collapse">
+                  <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-700 font-extrabold uppercase text-[9px] tracking-wider">
+                    <tr>
+                      <th className="py-3 px-3 w-10 text-center">#</th>
+                      <th className="py-3 px-3 min-w-[140px]">Método de Pago</th>
+                      <th className="py-3 px-3 min-w-[160px]">N° Cuenta / Teléfono / ID</th>
+                      <th className="py-3 px-3 min-w-[150px]">Titular / Beneficiario</th>
+                      <th className="py-3 px-3 min-w-[250px]">Detalles (Banco, Doc, Email)</th>
+                      <th className="py-3 px-3 min-w-[200px]">Conciliación Obligatoria</th>
+                      <th className="py-3 px-3 text-center">Estado</th>
+                      <th className="py-3 px-4 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paymentMethods.map((method, index) => {
+                      const idValue = method.accountNumber || method.userId || method.phone || method.username || 'N/A';
+                      const bankDetails = [
+                        method.bankName ? `Banco: ${method.bankName}` : null,
+                        method.bankCode ? `Cod: ${method.bankCode}` : null,
+                        method.accountType ? `Tipo: ${method.accountType}` : null,
+                        method.docId ? `Doc: ${method.docId}` : null,
+                        method.email ? `Email: ${method.email}` : null,
+                        method.routing ? `Routing: ${method.routing}` : null,
+                        method.bankAddress ? `Dir: ${method.bankAddress}` : null,
+                      ].filter(Boolean).join(' | ');
+
+                      return (
+                        <tr key={method.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-4 px-3 text-center font-bold text-slate-400 font-mono text-[10px]">
+                            {index + 1}
+                          </td>
+
+                          <td className="py-4 px-3 align-middle">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                                <CreditCard className="w-3.5 h-3.5" />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-black text-slate-900 text-xs tracking-tight">{method.name}</span>
+                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">
+                                  {method.badge || method.category}
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1">
+                          </td>
+
+                          <td className="py-4 px-3 align-middle">
+                            <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200 group">
+                              <span className="font-mono font-black text-slate-900 truncate">
+                                {idValue}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(idValue);
+                                  alert('Copiado al portapapeles');
+                                }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
+                                title="Copiar"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </td>
+
+                          <td className="py-4 px-3 align-middle">
+                            <span className="font-extrabold text-slate-800">
+                              {method.holderName || 'N/A'}
+                            </span>
+                          </td>
+
+                          <td className="py-4 px-3 align-middle">
+                            <div className="text-[10px] text-slate-600 leading-relaxed max-w-[250px] italic">
+                              {bankDetails || 'N/D'}
+                            </div>
+                          </td>
+
+                          <td className="py-4 px-3 align-middle">
+                            <div className="flex items-center gap-2 p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-black text-[9px] uppercase tracking-wider">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                              <span>{method.instructions || 'enviar comprobante de pago para conciliacion'}</span>
+                            </div>
+                          </td>
+
+                          <td className="py-4 px-3 text-center align-middle">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onUpdatePaymentMethod({
+                                  ...method,
+                                  active: !method.active
+                                });
+                              }}
+                              className={`w-20 py-1.5 rounded-full text-[10px] font-black transition cursor-pointer border shadow-xs ${
+                                method.active
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                  : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
+                              }`}
+                            >
+                              {method.active ? 'ACTIVO' : 'INACTIVO'}
+                            </button>
+                          </td>
+
+                          <td className="py-4 px-4 text-right align-middle">
+                            <div className="flex items-center justify-end gap-1.5">
                               <button
                                 type="button"
                                 onClick={() => setEditingMethod(method)}
-                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg cursor-pointer transition"
-                                title="Editar"
+                                className="p-2 rounded-xl bg-slate-50 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
+                                title="Editar Datos"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
-                              {onDeletePaymentMethod && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (confirm(`¿Eliminar el método de pago "${method.name}"?`)) {
-                                      onDeletePaymentMethod(method.id);
-                                    }
-                                  }}
-                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition"
-                                  title="Eliminar"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm('¿Deseas eliminar este método de pago?')) {
+                                    onDeletePaymentMethod(method.id);
+                                  }
+                                }}
+                                className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
-                          </div>
-                          <div className="text-xs text-slate-600 space-y-1 mb-2">
-                            <p>• <strong>Titular:</strong> {method.holderName}</p>
-                            <p>• <strong>Cuenta:</strong> <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">{method.accountNumber}</code></p>
-                          </div>
-                          <p className="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                            {method.instructions}
-                          </p>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+
+              /* VISTA 2: TARJETAS DETALLADAS */
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {paymentMethods.map((method) => (
+                  <div
+                    key={method.id}
+                    className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between space-y-3.5"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="font-black text-slate-900 text-sm flex items-center gap-1.5">
+                          <CreditCard className="w-4 h-4 text-indigo-600" />
+                          <span>{method.name}</span>
+                          {method.badge && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                              {method.badge}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setEditingMethod(method)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg cursor-pointer transition"
+                            title="Editar"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          {onDeletePaymentMethod && !method.id.includes('zeny') && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`¿Eliminar el método "${method.name}"?`)) {
+                                  onDeletePaymentMethod(method.id);
+                                }
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
 
-            {/* Modal para Agregar Nuevo Método */}
+                      <PaymentMethodFieldsDisplay
+                        method={method}
+                        compact={false}
+                        showConciliationNotice={true}
+                        showCopyButtons={true}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                      <div className="flex items-center gap-1">
+                        <span className="text-slate-400 font-medium">Monedas:</span>
+                        {(method.acceptedCurrencies || ['USD']).map((c) => (
+                          <span key={c} className="font-mono font-bold text-slate-700 px-1.5 py-0.5 rounded bg-slate-100">
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                          method.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {method.active ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* MODAL PARA EDITAR MÉTODO CON TODOS SUS CAMPOS */}
+            {editingMethod && (
+              <div className="fixed inset-0 z-70 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="w-full max-w-xl bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 animate-scaleIn space-y-4 max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+                        <Edit2 className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-slate-900 text-sm">
+                          Editar Campos: {editingMethod.name}
+                        </h4>
+                        <span className="text-[10px] text-slate-500">
+                          Ajusta los datos bancarios y la instrucción de conciliación.
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingMethod(null)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Nombre del Método *</label>
+                        <input
+                          type="text"
+                          value={editingMethod.name}
+                          onChange={(e) => setEditingMethod({ ...editingMethod, name: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Badge / Etiqueta</label>
+                        <input
+                          type="text"
+                          value={editingMethod.badge || ''}
+                          onChange={(e) => setEditingMethod({ ...editingMethod, badge: e.target.value })}
+                          placeholder="Ej: BNC, Binance, Lead Bank..."
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Campos Bancarios */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Banco</label>
+                        <input
+                          type="text"
+                          value={editingMethod.bankName || ''}
+                          onChange={(e) => setEditingMethod({ ...editingMethod, bankName: e.target.value })}
+                          placeholder="Ej: BNC, Guayaquil, Lead Bank..."
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Código Banco (Cod)</label>
+                        <input
+                          type="text"
+                          value={editingMethod.bankCode || ''}
+                          onChange={(e) => setEditingMethod({ ...editingMethod, bankCode: e.target.value })}
+                          placeholder="Ej: 0191, 0104..."
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Teléfono</label>
+                        <input
+                          type="text"
+                          value={editingMethod.phone || ''}
+                          onChange={(e) => setEditingMethod({ ...editingMethod, phone: e.target.value })}
+                          placeholder="Ej: 04242809333"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Documento / Cédula / RIF</label>
+                        <input
+                          type="text"
+                          value={editingMethod.docId || ''}
+                          onChange={(e) => setEditingMethod({ ...editingMethod, docId: e.target.value })}
+                          placeholder="Ej: V 18931731, J 506393794, 2451655498"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Titular de la Cuenta</label>
+                        <input
+                          type="text"
+                          value={editingMethod.holderName || ''}
+                          onChange={(e) => setEditingMethod({ ...editingMethod, holderName: e.target.value })}
+                          placeholder="Nombre del titular"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Tipo de Cuenta</label>
+                        <input
+                          type="text"
+                          value={editingMethod.accountType || ''}
+                          onChange={(e) => setEditingMethod({ ...editingMethod, accountType: e.target.value })}
+                          placeholder="Ahorros / Corriente"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Número de Cuenta / ID / Cuenta</label>
+                        <input
+                          type="text"
+                          value={editingMethod.accountNumber || ''}
+                          onChange={(e) => setEditingMethod({ ...editingMethod, accountNumber: e.target.value })}
+                          placeholder="Ej: 0042286503, 210345561126..."
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Correo Electrónico</label>
+                        <input
+                          type="text"
+                          value={editingMethod.email || ''}
+                          onChange={(e) => setEditingMethod({ ...editingMethod, email: e.target.value })}
+                          placeholder="gregoryrodriguez2021@gmail.com"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Identificadores y Routing */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">ID Usuario / Binance</label>
+                        <input
+                          type="text"
+                          value={editingMethod.userId || ''}
+                          onChange={(e) => setEditingMethod({ ...editingMethod, userId: e.target.value })}
+                          placeholder="393089335, 7604..."
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Usuario</label>
+                        <input
+                          type="text"
+                          value={editingMethod.username || ''}
+                          onChange={(e) => setEditingMethod({ ...editingMethod, username: e.target.value })}
+                          placeholder="gair1990..."
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Routing (EEUU)</label>
+                        <input
+                          type="text"
+                          value={editingMethod.routing || ''}
+                          onChange={(e) => setEditingMethod({ ...editingMethod, routing: e.target.value })}
+                          placeholder="101019644..."
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Dirección del Banco</label>
+                      <input
+                        type="text"
+                        value={editingMethod.bankAddress || ''}
+                        onChange={(e) => setEditingMethod({ ...editingMethod, bankAddress: e.target.value })}
+                        placeholder="1801 Main St., Kansas City. MO 64108"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">
+                        Instrucción de Conciliación * (Requisito)
+                      </label>
+                      <input
+                        type="text"
+                        value={editingMethod.instructions}
+                        onChange={(e) => setEditingMethod({ ...editingMethod, instructions: e.target.value })}
+                        placeholder="enviar comprobante de pago para conciliacion"
+                        className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-amber-50/50 text-xs font-semibold"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                      <div>
+                        <span className="font-bold text-slate-800 block">Estado del Método</span>
+                        <span className="text-[11px] text-slate-500">
+                          {editingMethod.active ? 'Disponible para los clientes en compras y recargas' : 'Oculto para los clientes'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditingMethod({ ...editingMethod, active: !editingMethod.active })}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer border ${
+                          editingMethod.active
+                            ? 'bg-emerald-600 text-white border-emerald-700'
+                            : 'bg-slate-200 text-slate-600 border-slate-300'
+                        }`}
+                      >
+                        {editingMethod.active ? 'Activo' : 'Inactivo'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setEditingMethod(null)}
+                      className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 font-semibold cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUpdatePaymentMethod(editingMethod);
+                        setEditingMethod(null);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold cursor-pointer shadow-md transition"
+                    >
+                      Guardar Cambios
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL PARA AGREGAR NUEVO MÉTODO */}
             {isNewPmModalOpen && (
               <div className="fixed inset-0 z-70 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-                <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 animate-scaleIn space-y-3.5">
-                  <div className="flex items-center justify-between pb-2 border-b">
+                <div className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 animate-scaleIn space-y-4 max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                     <h4 className="font-black text-slate-900 text-sm flex items-center gap-1.5">
                       <CreditCard className="w-4 h-4 text-indigo-600" />
                       <span>Agregar Nuevo Método de Pago</span>
@@ -3542,99 +3966,181 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
                     <button
                       type="button"
                       onClick={() => setIsNewPmModalOpen(false)}
-                      className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-3 text-xs">
                     <div>
                       <label className="font-bold text-slate-700 block mb-1">Nombre del Método *</label>
                       <input
                         type="text"
                         required
-                        placeholder="Ej: Pago Móvil BNC, Binance Pay USDT..."
+                        placeholder="Ej: Pago Móvil, Binance, Transferencia..."
                         value={newPmName}
                         onChange={(e) => setNewPmName(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500"
                       />
                     </div>
 
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">Tipo de Pago *</label>
-                      <select
-                        value={newPmType}
-                        onChange={(e) => setNewPmType(e.target.value as any)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-slate-50"
-                      >
-                        <option value="pago_movil">1. Pago Móvil</option>
-                        <option value="transferencia_nacional">2. Transferencia Bancaria (Nacional)</option>
-                        <option value="transferencia_int">3. Transferencia Bancaria (Internacional)</option>
-                        <option value="zelle">4. Zelle</option>
-                        <option value="billetera">5. Billeteras Wallet</option>
-                        <option value="transferencia_ecuador">6. Transferencia Bancaria (Ecuador)</option>
-                      </select>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Banco</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: BNC, Guayaquil, Lead Bank..."
+                          value={newPmBankName}
+                          onChange={(e) => setNewPmBankName(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Código Banco (Cod)</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: 0191, 0104..."
+                          value={newPmBankCode}
+                          onChange={(e) => setNewPmBankCode(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
                     </div>
 
-                    {/* CAMPOS DINÁMICOS SEGÚN EL TIPO */}
-                    {newPmType === 'pago_movil' && (
-                        <>
-                           <input type="text" placeholder="Nombre Banco" value={newPmName} onChange={(e) => setNewPmName(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"/>
-                           <input type="text" placeholder="Código Banco" onChange={(e) => {/*...*/}} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"/>
-                           {/* ... y así sucesivamente para todos los campos */}
-                        </>
-                    )}
-                    {/* ... continuar lógica para otros tipos */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Teléfono</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: 04242809333"
+                          value={newPmPhone}
+                          onChange={(e) => setNewPmPhone(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Documento / Cédula / RIF</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: V 18931731, J 506393794"
+                          value={newPmDocId}
+                          onChange={(e) => setNewPmDocId(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Titular</label>
+                        <input
+                          type="text"
+                          placeholder="Nombre del titular"
+                          value={newPmHolder}
+                          onChange={(e) => setNewPmHolder(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Número de Cuenta / ID</label>
+                        <input
+                          type="text"
+                          placeholder="Número de cuenta o usuario"
+                          value={newPmAccount}
+                          onChange={(e) => setNewPmAccount(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Correo Electrónico</label>
+                        <input
+                          type="text"
+                          placeholder="gregoryrodriguez2021@gmail.com"
+                          value={newPmEmail}
+                          onChange={(e) => setNewPmEmail(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Moneda Principal</label>
+                        <select
+                          value={newPmCurrency}
+                          onChange={(e) => setNewPmCurrency(e.target.value as any)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-slate-50"
+                        >
+                          <option value="USD">Dólares ($ USD)</option>
+                          <option value="BS">Bolívares (Bs.)</option>
+                          <option value="USDT">Tether (USDT)</option>
+                        </select>
+                      </div>
+                    </div>
 
                     <div>
-                      <label className="font-bold text-slate-700 block mb-1">Instrucciones de Pago *</label>
-                      <textarea
-                        rows={2}
+                      <label className="font-bold text-slate-700 block mb-1">
+                        Instrucción de Conciliación *
+                      </label>
+                      <input
+                        type="text"
                         required
-                        placeholder="Instrucciones breves para que el cliente realice el pago..."
                         value={newPmInstructions}
                         onChange={(e) => setNewPmInstructions(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                        className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-amber-50/50 text-xs font-semibold"
                       />
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-3 border-t">
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
                     <button
                       type="button"
                       onClick={() => setIsNewPmModalOpen(false)}
-                      className="px-3 py-1.5 rounded-lg border text-slate-600 cursor-pointer"
+                      className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 font-semibold cursor-pointer"
                     >
                       Cancelar
                     </button>
                     <button
                       type="button"
                       onClick={() => {
-                        if (!newPmName || !newPmAccount || !newPmInstructions) {
-                          alert('Por favor completa los campos requeridos.');
+                        if (!newPmName.trim()) {
+                          alert('Por favor ingresa el nombre del método.');
                           return;
                         }
                         if (onAddPaymentMethod) {
                           onAddPaymentMethod({
                             id: `pm-${Date.now()}`,
-                            name: newPmName,
-                            shortName: newPmName.slice(0, 8),
-                            category: newPmType === 'nacional' ? 'venezuela' : 'internacional',
-                            holderName: newPmHolder,
-                            accountNumber: newPmAccount,
-                            accountTypeLabel: 'Ahorro / Corriente',
-                            instructions: newPmInstructions,
+                            name: newPmName.trim(),
+                            shortName: newPmName.trim().slice(0, 10),
+                            category: newPmCurrency === 'BS' ? 'venezuela' : newPmCurrency === 'USDT' ? 'cripto' : 'internacional',
+                            holderName: newPmHolder || newPmEmail || newPmName,
+                            accountNumber: newPmAccount || newPmPhone || newPmUserId || '0000',
+                            accountTypeLabel: newPmBankName || 'Transferencia',
+                            instructions: newPmInstructions || 'enviar comprobante de pago para conciliacion',
+                            bankName: newPmBankName || undefined,
+                            bankCode: newPmBankCode || undefined,
+                            phone: newPmPhone || undefined,
+                            docId: newPmDocId || undefined,
+                            email: newPmEmail || undefined,
+                            accountType: newPmAccountType || undefined,
+                            routing: newPmRouting || undefined,
+                            bankAddress: newPmBankAddress || undefined,
+                            userId: newPmUserId || undefined,
+                            username: newPmUsername || undefined,
                             active: true,
-                            acceptedCurrencies: newPmType === 'nacional' ? ['BS'] : ['USD', 'USDT']
+                            acceptedCurrencies: [newPmCurrency]
                           });
                         }
                         setNewPmName('');
                         setNewPmAccount('');
-                        setNewPmInstructions('');
+                        setNewPmBankName('');
+                        setNewPmBankCode('');
+                        setNewPmDocId('');
+                        setNewPmEmail('');
                         setIsNewPmModalOpen(false);
                       }}
-                      className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold cursor-pointer shadow-md transition"
                     >
                       Crear Método
                     </button>

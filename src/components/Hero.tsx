@@ -64,7 +64,7 @@ export const Hero: React.FC<HeroProps> = ({
   const heroGradient = branding?.heroTitleGradient || 'diseño claro y precio justo';
   const heroSubtitle =
     branding?.heroSubtitle ||
-    'Perfiles privados con PIN y cuentas completas en 4K Ultra HD. Paga con Pago Móvil a tasa oficial BCV, Binance Pay, Cuenta en EEUU (Zelle/ACH), Airtm, Pichincha Ecuador, Wally, Zinli, UglyCash, TDC Banesco Conecta o saldo Zeny.';
+    'Perfiles privados con PIN y cuentas completas en 4K Ultra HD. Paga con Pago Móvil BNC o Jurídico a tasa BCV, Binance, Banco Guayaquil, ApoloPay, Zinli, Wally, Uglycash, Transferencia EEUU o saldo Zeny.';
 
   return (
     <section

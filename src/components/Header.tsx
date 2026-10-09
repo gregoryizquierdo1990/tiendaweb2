@@ -234,14 +234,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 text-slate-300 ml-auto">
-            <button
-              type="button"
-              onClick={onOpenTrackerModal}
-              className="hover:text-white transition flex items-center gap-1.5 cursor-pointer text-xs font-semibold bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-800"
-            >
-              <Clock className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Rastrear Pedido</span>
-            </button>
             {onOpenInstallModal && (
               <button
                 type="button"

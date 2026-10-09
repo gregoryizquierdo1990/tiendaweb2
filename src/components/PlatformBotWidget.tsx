@@ -639,6 +639,10 @@ export const PlatformBotWidget: React.FC<PlatformBotWidgetProps> = ({
                             )}
                           </button>
                         </div>
+                        <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 font-bold text-[10px] uppercase">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                          <span>enviar comprobante de pago para conciliacion</span>
+                        </div>
                       </div>
                     ))}
                 </div>

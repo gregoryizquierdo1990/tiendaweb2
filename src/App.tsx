@@ -32,6 +32,7 @@ import {
   syncOrderToFirestore, 
   syncWalletTopupToFirestore, 
   syncIncidentToFirestore,
+  syncPaymentMethodToFirestore,
   syncProductToFirestore,
   deleteProductFromFirestore,
   sanitizeForFirestore,
@@ -521,9 +522,21 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (paymentMethods.length === 0) {
-      setPaymentMethods(INITIAL_PAYMENT_METHODS);
-    }
+    setPaymentMethods((prev) => {
+      const updatedMap = new Map<string, PaymentMethod>();
+      // First populate official methods
+      INITIAL_PAYMENT_METHODS.forEach((officialMethod) => {
+        updatedMap.set(officialMethod.id, officialMethod);
+        syncPaymentMethodToFirestore(officialMethod);
+      });
+      // Keep any custom user-added methods from admin (excluding old temporary seeds)
+      prev.forEach((m) => {
+        if (!updatedMap.has(m.id) && !['pm-eeuu', 'pm-binance-usdt', 'pm-wally-zinli', 'pm-apolopay-uglycash', 'pm-banesco-conecta'].includes(m.id)) {
+          updatedMap.set(m.id, m);
+        }
+      });
+      return Array.from(updatedMap.values());
+    });
     syncDatabaseWithSupabase();
   }, []);
 

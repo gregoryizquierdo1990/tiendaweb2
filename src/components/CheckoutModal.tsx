@@ -32,6 +32,7 @@ import {
   calculateDiscountedPrice
 } from '../utils/formatters';
 import { compressImageFile } from '../utils/imageCompressor';
+import { PaymentMethodFieldsDisplay } from './PaymentMethodFieldsDisplay';
 
 interface CheckoutModalProps {
   product: Product;
@@ -650,42 +651,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 text-xs">
-                        <div className="bg-white p-3 rounded-xl border border-amber-200 flex items-center justify-between">
-                          <div>
-                            <div className="text-slate-400 text-[10px] font-semibold uppercase">
-                              Número de Cuenta / Teléfono / ID
-                            </div>
-                            <div className="text-slate-900 font-mono font-bold text-sm">
-                              {selectedMethod.accountNumber}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleCopyAccount}
-                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer flex items-center gap-1 text-[11px]"
-                          >
-                            {copiedAccount ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                            <span>{copiedAccount ? 'Copiado' : 'Copiar'}</span>
-                          </button>
-                        </div>
-
-                        <div className="bg-white p-3 rounded-xl border border-amber-200">
-                          <div className="text-slate-400 text-[10px] font-semibold uppercase">
-                            Titular / Beneficiario
-                          </div>
-                          <div className="text-slate-900 font-semibold text-sm">
-                            {selectedMethod.holderName}
-                          </div>
-                          {selectedMethod.extraDetails && (
-                            <div className="text-[11px] text-slate-500">{selectedMethod.extraDetails}</div>
-                          )}
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-amber-900/90 leading-relaxed bg-white/70 p-2.5 rounded-xl border border-amber-200/50">
-                        <strong>Instrucciones:</strong> {selectedMethod.instructions}
-                      </p>
+                      <PaymentMethodFieldsDisplay
+                        method={selectedMethod}
+                        compact={false}
+                        showCopyButtons={true}
+                        showConciliationNotice={true}
+                      />
                     </div>
                   )}
 

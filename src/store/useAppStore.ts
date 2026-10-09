@@ -222,10 +222,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   incidents: load<IncidentReport[]>('streamsync_incidents_v2', []),
   franchises: load<FranchiseTenant[]>('streamsync_franchises_v1', []),
   expenses: load<ExpenseItem[]>('gi_expenses_list_2026', []),
-  paymentMethods: load<PaymentMethod[]>('streamsync_methods_v2', INITIAL_PAYMENT_METHODS),
+  paymentMethods: (() => {
+    const loaded = load<PaymentMethod[]>('streamsync_methods_v2', INITIAL_PAYMENT_METHODS);
+    if (!loaded || loaded.length === 0 || loaded.some((m) => m.id === 'pm-pichincha' || m.name?.includes('Pichincha') || m.id === 'pm-zelle')) {
+      return INITIAL_PAYMENT_METHODS;
+    }
+    return loaded;
+  })(),
   invoices: load<Invoice[]>('streamsync_invoices_v1', []),
   faqItems: load<FaqItem[]>('streamsync_faq_v1', [
-    { id: 'faq-1', category: 'Pagos', question: '¿Cómo funciona la pasarela de pago con conciliación manual?', answer: 'Seleccionas tu plataforma y plan (1, 3, 6 o 12 meses). Puedes pagar en Dólares ($ USD) o en Bolívares (Bs.) calculados a la tasa oficial del BCV. Contamos con 9 métodos de pago: Cuenta en EEUU (Zelle / ACH), Airtm, Pago Móvil (Venezuela), Binance Pay (USDT), Banco Pichincha (Ecuador), Wally, Zinli, UglyCash y TDC (Banesco Conecta). Realizas la transferencia, ingresas tu número de referencia bancario y nuestro equipo valida el ingreso en minutos para activar tu suscripción.', order: 1 },
+    { id: 'faq-1', category: 'Pagos', question: '¿Cómo funciona la pasarela de pago con conciliación manual?', answer: 'Seleccionas tu plataforma y plan (1, 3, 6 o 12 meses). Puedes pagar en Dólares ($ USD) o en Bolívares (Bs.) calculados a la tasa oficial del BCV. Contamos con 9 métodos de pago a tu elección: Pago Móvil BNC, Binance, Transferencia Internacional (Banco Guayaquil), ApoloPay, Zinli, Wally, Uglycash, Transferencia EEUU (Lead Bank) y Pago Móvil Jurídico (Venezolano de Crédito), además de la Wallet Privada Zeny. Realizas la transferencia, envías tu comprobante de pago para conciliación y nuestro equipo valida el ingreso en minutos para activar tu suscripción.', order: 1 },
     { id: 'faq-2', category: 'Zeny', question: '¿Qué es la Wallet Zeny y cómo funciona?', answer: 'Zeny es la moneda y billetera interna de StreamSync (1 Zeny = 1 USD, equivalente en Bs. a tasa BCV). Puedes solicitar recargas de saldo abonando por cualquiera de nuestros métodos de pago. Una vez que el administrador acredita tu saldo en tu cuenta, puedes adquirir o renovar suscripciones con 1 solo clic y activación inmediata sin esperas. Importante: este saldo es exclusivo para compras y renovaciones en la plataforma, no es retirable ni canjeable por efectivo.', order: 2 },
     { id: 'faq-3', category: 'Tasa BCV', question: '¿Cómo se actualiza la tasa oficial del Banco Central de Venezuela (BCV)?', answer: 'Nuestra plataforma se conecta diariamente y de forma automática a los servicios oficiales del BCV para actualizar el valor en Bolívares. Además, el administrador tiene la facultad de ajustar o fijar la tasa manualmente desde el panel de control si fuera necesario.', order: 3 },
     { id: 'faq-4', category: 'Clientes', question: '¿Dónde veo mis cuentas activas y su fecha de vencimiento?', answer: 'Al registrarte en el Área de Clientes con tu correo y contraseña, dispones de una pestaña llamada "Mis Suscripciones & Vencimientos". Allí verás cada servicio contratado, tus credenciales de acceso (usuario, clave, perfil y PIN) y una cuenta regresiva con los días exactos que restan para el vencimiento de cada pantalla.', order: 4 },
@@ -273,7 +279,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       cardRadius: 'rounded-2xl',
       containerMaxWidth: 'max-w-7xl',
       // Footer Default Values
-      footerDescription: 'Plataforma de suscripciones y perfiles de streaming con pasarela de pago manual y sincronización en Google Sheets.',
+      footerDescription: 'Plataformas de Servicios : Perfiles, Cuentas Completas; dispositivos y Aplicaciones a tu disposicion y con Pasarela de Pago Manual',
       footerGuaranteeText: 'Garantía 100% de duración',
       footerPlatforms: [
         'Netflix Ultra HD 4K',
@@ -284,15 +290,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         'Magis TV & IPTV Internacional'
       ],
       footerPaymentMethods: [
-        'Cuenta en EEUU (Zelle / ACH)',
+        'Cuenta en EEUU',
         'Airtm',
         'Pago Móvil (Tasa BCV)',
         'Binance Pay (USDT)',
-        'Banco Pichincha (Ecuador)',
+        'Banco Guayaquil (Ecuador)',
         'Wally & Zinli',
-        'UglyCash',
+        'Apolopay-Uglycash',
         'TDC Banesco Conecta',
-        'Wallet Privada Zeny'
+        '• Wallet Privada Zeny'
       ],
       footerWhatsAppUrl: 'https://wa.me/584241983648?text=Hola,%20necesito%20informaci%C3%B3n%20o%20soporte%20con%20mi%20cuenta%20streaming.'
   } as AppBrandingConfig),

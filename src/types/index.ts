@@ -122,6 +122,17 @@ export interface PaymentMethod {
   active: boolean;
   badge?: string;
   acceptedCurrencies: ('USD' | 'BS' | 'USDT')[];
+  // Campos detallados estructurados
+  bankName?: string;
+  bankCode?: string;
+  phone?: string;
+  docId?: string;
+  email?: string;
+  accountType?: string;
+  routing?: string;
+  bankAddress?: string;
+  userId?: string;
+  username?: string;
 }
 
 export interface Order {

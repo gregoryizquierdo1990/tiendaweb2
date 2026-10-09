@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, MessageCircle, ShieldCheck, Heart, FileSpreadsheet, Lock } from 'lucide-react';
+import { Sparkles, ShieldCheck, Heart, Lock } from 'lucide-react';
 import { AppBrandingConfig } from '../types';
 
 interface FooterProps {
@@ -17,7 +17,11 @@ export const Footer: React.FC<FooterProps> = ({
   projectName = 'Gregory Izquierdo Streaming',
   branding
 }) => {
-  const description = branding?.footerDescription || 'Plataforma de suscripciones y perfiles de streaming con pasarela de pago manual y sincronización en Google Sheets.';
+  const oldDefault = 'Plataforma de suscripciones y perfiles de streaming con pasarela de pago manual y sincronización en Google Sheets.';
+  const defaultDesc = 'Plataformas de Servicios : Perfiles, Cuentas Completas; dispositivos y Aplicaciones a tu disposicion y con Pasarela de Pago Manual';
+  const description = (!branding?.footerDescription || branding?.footerDescription === oldDefault)
+    ? defaultDesc
+    : branding.footerDescription;
   const guarantee = branding?.footerGuaranteeText || 'Garantía 100% de duración';
   
   const platforms = branding?.footerPlatforms || [
@@ -29,26 +33,32 @@ export const Footer: React.FC<FooterProps> = ({
     'Magis TV & IPTV Internacional'
   ];
 
-  const paymentMethods = branding?.footerPaymentMethods || [
-    'Cuenta en EEUU (Zelle / ACH)',
+  const defaultPaymentMethods = [
+    'Cuenta en EEUU',
     'Airtm',
     'Pago Móvil (Tasa BCV)',
     'Binance Pay (USDT)',
-    'Banco Pichincha (Ecuador)',
+    'Banco Guayaquil (Ecuador)',
     'Wally & Zinli',
-    'UglyCash',
+    'Apolopay-Uglycash',
     'TDC Banesco Conecta',
-    'Wallet Privada Zeny'
+    '• Wallet Privada Zeny'
   ];
 
-  const whatsAppUrl = branding?.footerWhatsAppUrl || 'https://wa.me/584241983648?text=Hola,%20tengo%20una%20consulta%20sobre%20las%20cuentas%20de%20streaming';
+  const hasOldDefaults = branding?.footerPaymentMethods?.some(
+    pm => pm.includes('Pichincha') || pm === 'UglyCash' || pm.includes('Zelle / ACH')
+  );
+
+  const paymentMethods = (!branding?.footerPaymentMethods || hasOldDefaults)
+    ? defaultPaymentMethods
+    : branding.footerPaymentMethods;
 
   return (
     <footer className="bg-white border-t border-slate-200/80 text-slate-600 text-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           {/* Brand */}
-          <div className="md:col-span-1 space-y-3">
+          <div className="space-y-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-sky-500 flex items-center justify-center text-white shadow-xs">
                 <Sparkles className="w-4 h-4" />
@@ -83,7 +93,7 @@ export const Footer: React.FC<FooterProps> = ({
           {/* Formas de Pago */}
           <div>
             <h4 className="font-bold text-slate-900 mb-3 uppercase tracking-wider text-[11px]">
-              Pasarela de Pago Manual ({paymentMethods.length} Métodos)
+              Pasarela de Pago Manual a tu Elección
             </h4>
             <ul className="space-y-1.5 text-slate-500">
               {paymentMethods.map((pm, i) => {
@@ -95,45 +105,10 @@ export const Footer: React.FC<FooterProps> = ({
                 );
               })}
             </ul>
-          </div>
-
-          {/* Enlaces de Utilidad */}
-          <div>
-            <h4 className="font-bold text-slate-900 mb-3 uppercase tracking-wider text-[11px]">
-              Gestión & Soporte
-            </h4>
-            <ul className="space-y-2 text-slate-600">
-              <li>
-                <button
-                  type="button"
-                  onClick={onOpenTracker}
-                  className="hover:text-indigo-600 transition cursor-pointer font-medium flex items-center"
-                >
-                  Rastrear Estado de Pedido
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={onOpenSheets}
-                  className="hover:text-indigo-600 transition cursor-pointer flex items-center gap-1.5 font-medium"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Base de Datos Google Sheets</span>
-                </button>
-              </li>
-              <li>
-                <a
-                  href={whatsAppUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-emerald-600 transition flex items-center gap-1 font-bold"
-                >
-                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Soporte por WhatsApp</span>
-                </a>
-              </li>
-            </ul>
+            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-1.5 text-[11px] text-amber-700 font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+              <span>enviar comprobante de pago para conciliacion</span>
+            </div>
           </div>
         </div>
 

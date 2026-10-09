@@ -42,6 +42,7 @@ import {
   safeFormatDate
 } from '../utils/formatters';
 import { compressImageFile } from '../utils/imageCompressor';
+import { PaymentMethodFieldsDisplay } from './PaymentMethodFieldsDisplay';
 
 interface CustomerPortalModalProps {
   user: CustomerUser;
@@ -1178,27 +1179,15 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
 
                   {/* Account instructions */}
                   <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs text-amber-900 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-[11px] uppercase">Datos para transferir:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(selectedMethod.accountNumber);
-                          setCopiedAccount(true);
-                          setTimeout(() => setCopiedAccount(false), 2000);
-                        }}
-                        className="text-[11px] text-indigo-700 font-semibold hover:underline cursor-pointer"
-                      >
-                        {copiedAccount ? '¡Copiado!' : 'Copiar Cuenta'}
-                      </button>
-                    </div>
-                    <div className="font-mono font-bold text-slate-900 bg-white p-2 rounded-lg border border-amber-200">
-                      {selectedMethod.accountNumber}
-                    </div>
-                    <div className="text-[11px] text-slate-600">
-                      Titular: <strong>{selectedMethod.holderName}</strong>
-                    </div>
-                    <p className="text-[10px] text-slate-500">{selectedMethod.instructions}</p>
+                    <span className="font-bold text-[11px] uppercase block mb-1">
+                      Datos para transferir en {selectedMethod.name}:
+                    </span>
+                    <PaymentMethodFieldsDisplay
+                      method={selectedMethod}
+                      compact={false}
+                      showCopyButtons={true}
+                      showConciliationNotice={true}
+                    />
                   </div>
 
                   {/* Reference Number */}
