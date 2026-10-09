@@ -105,8 +105,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     ? (currency === 'BS' ? downPaymentBs : downPaymentUsd)
     : finalPrice;
 
+  const customerBalance = customerUser ? (customerUser.grpayBalance || customerUser.zenyBalance || 0) : 0;
+  const canUseWallet = customerBalance > 0;
+  
+  const walletAmountApplied = payWithGrpay ? Math.min(customerBalance, priceUsd) : 0;
+  const remainingUsdAfterWallet = priceUsd - walletAmountApplied;
+  const remainingBsAfterWallet = Number((remainingUsdAfterWallet * bcvRate).toFixed(2));
+  
+  const finalRemainingToPay = currency === 'BS' ? remainingBsAfterWallet : remainingUsdAfterWallet;
+  const requiresManualPayment = remainingUsdAfterWallet > 0;
+
   const hasEnoughGrpay = Boolean(
-    customerUser && (customerUser.grpayBalance || 0) >= priceUsd
+    customerUser && customerBalance >= priceUsd
   );
 
   const selectedMethod =
@@ -156,12 +166,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
-    if (!payWithGrpay && !referenceNumber.trim()) {
-      setErrorMessage('Por favor ingresa el número de comprobante o referencia de tu pago');
+    if (requiresManualPayment && !referenceNumber.trim()) {
+      setErrorMessage('Por favor ingresa el número de comprobante o referencia de tu pago manual (restante)');
       return;
     }
 
-    if (!payWithGrpay && !isVerifiedRobot) {
+    if (requiresManualPayment && !isVerifiedRobot) {
       setErrorMessage('Por favor verifica que no eres un robot marcando la casilla reCAPTCHA.');
       return;
     }
@@ -191,14 +201,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         productName: product.name,
         duration,
         accountType: product.accountType,
-        total: effectivePrice,
+        total: effectivePrice, // This is the total price of the product/installment
         currency,
         paymentCondition: product.allowInstallments ? paymentCondition : 'contado',
-        paymentMethodId: payWithGrpay ? 'wallet-grpay' : selectedMethod.id,
-        paymentMethodName: payWithGrpay ? 'Saldo Zeny Wallet' : selectedMethod.name,
-        referenceNumber: payWithGrpay ? `Zeny-AUTO-${orderId}` : referenceNumber.trim(),
-        status: payWithGrpay ? 'confirmed' : 'pending_reconciliation',
+        paymentMethodId: payWithGrpay ? (requiresManualPayment ? `split-wallet-${selectedMethod.id}` : 'wallet-grpay') : selectedMethod.id,
+        paymentMethodName: payWithGrpay ? (requiresManualPayment ? `Zeny ($${walletAmountApplied}) + ${selectedMethod.name}` : 'Saldo Zeny Wallet') : selectedMethod.name,
+        referenceNumber: !requiresManualPayment ? `Zeny-AUTO-${orderId}` : referenceNumber.trim(),
+        status: !requiresManualPayment ? 'confirmed' : 'pending_reconciliation',
         paidWithGrpay: payWithGrpay,
+        walletAmountApplied: walletAmountApplied,
+        manualAmountPaid: finalRemainingToPay,
         syncedToSheets: false
       };
 
@@ -493,12 +505,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           {customerUser ? (
             <div
               onClick={() => {
-                if (hasEnoughGrpay) setPayWithGrpay(!payWithGrpay);
+                if (canUseWallet) setPayWithGrpay(!payWithGrpay);
               }}
               className={`p-4 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${
                 payWithGrpay
                   ? 'border-indigo-600 bg-indigo-50/80 ring-2 ring-indigo-500/20'
-                  : hasEnoughGrpay
+                  : canUseWallet
                   ? 'border-indigo-200 bg-indigo-50/30 hover:bg-indigo-50/60'
                   : 'border-slate-200 bg-slate-50 opacity-75'
               }`}
@@ -507,23 +519,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
                   <Wallet className="w-5 h-5" />
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-900">
-                      Pagar con mi Saldo Zeny Wallet
+                      Utilizar mi Saldo Zeny Wallet
                     </span>
-                    <span className="px-1.5 py-0.2 rounded bg-indigo-200 text-indigo-900 text-[10px] font-bold">
-                      Activación Inmediata
+                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${hasEnoughGrpay ? 'bg-indigo-200 text-indigo-900' : 'bg-amber-100 text-amber-900'}`}>
+                      {hasEnoughGrpay ? 'Pago Total' : 'Pago Parcial'}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    Tu saldo actual:{' '}
+                  <div className="text-xs text-slate-500 mt-0.5 truncate">
+                    Saldo:{' '}
                     <strong className="text-indigo-700 font-mono">
-                      {formatGrpay(customerUser.grpayBalance)}
+                      {formatGrpay(customerBalance)}
                     </strong>
-                    {hasEnoughGrpay
-                      ? ` (Te quedarán ${((customerUser.grpayBalance || 0) - priceUsd).toFixed(2)} Zeny)`
-                      : ` (Requiere ${priceUsd} Zeny - Saldo insuficiente)`}
+                    {payWithGrpay && (
+                      <span className="ml-1 text-emerald-600 font-bold">
+                        (-${walletAmountApplied.toFixed(2)} USD)
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -531,9 +545,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <input
                 type="checkbox"
                 checked={payWithGrpay}
-                disabled={!hasEnoughGrpay}
+                disabled={!canUseWallet}
                 onChange={() => {}}
-                className="w-5 h-5 text-indigo-600 rounded-md focus:ring-indigo-500"
+                className="w-5 h-5 text-indigo-600 rounded-md focus:ring-indigo-500 shrink-0"
               />
             </div>
           ) : (
@@ -593,8 +607,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </span>
               </div>
 
-              {/* If NOT paying with Zeny, show manual payment methods */}
-              {!payWithGrpay && (
+              {/* If manual payment is still required (e.g. partial wallet payment or full manual), show manual payment methods */}
+              {requiresManualPayment && (
                 <>
                   {/* Section 2: Payment Method Choice */}
                   <div>
@@ -646,8 +660,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         </div>
                         <span className="text-xs font-bold text-amber-900">
                           {selectedMethod.acceptedCurrencies.includes('BS')
-                            ? `Bs. ${priceBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                            : `$${priceUsd.toFixed(2)} USD`}
+                            ? `Bs. ${remainingBsAfterWallet.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                            : `$${remainingUsdAfterWallet.toFixed(2)} USD`}
                         </span>
                       </div>
 
@@ -716,7 +730,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               )}
 
               {/* reCAPTCHA No soy un robot verification */}
-              {!payWithGrpay && (
+              {requiresManualPayment && (
                 <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between shadow-2xs">
                   <label className="flex items-center gap-3 cursor-pointer select-none">
                     <input

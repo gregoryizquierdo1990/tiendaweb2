@@ -230,10 +230,10 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
               </div>
               <div className="flex items-baseline gap-3">
                 <span className="text-3xl sm:text-4xl font-black tracking-tight">
-                  {formatGrpay(user.grpayBalance)}
+                  {formatGrpay(user.grpayBalance || user.zenyBalance)}
                 </span>
                 <span className="text-xs sm:text-sm text-indigo-200 font-medium">
-                  ≈ Bs. {((user.grpayBalance || 0) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  ≈ Bs. {((user.grpayBalance || user.zenyBalance || 0) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                 </span>
               </div>
               <p className="text-[11px] text-indigo-200/80 mt-1 max-w-md">

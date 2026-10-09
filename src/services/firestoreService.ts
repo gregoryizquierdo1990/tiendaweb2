@@ -509,8 +509,12 @@ export function initRealtimeFirestoreSync() {
     const active = store.activeCustomer;
     if (active) {
       const found = list.find(c => c.id === active.id || c.email?.toLowerCase() === active.email?.toLowerCase());
-      if (found && (found.zenyBalance !== active.zenyBalance || JSON.stringify(found) !== JSON.stringify(active))) {
-        store.setActiveCustomer(found);
+      if (found) {
+        const remoteBal = found.grpayBalance || found.zenyBalance || 0;
+        const localBal = active.grpayBalance || active.zenyBalance || 0;
+        if (remoteBal !== localBal || JSON.stringify(found) !== JSON.stringify(active)) {
+          store.setActiveCustomer(found);
+        }
       }
     }
     setIsSyncingFromFirestore(false);

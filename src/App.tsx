@@ -1179,11 +1179,16 @@ export default function App() {
       showNotification('error', 'Tu cuenta se encuentra suspendida para realizar compras. Contacta a soporte.');
       return;
     }
-    // If paid with Zeny, deduct balance from activeCustomer
+    // If paid with Zeny (total or partial), deduct balance from activeCustomer
     if (usedGrpay && activeCustomer) {
-      const deduction = order.total; // in USD / Zeny
-      const newBalance = Math.max(0, (activeCustomer.zenyBalance || 0) - deduction);
-      const updatedUser = { ...activeCustomer, zenyBalance: newBalance };
+      const deduction = (order as any).walletAmountApplied || order.total; // Use specific applied amount or full total if old version
+      const currentBal = activeCustomer.zenyBalance || activeCustomer.grpayBalance || 0;
+      const newBalance = Math.max(0, Number((currentBal - deduction).toFixed(2)));
+      const updatedUser = { 
+        ...activeCustomer, 
+        zenyBalance: newBalance,
+        grpayBalance: newBalance 
+      };
 
       setActiveCustomer(updatedUser);
       setCustomerUsers((prev) =>
@@ -1506,8 +1511,13 @@ export default function App() {
 
     if (userToCredit) {
       const added = targetTopup.amountZenyPoints || targetTopup.amountZeny || targetTopup.amount || 0;
-      const newBal = Number(((userToCredit.zenyBalance || 0) + added).toFixed(2));
-      const updatedUser = { ...userToCredit, zenyBalance: newBal };
+      const currentZeny = userToCredit.zenyBalance || userToCredit.grpayBalance || 0;
+      const newBal = Number((currentZeny + added).toFixed(2));
+      const updatedUser = { 
+        ...userToCredit, 
+        zenyBalance: newBal,
+        grpayBalance: newBal 
+      };
 
       setCustomerUsers((prev) =>
         prev.map((u) => (u.id === userToCredit.id ? updatedUser : u))
@@ -1563,12 +1573,14 @@ export default function App() {
       prev.map((u) => {
         if (u.email.toLowerCase() === targetEmail) {
           found = true;
-          const newBal = Math.max(0, Number(((u.zenyBalance || 0) + delta).toFixed(2)));
+          const currentBal = u.zenyBalance || u.grpayBalance || 0;
+          const newBal = Math.max(0, Number((currentBal + delta).toFixed(2)));
           finalBalance = newBal;
+          const updated = { ...u, zenyBalance: newBal, grpayBalance: newBal };
           if (activeCustomer && activeCustomer.id === u.id) {
-            setActiveCustomer({ ...activeCustomer, zenyBalance: newBal });
+            setActiveCustomer(updated);
           }
-          return { ...u, zenyBalance: newBal };
+          return updated;
         }
         return u;
       })
@@ -1582,6 +1594,7 @@ export default function App() {
           email: targetEmail,
           phone: '+58',
           zenyBalance: delta,
+          grpayBalance: delta,
           createdAt: new Date().toISOString()
         };
         setCustomerUsers((prev) => [newCust, ...prev]);

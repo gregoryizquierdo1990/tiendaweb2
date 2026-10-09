@@ -304,7 +304,8 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
             name: editingFicha.name,
             phone: editingFicha.phone,
             email: editingFicha.email,
-            grpayBalance: editingFicha.grpayBalance !== undefined ? editingFicha.grpayBalance : c.grpayBalance,
+            grpayBalance: editingFicha.grpayBalance !== undefined ? editingFicha.grpayBalance : (c.grpayBalance || c.zenyBalance),
+            zenyBalance: editingFicha.grpayBalance !== undefined ? editingFicha.grpayBalance : (c.zenyBalance || c.grpayBalance),
             role: editingFicha.role || c.role || 'cliente',
             isSuspended: editingFicha.isSuspended !== undefined ? editingFicha.isSuspended : c.isSuspended,
             notes: editingFicha.notes !== undefined ? editingFicha.notes : c.notes
@@ -773,7 +774,7 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
                       <div>Teléfono: <span className="text-white">{cust.phone}</span></div>
                       <div>
                         Billetera Zeny:{' '}
-                        <span className="text-emerald-400 font-bold">${(cust.grpayBalance || 0).toFixed(2)}</span>
+                        <span className="text-emerald-400 font-bold">${(cust.grpayBalance || cust.zenyBalance || 0).toFixed(2)}</span>
                       </div>
                       {cust.notes && (
                         <div className="text-[10px] text-slate-500 truncate">Nota: {cust.notes}</div>
@@ -790,7 +791,7 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
                             name: cust.name,
                             phone: cust.phone,
                             email: cust.email,
-                            grpayBalance: cust.grpayBalance,
+                            grpayBalance: cust.grpayBalance || cust.zenyBalance,
                             role: cust.role,
                             notes: cust.notes || '',
                             isSuspended: cust.isSuspended

@@ -3617,7 +3617,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
                                 type="button"
                                 onClick={() => {
                                   if (confirm('¿Deseas eliminar este método de pago?')) {
-                                    onDeletePaymentMethod(method.id);
+                                    onDeletePaymentMethod && onDeletePaymentMethod(method.id);
                                   }
                                 }}
                                 className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"

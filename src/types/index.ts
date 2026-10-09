@@ -199,6 +199,8 @@ export interface Order {
     processedBy?: string;
     notes?: string;
   };
+  walletAmountApplied?: number;
+  manualAmountPaid?: number;
 }
 
 export type UserRole = 'cliente' | 'vendedor' | 'administrador' | 'admin';
