@@ -41,6 +41,7 @@ import {
   generateTopupId,
   safeFormatDate
 } from '../utils/formatters';
+import { compressImageFile } from '../utils/imageCompressor';
 
 interface CustomerPortalModalProps {
   user: CustomerUser;
@@ -123,14 +124,15 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
 
   const equivalentBs = (topupAmountUsd * bcvRate).toFixed(2);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setTopupReceiptImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImageFile(file);
+        setTopupReceiptImage(compressed);
+      } catch (err) {
+        console.warn('Error al procesar comprobante:', err);
+      }
     }
   };
 
@@ -148,16 +150,22 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
         customerId: user.id,
         customerName: user.name,
         customerEmail: user.email,
+        customerPhone: user.phone || '',
+        amount: topupAmountUsd,
         amountZeny: topupAmountUsd,
+        amountZenyPoints: topupAmountUsd,
         amountPaid,
         currency: isBs ? 'BS' : 'USD',
         paymentMethodId: selectedMethod.id,
         paymentMethodName: selectedMethod.name,
         referenceNumber: topupRefNumber.trim(),
-        receiptImage: topupReceiptImage || undefined,
         status: 'pending',
         createdAt: new Date().toISOString()
       };
+
+      if (topupReceiptImage) {
+        newTopup.receiptImage = topupReceiptImage;
+      }
 
       await onRequestTopup(newTopup);
       setTopupSuccess(newTopup);
@@ -216,7 +224,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                 <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Billetera Privada StreamSync</span>
                 <span className="px-1.5 py-0.2 rounded bg-indigo-500/40 text-[10px] text-indigo-100 font-mono">
-                  1 Zeny = 1 USD / 1 USDT
+                  1 Zeny = 1 USD
                 </span>
               </div>
               <div className="flex items-baseline gap-3">
@@ -553,7 +561,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
               <div>
                 <span className="font-bold">Política de Uso de la Wallet Zeny:</span>
                 <p className="mt-0.5 text-amber-800 leading-relaxed">
-                  El saldo Zeny es recargado mediante comprobante verificado por el administrador (1 Zeny = $1.00 USD / 1 USDT / Tasa BCV en Bolívares).
+                  El saldo Zeny es recargado mediante comprobante verificado por el administrador (1 Zeny = $1.00 USD / Tasa BCV en Bolívares).
                   <strong> Este saldo es de uso estricto y exclusivo para compras y renovaciones dentro de la página; no es canjeable ni transferible fuera de la plataforma.</strong>
                 </p>
               </div>
@@ -1057,7 +1065,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                       Recargar Saldo en Wallet Zeny
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      1 Zeny = 1.00 USD / 1 USDT • Tasa BCV Oficial: {bcvRate} Bs/USD
+                      1 Zeny = 1.00 USD • Tasa BCV Oficial: {bcvRate} Bs/USD
                     </p>
                   </div>
                 </div>

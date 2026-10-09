@@ -34,6 +34,7 @@ import {
   syncIncidentToFirestore,
   syncProductToFirestore,
   deleteProductFromFirestore,
+  sanitizeForFirestore,
   seedFirestoreIfEmpty
 } from './services/firestoreService';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
@@ -545,6 +546,48 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_TOPUPS_KEY, JSON.stringify(walletTopups));
+  }, [walletTopups]);
+
+  // Sincronizar solicitudes de recarga de Wallet Zeny hacia la lista general de Pedidos
+  useEffect(() => {
+    if (walletTopups.length > 0) {
+      setOrders((prevOrders) => {
+        let changed = false;
+        const newOrders = [...prevOrders];
+        walletTopups.forEach((topup) => {
+          const recId = topup.id.startsWith('WAL-') ? topup.id.replace('WAL-', 'REC-') : `REC-${topup.id}`;
+          const existing = newOrders.find((o) => o.id === recId || o.id === topup.id);
+          if (!existing) {
+            const topupAmount = topup.amountZeny || topup.amount || topup.amountPaid || 1;
+            const mappedOrder: Order = {
+              id: recId,
+              createdAt: topup.createdAt || new Date().toISOString(),
+              customerId: topup.customerId,
+              customerName: topup.customerName,
+              customerEmail: topup.customerEmail,
+              customerPhone: topup.customerPhone || '',
+              productId: 'topup-zeny',
+              productName: `Recarga Saldo Wallet Zeny (${topupAmount} USD)`,
+              duration: '1_mes',
+              accountType: 'perfil_completo',
+              total: topupAmount,
+              currency: topup.currency,
+              paymentMethodId: topup.paymentMethodId,
+              paymentMethodName: topup.paymentMethodName,
+              referenceNumber: topup.referenceNumber,
+              receiptImage: topup.receiptImage,
+              customerNotes: `Solicitud de recarga de saldo virtual Zeny. Acreditar $${topupAmount} USD al saldo del cliente (1 Zeny = 1.00 USD).`,
+              status: topup.status === 'approved' ? 'confirmed' : topup.status === 'rejected' ? 'rejected' : 'pending_reconciliation'
+            };
+            const sanitized = sanitizeForFirestore(mappedOrder);
+            newOrders.unshift(sanitized);
+            syncOrderToFirestore(sanitized);
+            changed = true;
+          }
+        });
+        return changed ? newOrders : prevOrders;
+      });
+    }
   }, [walletTopups]);
 
   useEffect(() => {
@@ -1267,6 +1310,74 @@ export default function App() {
       metadata: { orderId, newStatus, rejectionReason }
     });
 
+    // Si es un pedido de recarga de saldo Zeny, acreditar automáticamente el saldo al cliente
+    if (newStatus === 'confirmed') {
+      const targetOrder = orders.find((o) => o.id === orderId);
+      if (
+        targetOrder &&
+        (targetOrder.productId === 'topup-zeny' ||
+          targetOrder.productName.toLowerCase().includes('zeny'))
+      ) {
+        const added = targetOrder.total || 0;
+        const userToCredit = customerUsers.find(
+          (u) =>
+            u.id === targetOrder.customerId ||
+            u.email.toLowerCase() === targetOrder.customerEmail.toLowerCase()
+        );
+        if (userToCredit) {
+          const newBal = Number(((userToCredit.zenyBalance || 0) + added).toFixed(2));
+          const updatedUser = { ...userToCredit, zenyBalance: newBal };
+          setCustomerUsers((prev) =>
+            prev.map((u) => (u.id === userToCredit.id ? updatedUser : u))
+          );
+          if (activeCustomer && (activeCustomer.id === userToCredit.id || activeCustomer.email.toLowerCase() === userToCredit.email.toLowerCase())) {
+            setActiveCustomer(updatedUser);
+          }
+          syncCustomerToFirestore(updatedUser);
+        }
+
+        // Marcar la recarga de billetera asociada como aprobada
+        setWalletTopups((prev) =>
+          prev.map((t) => {
+            const recId = t.id.startsWith('WAL-') ? t.id.replace('WAL-', 'REC-') : `REC-${t.id}`;
+            if (t.id === orderId || recId === orderId) {
+              const approvedTopup: WalletTopup = {
+                ...t,
+                status: 'approved',
+                approvedAt: new Date().toISOString()
+              };
+              syncWalletTopupToFirestore(approvedTopup);
+              return approvedTopup;
+            }
+            return t;
+          })
+        );
+      }
+    } else if (newStatus === 'rejected') {
+      const targetOrder = orders.find((o) => o.id === orderId);
+      if (
+        targetOrder &&
+        (targetOrder.productId === 'topup-zeny' ||
+          targetOrder.productName.toLowerCase().includes('zeny'))
+      ) {
+        setWalletTopups((prev) =>
+          prev.map((t) => {
+            const recId = t.id.startsWith('WAL-') ? t.id.replace('WAL-', 'REC-') : `REC-${t.id}`;
+            if (t.id === orderId || recId === orderId) {
+              const rejectedTopup: WalletTopup = {
+                ...t,
+                status: 'rejected',
+                rejectionReason: rejectionReason || 'Rechazado por administración'
+              };
+              syncWalletTopupToFirestore(rejectedTopup);
+              return rejectedTopup;
+            }
+            return t;
+          })
+        );
+      }
+    }
+
     if (newStatus === 'confirmed' || newStatus === 'delivered') {
       sendPushNotification(
         newStatus === 'confirmed' ? '¡Pago Confirmado!' : '¡Credenciales Entregadas!',
@@ -1319,8 +1430,41 @@ export default function App() {
       showNotification('error', 'Tu cuenta se encuentra suspendida para recargas de saldo. Contacta a soporte.');
       return;
     }
-    setWalletTopups((prev) => [topup, ...prev]);
-    await syncWalletTopupToFirestore(topup);
+    const cleanTopup: WalletTopup = {
+      ...topup,
+      amount: topup.amount ?? topup.amountZeny ?? topup.amountZenyPoints ?? topup.amountPaid
+    };
+    const sanitized = sanitizeForFirestore(cleanTopup);
+    setWalletTopups((prev) => [sanitized, ...prev.filter((t) => t.id !== sanitized.id)]);
+    await syncWalletTopupToFirestore(sanitized);
+
+    // Crear la orden correspondiente para que se refleje inmediatamente en el módulo administrativo de Pedidos
+    const recId = topup.id.startsWith('WAL-') ? topup.id.replace('WAL-', 'REC-') : `REC-${topup.id}`;
+    const topupAmount = topup.amountZeny || topup.amount || topup.amountPaid || 1;
+    const topupOrder: Order = {
+      id: recId,
+      createdAt: topup.createdAt || new Date().toISOString(),
+      customerId: topup.customerId,
+      customerName: topup.customerName,
+      customerEmail: topup.customerEmail,
+      customerPhone: topup.customerPhone || activeCustomer?.phone || '',
+      productId: 'topup-zeny',
+      productName: `Recarga Saldo Wallet Zeny (${topupAmount} USD)`,
+      duration: '1_mes',
+      accountType: 'perfil_completo',
+      total: topupAmount,
+      currency: topup.currency,
+      paymentMethodId: topup.paymentMethodId,
+      paymentMethodName: topup.paymentMethodName,
+      referenceNumber: topup.referenceNumber,
+      receiptImage: topup.receiptImage,
+      customerNotes: `Solicitud de recarga de saldo virtual Zeny. Acreditar $${topupAmount} USD al saldo del cliente (1 Zeny = 1.00 USD).`,
+      status: 'pending_reconciliation'
+    };
+    const sanitizedOrder = sanitizeForFirestore(topupOrder);
+    setOrders((prev) => [sanitizedOrder, ...prev.filter((o) => o.id !== recId)]);
+    await syncOrderToFirestore(sanitizedOrder);
+
     showNotification('success', 'Solicitud de recarga enviada. En espera de confirmación.');
   };
 
@@ -1329,34 +1473,45 @@ export default function App() {
     const targetTopup = walletTopups.find((t) => t.id === topupId);
     if (!targetTopup) return;
 
+    const approvedTopup: WalletTopup = {
+      ...targetTopup,
+      status: 'approved',
+      approvedAt: new Date().toISOString()
+    };
+
     setWalletTopups((prev) =>
-      prev.map((t) =>
-        t.id === topupId
-          ? { ...t, status: 'approved', approvedAt: new Date().toISOString() }
-          : t
-      )
+      prev.map((t) => (t.id === topupId ? approvedTopup : t))
     );
+    await syncWalletTopupToFirestore(approvedTopup);
 
     // Credit user's Zeny balance
-    setCustomerUsers((prev) =>
-      prev.map((u) => {
-        if (
-          u.id === targetTopup.customerId ||
-          u.email.toLowerCase() === targetTopup.customerEmail.toLowerCase()
-        ) {
-          const newBal = (u.zenyBalance || 0) + (targetTopup.amountZenyPoints || targetTopup.amountZeny || 0);
-          if (activeCustomer && activeCustomer.id === u.id) {
-            setActiveCustomer({ ...activeCustomer, zenyBalance: newBal });
-          }
-          return { ...u, zenyBalance: newBal };
-        }
-        return u;
-      })
+    const userToCredit = customerUsers.find(
+      (u) =>
+        u.id === targetTopup.customerId ||
+        u.email.toLowerCase() === targetTopup.customerEmail.toLowerCase()
     );
+
+    if (userToCredit) {
+      const added = targetTopup.amountZenyPoints || targetTopup.amountZeny || targetTopup.amount || 0;
+      const newBal = Number(((userToCredit.zenyBalance || 0) + added).toFixed(2));
+      const updatedUser = { ...userToCredit, zenyBalance: newBal };
+
+      setCustomerUsers((prev) =>
+        prev.map((u) => (u.id === userToCredit.id ? updatedUser : u))
+      );
+      if (activeCustomer && (activeCustomer.id === userToCredit.id || activeCustomer.email.toLowerCase() === userToCredit.email.toLowerCase())) {
+        setActiveCustomer(updatedUser);
+      }
+      await syncCustomerToFirestore(updatedUser);
+    }
+
+    // Actualizar el pedido asociado en la lista de pedidos si existe
+    const recId = topupId.startsWith('WAL-') ? topupId.replace('WAL-', 'REC-') : `REC-${topupId}`;
+    handleUpdateOrderStatus(recId, 'confirmed');
 
     showNotification(
       'success',
-      `¡Recarga #${topupId} aprobada! +${targetTopup.amountZeny} Zeny acreditados a ${targetTopup.customerEmail}.`
+      `¡Recarga #${topupId} aprobada! +${targetTopup.amountZeny || targetTopup.amount || 1} Zeny acreditados a ${targetTopup.customerEmail}.`
     );
   };
 
@@ -1369,6 +1524,17 @@ export default function App() {
           : t
       )
     );
+    const targetTopup = walletTopups.find((t) => t.id === topupId);
+    if (targetTopup) {
+      syncWalletTopupToFirestore({
+        ...targetTopup,
+        status: 'rejected',
+        rejectionReason: reason || 'Comprobante no verificado'
+      });
+    }
+
+    const recId = topupId.startsWith('WAL-') ? topupId.replace('WAL-', 'REC-') : `REC-${topupId}`;
+    handleUpdateOrderStatus(recId, 'rejected', undefined, reason);
     showNotification('info', `Recarga #${topupId} rechazada.`);
   };
 
@@ -1961,7 +2127,7 @@ export default function App() {
                 Recarga tu Wallet Zeny y activa tus cuentas al instante
               </h3>
               <p className="text-slate-300 text-xs sm:text-sm mt-2 leading-relaxed">
-                Abona saldo en Bolívares (Tasa BCV) o USDT / Dólares. 1 ZenyPoint = 1 USD / 1 USDT. Usa tu saldo para comprar o renovar sin esperar tiempos de validación bancaria en cada compra.
+                Abona saldo en Bolívares (Tasa BCV) o Dólares. 1 Zeny = 1 USD. Usa tu saldo para comprar o renovar sin esperar tiempos de validación bancaria en cada compra.
               </p>
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <button

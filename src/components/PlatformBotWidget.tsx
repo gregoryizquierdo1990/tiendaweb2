@@ -125,7 +125,7 @@ export const PlatformBotWidget: React.FC<PlatformBotWidgetProps> = ({
           action: () => setActiveTab('catalogo')
         };
       } else if (lower.includes('grpay') || lower.includes('wallet') || lower.includes('saldo')) {
-        botResponse = 'Zeny es nuestra moneda interna. 1 Zeny equivale a 1 USD o 1 USDT. Puedes abonar saldo y pagar o renovar al instante sin esperar confirmaciones bancarias.';
+        botResponse = 'Zeny es nuestra moneda interna. 1 Zeny equivale a 1 USD. Puedes abonar saldo y pagar o renovar al instante sin esperar confirmaciones bancarias.';
         quickAction = {
           label: activeCustomer ? 'Ver Mi Saldo Zeny' : 'Iniciar Sesión',
           action: () => {

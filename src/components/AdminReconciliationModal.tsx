@@ -116,6 +116,7 @@ import {
   formatGrpay,
   buildWhatsAppCredentialsUrl,
   buildTelegramCredentialsUrl,
+  buildFormattedCredentialsText,
   buildWhatsAppIncidentStatusUrl,
   buildTelegramIncidentStatusUrl,
   buildFormattedIncidentStatusText,
@@ -1032,15 +1033,20 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
     if (!reconcilingOrder) return;
     try {
       setIsProcessing(true);
-      const credentials = {
-        accountUser: credUser.trim(),
-        accountPass: credPass.trim(),
-        pin: credPin.trim(),
-        profileName: credProfile.trim(),
-        startDate: reconcilingOrder.createdAt,
-        expirationDate: credExpirationDate,
-        instructions: credInstructions.trim()
-      };
+      const isTopup = reconcilingOrder.productId === 'topup-zeny' || reconcilingOrder.productName.toLowerCase().includes('zeny');
+      const credentials = isTopup
+        ? {
+            instructions: credInstructions.trim() || 'Recarga de saldo acreditada en Wallet Zeny.'
+          }
+        : {
+            accountUser: credUser.trim(),
+            accountPass: credPass.trim(),
+            pin: credPin.trim(),
+            profileName: credProfile.trim(),
+            startDate: reconcilingOrder.createdAt,
+            expirationDate: credExpirationDate,
+            instructions: credInstructions.trim()
+          };
 
       await onUpdateOrderStatus(
         reconcilingOrder.id,
@@ -1526,12 +1532,23 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
                             </td>
 
                             <td className="py-3.5 px-4">
-                              <div className="font-medium text-slate-900">{order.productName}</div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {(order.productId === 'topup-zeny' || order.productName.toLowerCase().includes('zeny')) && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                    💰 RECARGA ZENY
+                                  </span>
+                                )}
+                                <span className="font-medium text-slate-900">{order.productName}</span>
+                              </div>
                               <div className="text-[11px] text-indigo-600 font-semibold">{order.duration}</div>
                             </td>
 
                             <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
-                              {order.paidWithGrpay ? (
+                              {(order.productId === 'topup-zeny' || order.productName.toLowerCase().includes('zeny')) ? (
+                                <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] font-black">
+                                  +{order.total.toFixed(2)} Zeny ($ USD)
+                                </span>
+                              ) : order.paidWithGrpay ? (
                                 <span className="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-[11px]">
                                   Zeny Wallet
                                 </span>
@@ -3251,7 +3268,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
               </div>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs text-slate-500">
-                  1 Zeny = 1 USD / 1 USDT. Acredita o disminuye saldo de la billetera virtual.
+                  1 Zeny = 1 USD. Acredita o disminuye saldo de la billetera virtual.
                 </p>
                 <select
                   value={manualCreditOperation}
@@ -6181,97 +6198,172 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
                   )}
                 </div>
 
-                {/* Formulario de Credenciales de Entrega */}
-                <div className="space-y-3 border-t border-slate-200 pt-4">
-                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Credenciales de la Cuenta de Streaming a Entregar</span>
-                  </h4>
+                {/* Formulario de Conciliación: Billetera Zeny o Streaming */}
+                {(reconcilingOrder.productId === 'topup-zeny' || reconcilingOrder.productName.toLowerCase().includes('zeny')) ? (
+                  <div className="space-y-4 border-t border-slate-200 pt-4">
+                    <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-950 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Wallet className="w-5 h-5 text-indigo-600 shrink-0" />
+                        <div>
+                          <h4 className="font-extrabold text-sm text-indigo-900">
+                            Acreditación Directa de Saldo en Wallet Zeny
+                          </h4>
+                          <p className="text-xs text-indigo-700">
+                            Valor oficial: <strong>1 Zeny = 1.00 USD</strong>
+                          </p>
+                        </div>
+                      </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Correo / Usuario de Acceso *</label>
-                      <input
-                        type="text"
-                        value={credUser}
-                        onChange={(e) => setCredUser(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-500"
-                        placeholder="usuario@streaming.com"
-                      />
+                      <div className="bg-white p-3.5 rounded-xl border border-indigo-100 flex items-center justify-between">
+                        <div>
+                          <span className="text-[11px] text-slate-500 font-bold block">Saldo a Acreditar:</span>
+                          <span className="text-base font-black text-indigo-700 font-mono">
+                            +{reconcilingOrder.total.toFixed(2)} Zeny ($ USD)
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[11px] text-slate-500 font-bold block">Cliente Beneficiario:</span>
+                          <span className="text-xs font-extrabold text-slate-800">
+                            {reconcilingOrder.customerName}
+                          </span>
+                          <div className="text-[10px] text-slate-500 font-mono">{reconcilingOrder.customerEmail}</div>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-indigo-800 space-y-1">
+                        <p>
+                          ✓ Al hacer clic en <strong>Aprobar y Conciliar Pago</strong>, el saldo se acreditará inmediatamente a la cuenta del usuario.
+                        </p>
+                        <p>
+                          ✓ Se emitirá la factura digital en el módulo de facturación.
+                        </p>
+                        <p>
+                          ✓ Se habilitará el botón de WhatsApp con el mensaje oficial de recarga acreditada para el cliente.
+                        </p>
+                      </div>
                     </div>
 
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Contraseña de la Cuenta *</label>
-                      <input
-                        type="text"
-                        value={credPass}
-                        onChange={(e) => setCredPass(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-500"
-                        placeholder="Clave2026*"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Nombre de Perfil / Pantalla</label>
-                      <input
-                        type="text"
-                        value={credProfile}
-                        onChange={(e) => setCredProfile(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500"
-                        placeholder="Perfil 1 (Pablo)"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">PIN de Perfil (Si aplica)</label>
-                      <input
-                        type="text"
-                        value={credPin}
-                        onChange={(e) => setCredPin(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-500"
-                        placeholder="1234"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Fecha de Vencimiento / Corte *</label>
-                      <input
-                        type="date"
-                        value={credExpirationDate ? credExpirationDate.split('T')[0] : ''}
-                        onChange={(e) => setCredExpirationDate(`${e.target.value}T23:59:59.000Z`)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Asesor Responsable</label>
-                      <select
-                        value={assignedSellerId}
-                        onChange={(e) => {
-                          setAssignedSellerId(e.target.value);
-                          const seller = sellerOptions.find(s => s.id === e.target.value);
-                          if (seller) setAssignedSellerName(seller.name);
-                        }}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-indigo-500"
-                      >
-                        {sellerOptions.map(s => (
-                          <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="col-span-1 sm:col-span-2">
-                      <label className="block font-bold text-slate-700 mb-1">Reglas de Garantía e Instrucciones</label>
-                      <textarea
-                        rows={2}
-                        value={credInstructions}
-                        onChange={(e) => setCredInstructions(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500"
-                        placeholder="Instrucciones para el cliente..."
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Asesor Responsable</label>
+                        <select
+                          value={assignedSellerId}
+                          onChange={(e) => {
+                            setAssignedSellerId(e.target.value);
+                            const seller = sellerOptions.find(s => s.id === e.target.value);
+                            if (seller) setAssignedSellerName(seller.name);
+                          }}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-indigo-500"
+                        >
+                          {sellerOptions.map(s => (
+                            <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Nota Administrativa (Opcional)</label>
+                        <input
+                          type="text"
+                          value={credInstructions}
+                          onChange={(e) => setCredInstructions(e.target.value)}
+                          placeholder="Ej: Validado en cuenta Banco..."
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-3 border-t border-slate-200 pt-4">
+                    <h4 className="text-xs font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Credenciales de la Cuenta de Streaming a Entregar</span>
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Correo / Usuario de Acceso *</label>
+                        <input
+                          type="text"
+                          value={credUser}
+                          onChange={(e) => setCredUser(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-500"
+                          placeholder="usuario@streaming.com"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Contraseña de la Cuenta *</label>
+                        <input
+                          type="text"
+                          value={credPass}
+                          onChange={(e) => setCredPass(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-500"
+                          placeholder="Clave2026*"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Nombre de Perfil / Pantalla</label>
+                        <input
+                          type="text"
+                          value={credProfile}
+                          onChange={(e) => setCredProfile(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500"
+                          placeholder="Perfil 1 (Pablo)"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">PIN de Perfil (Si aplica)</label>
+                        <input
+                          type="text"
+                          value={credPin}
+                          onChange={(e) => setCredPin(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-500"
+                          placeholder="1234"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Fecha de Vencimiento / Corte *</label>
+                        <input
+                          type="date"
+                          value={credExpirationDate ? credExpirationDate.split('T')[0] : ''}
+                          onChange={(e) => setCredExpirationDate(`${e.target.value}T23:59:59.000Z`)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Asesor Responsable</label>
+                        <select
+                          value={assignedSellerId}
+                          onChange={(e) => {
+                            setAssignedSellerId(e.target.value);
+                            const seller = sellerOptions.find(s => s.id === e.target.value);
+                            if (seller) setAssignedSellerName(seller.name);
+                          }}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-indigo-500"
+                        >
+                          {sellerOptions.map(s => (
+                            <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="col-span-1 sm:col-span-2">
+                        <label className="block font-bold text-slate-700 mb-1">Reglas de Garantía e Instrucciones</label>
+                        <textarea
+                          rows={2}
+                          value={credInstructions}
+                          onChange={(e) => setCredInstructions(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500"
+                          placeholder="Instrucciones para el cliente..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Rechazar pedido opcional */}
                 {showRejectInput && (

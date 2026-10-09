@@ -51,7 +51,7 @@ const DEFAULT_BOT_COMMANDS: TelegramBotCustomCommand[] = [
   {
     command: '/wallet',
     description: 'Información de la billetera interna Zeny, saldo y recargas.',
-    responseTemplate: '💰 *WALLET Zeny STREAMING*\n\nTu billetera interna digital privada:\n• 1 Zeny = $1.00 USD / USDT.\n• Activación inmediata sin esperar verificación bancaria.\n• Recarga mediante Pago Móvil, Zelle o Binance Pay.\n\nConsulta tu saldo en tu portal: https://gregoryizquierdo.xyz',
+    responseTemplate: '💰 *WALLET Zeny STREAMING*\n\nTu billetera interna digital privada:\n• 1 Zeny = $1.00 USD.\n• Activación inmediata sin esperar verificación bancaria.\n• Recarga mediante Pago Móvil, Zelle o Binance Pay.\n\nConsulta tu saldo en tu portal: https://gregoryizquierdo.xyz',
     category: 'wallet',
     enabled: true
   },

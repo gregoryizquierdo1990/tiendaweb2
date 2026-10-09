@@ -65,9 +65,8 @@ service cloud.firestore {
     // --- Wallet Topups Collection ---
     match /wallet_topups/{topupId} {
       allow read: if true;
-      allow create, update: if hasRequiredFields(['id', 'amount', 'status']) &&
-                            request.resource.data.id is string &&
-                            request.resource.data.amount is number;
+      allow create, update: if hasRequiredFields(['id', 'status']) &&
+                            request.resource.data.id is string;
       allow delete: if true;
     }
 

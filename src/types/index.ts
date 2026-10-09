@@ -218,6 +218,8 @@ export interface WalletTopup {
   customerId: string;
   customerName: string;
   customerEmail: string;
+  customerPhone?: string;
+  amount?: number; // General amount
   amountZenyPoints?: number; // Amount in ZenyPoints (USD equivalent)
   amountZeny?: number; // Compatibility alias
   amountPaid: number;  // Amount paid in the payment currency

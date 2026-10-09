@@ -31,6 +31,7 @@ import {
   calculateExpirationDate,
   calculateDiscountedPrice
 } from '../utils/formatters';
+import { compressImageFile } from '../utils/imageCompressor';
 
 interface CheckoutModalProps {
   product: Product;
@@ -118,14 +119,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setReceiptPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImageFile(file);
+        setReceiptPreview(compressed);
+      } catch (err) {
+        console.warn('Error al procesar comprobante:', err);
+      }
     }
   };
 

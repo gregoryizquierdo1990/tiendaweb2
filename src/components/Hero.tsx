@@ -91,7 +91,7 @@ export const Hero: React.FC<HeroProps> = ({
           </p>
 
           <div className="mt-4 inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full text-indigo-700 text-xs font-bold font-mono shadow-sm">
-            <span>1 ZenyPoint = $1.00 USD</span>
+            <span>1 Zeny = 1.00 USD</span>
           </div>
 
           {/* Quick trust metrics */}

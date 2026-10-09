@@ -141,6 +141,19 @@ export function getDaysRemaining(expirationDate?: string): {
 }
 
 export function buildFormattedCredentialsText(order: Order): string {
+  if (order.productId === 'topup-zeny' || order.productName.toLowerCase().includes('zeny')) {
+    return `💳 *¡Recarga Aprobada en Gregori Izquierdo Streaming!*
+
+Hola *${order.customerName}*, tu recarga de saldo Zeny para el pedido *#${order.id}* ha sido confirmada y acreditada con éxito:
+
+💰 *Monto Recargado:* $${order.total.toFixed(2)} USD
+⭐ *Saldo Acreditado:* +${order.total.toFixed(2)} Zeny (1 Zeny = 1.00 USD)
+🔖 *Referencia Bancaria:* ${order.referenceNumber || 'Validada'}
+🧑‍💼 *Atendido por:* ${order.assignedSellerName || 'Gregori Izquierdo (Admin)'}
+
+Ya puedes usar tu saldo en https://gregoryizquierdo.xyz para renovar o comprar pantallas al instante sin esperar verificación bancaria. ¡Muchas gracias por tu preferencia!`;
+  }
+
   const creds = order.credentials;
   const expFormatted = safeFormatDate(
     creds?.expirationDate,
