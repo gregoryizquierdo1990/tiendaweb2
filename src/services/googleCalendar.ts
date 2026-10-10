@@ -21,33 +21,35 @@ export interface GoogleCalendarEvent {
 export const fetchCalendarEvents = async (timeMin?: string): Promise<GoogleCalendarEvent[]> => {
   const token = await getAccessToken();
   if (!token) {
-    throw new Error('No has iniciado sesión con Google. Conecta tu cuenta para sincronizar.');
+    return [];
   }
 
   // Por defecto, traer eventos desde hace 30 días en adelante
   const minTime = timeMin || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const response = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=150&timeMin=${encodeURIComponent(minTime)}&orderBy=startTime&singleEvents=true`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json'
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=150&timeMin=${encodeURIComponent(minTime)}&orderBy=startTime&singleEvents=true`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json'
+        }
       }
-    }
-  );
+    );
 
-  if (!response.ok) {
-    if (response.status === 401) {
-      setCachedAccessToken(null); // Clear expired token
-      throw new Error('La sesión de Google ha expirado (401). Por favor, vuelve a sincronizar.');
+    if (!response.ok) {
+      if (response.status === 401) {
+        setCachedAccessToken(null); // Clear expired token
+      }
+      return [];
     }
-    const errorDetails = await response.text();
-    throw new Error(`Google Calendar API respondió con error: ${response.status} - ${errorDetails}`);
+
+    const data = await response.json();
+    return data.items || [];
+  } catch {
+    return [];
   }
-
-  const data = await response.json();
-  return data.items || [];
 };
 
 /**

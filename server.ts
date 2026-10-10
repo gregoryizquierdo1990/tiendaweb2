@@ -46,6 +46,49 @@ app.post('/api/db', (req: Request, res: Response) => {
   }
 });
 
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getMessaging } from 'firebase-admin/messaging';
+
+// Initialize Firebase Admin
+if (getApps().length === 0) {
+  try {
+    initializeApp({
+      projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'tactical-codex-mxjsq'
+    });
+    console.log('Firebase Admin initialized');
+  } catch (err) {
+    console.error('Firebase Admin initialization error:', err);
+  }
+}
+
+app.post('/api/push-notification', async (req: Request, res: Response) => {
+  try {
+    const { token, title, body, url } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' });
+    }
+
+    const message = {
+      notification: {
+        title: title || 'StreamSync Pro',
+        body: body || 'Nueva notificación',
+      },
+      data: {
+        url: url || '/',
+      },
+      token: token,
+    };
+
+    const response = await getMessaging().send(message);
+    console.log('Successfully sent message:', response);
+    res.json({ success: true, messageId: response });
+  } catch (error) {
+    console.error('Error sending push notification:', error);
+    res.status(500).json({ error: 'Failed to send push notification' });
+  }
+});
+
 app.post('/api/gemini', async (req: Request, res: Response) => {
   try {
     const { prompt } = req.body;

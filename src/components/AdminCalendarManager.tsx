@@ -28,7 +28,8 @@ import {
   CustomerUser,
   PlanDuration,
   MessageTemplate,
-  ActionTemplateMapping
+  ActionTemplateMapping,
+  Invoice
 } from '../types';
 import {
   getActiveTemplate,
@@ -45,6 +46,7 @@ interface AdminCalendarManagerProps {
   templates: MessageTemplate[];
   actionMapping?: ActionTemplateMapping;
   onRenewOrder?: (orderId: string, duration: PlanDuration, newExpirationDate: string) => void;
+  invoices?: Invoice[];
 }
 
 const MONTH_NAMES = [
@@ -71,7 +73,8 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
   bcvRate,
   templates,
   actionMapping,
-  onRenewOrder
+  onRenewOrder,
+  invoices = []
 }) => {
   const today = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => today.toISOString().split('T')[0], [today]);
@@ -114,11 +117,16 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
         return;
       }
       const events = await fetchCalendarEvents();
+      // If token became invalid during request, inform cleanly
+      if (!getAccessToken()) {
+        setGoogleEvents([]);
+        setGoogleSyncMsg('La sesión de Google ha expirado. Por favor, haz clic en "Sincronizar Nube" para volver a conectar tu cuenta.');
+        return;
+      }
       setGoogleEvents(events);
       setGoogleSyncMsg(`Sincronizado: ${events.length} eventos de Google Calendar cargados con éxito.`);
     } catch (err: any) {
-      console.error(err);
-      setGoogleSyncMsg(err.message || 'Error de conexión con Google Calendar.');
+      setGoogleSyncMsg(err?.message || 'Error de conexión con Google Calendar.');
     } finally {
       setGoogleLoading(false);
     }
@@ -255,12 +263,48 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
       });
   }, [orders, customers, todayStr]);
 
+  // Combine orders with pending invoices for the calendar
+  const calendarItems = useMemo(() => {
+    const items = [...ordersWithExpiry];
+
+    // Add pending invoices that are not already linked to a displayed order
+    // Or just show all pending invoices as "Cobros Pendientes"
+    invoices.forEach((inv) => {
+      if (inv.paymentStatus === 'pending' && inv.dueDate) {
+        const dateObj = new Date(inv.dueDate);
+        const dateStr = !isNaN(dateObj.getTime())
+          ? dateObj.toISOString().split('T')[0]
+          : todayStr;
+
+        const expTime = new Date(dateStr + 'T12:00:00').getTime();
+        const todayTime = new Date(todayStr + 'T12:00:00').getTime();
+        const diffDays = isNaN(expTime) || isNaN(todayTime)
+          ? 0
+          : Math.ceil((expTime - todayTime) / (1000 * 60 * 60 * 24));
+
+        items.push({
+          invoice: inv,
+          expDateStr: dateStr,
+          diffDays,
+          isOverdue: diffDays < 0,
+          isToday: diffDays === 0,
+          isNear: diffDays > 0 && diffDays <= 3,
+          isSenior: false,
+          isTrust: false,
+          isInvoice: true
+        } as any);
+      }
+    });
+
+    return items;
+  }, [ordersWithExpiry, invoices, todayStr]);
+
   // Expiration count map by YYYY-MM-DD
   const expiryCountMap = useMemo(() => {
     const map: Record<string, { total: number; overdue: number; today: number; near: number; googleCount: number }> = {};
     
-    // Add local orders
-    for (const item of ordersWithExpiry) {
+    // Add local items (orders and invoices)
+    for (const item of calendarItems) {
       if (!map[item.expDateStr]) {
         map[item.expDateStr] = { total: 0, overdue: 0, today: 0, near: 0, googleCount: 0 };
       }
@@ -335,25 +379,25 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
   // Combined list of items shown on the selected day / filtered list (including Google Calendar events!)
   const filteredList = useMemo(() => {
     // Local events matching criteria
-    const localFiltered = ordersWithExpiry.filter((item) => {
+    const localFiltered = calendarItems.filter((item: any) => {
       // Text Search
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matches =
-          item.order.customerName.toLowerCase().includes(query) ||
-          item.order.customerPhone.includes(query) ||
-          item.order.productName.toLowerCase().includes(query) ||
-          item.order.id.toLowerCase().includes(query);
+          (item.order?.customerName || item.invoice?.customerName || '').toLowerCase().includes(query) ||
+          (item.order?.customerPhone || item.invoice?.customerPhone || '').includes(query) ||
+          (item.order?.productName || item.invoice?.items?.[0]?.description || '').toLowerCase().includes(query) ||
+          (item.order?.id || item.invoice?.id || '').toLowerCase().includes(query);
         if (!matches) return false;
       }
 
       // Quick filter
       if (typeFilter === 'installments') {
-        const isInst = item.order.paymentCondition === 'cuotas' || Boolean(item.order.installmentPlan);
+        const isInst = item.order?.paymentCondition === 'cuotas' || Boolean(item.order?.installmentPlan) || item.isInvoice;
         if (!isInst) return false;
       }
       if (typeFilter === 'memberships') {
-        const isInst = item.order.paymentCondition === 'cuotas' || Boolean(item.order.installmentPlan);
+        const isInst = item.order?.paymentCondition === 'cuotas' || Boolean(item.order?.installmentPlan) || item.isInvoice;
         if (isInst) return false;
       }
 
@@ -415,7 +459,7 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
       ...localFiltered.map(l => ({ ...l, isGoogleEvent: false })),
       ...googleFiltered.map(g => ({ ...g, isGoogleEvent: true }))
     ];
-  }, [ordersWithExpiry, mappedGoogleEvents, quickFilter, typeFilter, selectedDateStr, currentYear, currentMonth, searchQuery]);
+  }, [calendarItems, mappedGoogleEvents, quickFilter, typeFilter, selectedDateStr, currentYear, currentMonth, searchQuery]);
 
   // Navigation handlers
   const handlePrevMonth = () => {
@@ -445,16 +489,17 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
 
   // Monthly KPIs
   const currentMonthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-  const monthOrders = ordersWithExpiry.filter((i) => i.expDateStr.startsWith(currentMonthPrefix));
-  const monthTotalUsd = monthOrders.reduce((sum, i) => sum + (i.order.total || 0), 0);
+  const monthOrders = calendarItems.filter((i: any) => i.expDateStr.startsWith(currentMonthPrefix));
+  const monthTotalUsd = monthOrders.reduce((sum, i: any) => sum + (i.order?.total || i.invoice?.totalUsd || 0), 0);
   const monthTotalBs = monthTotalUsd * bcvRate;
-  const overdueTotal = ordersWithExpiry.filter((i) => i.isOverdue).length;
-  const todayTotal = ordersWithExpiry.filter((i) => i.isToday).length;
+  const overdueTotal = calendarItems.filter((i: any) => i.isOverdue).length;
+  const todayTotal = calendarItems.filter((i: any) => i.isToday).length;
 
   // WhatsApp Expiration Reminder Trigger
-  const handleSendReminderWhatsApp = (item: (typeof ordersWithExpiry)[0]) => {
+  const handleSendReminderWhatsApp = (item: any) => {
     const activeTemplate = getActiveTemplate('aviso_vencimiento', templates, actionMapping);
-    const bsEquiv = (item.order.total * bcvRate).toFixed(2);
+    const total = item.order?.total || item.invoice?.totalUsd || 0;
+    const bsEquiv = (total * bcvRate).toFixed(2);
     const dateFormatted = safeFormatDate(
       item.expDateStr ? item.expDateStr + 'T12:00:00' : null,
       { day: 'numeric', month: 'long', year: 'numeric' },
@@ -462,16 +507,17 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
     );
 
     const message = renderTemplate(activeTemplate.content, {
-      cliente: item.order.customerName,
-      servicio: item.order.productName,
+      cliente: item.order?.customerName || item.invoice?.customerName || '',
+      servicio: item.order?.productName || item.invoice?.items?.[0]?.description || 'Servicio',
       fecha_vencimiento: dateFormatted,
-      monto_renovacion_usd: item.order.total.toFixed(2),
+      monto_renovacion_usd: total.toFixed(2),
       monto_renovacion_bs: bsEquiv,
       tasa_bcv: bcvRate.toFixed(2),
       dominio: DOMAIN_OFFICIAL
     });
 
-    const cleanPhone = (item.order?.customerPhone || '').replace(/\D/g, '');
+    const phoneRaw = item.order?.customerPhone || item.invoice?.customerPhone || '';
+    const cleanPhone = phoneRaw.replace(/\D/g, '');
     const phoneWithCountry = cleanPhone.startsWith('58') ? cleanPhone : `58${cleanPhone.replace(/^0/, '')}`;
     const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
@@ -511,11 +557,19 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
 
   const handleSyncGoogleCalendar = () => {
     let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Streaming Pro//Admin Calendar//ES\n";
-    ordersWithExpiry.forEach((ord) => {
+    calendarItems.forEach((ord: any) => {
       const dateStr = ord.expDateStr.replace(/-/g, '');
+      const summary = ord.isInvoice 
+        ? `Cobro Factura: ${ord.invoice.invoiceNumber} (${ord.invoice.customerName})`
+        : `Vencimiento: ${ord.order.productName} (${ord.order.customerName})`;
+      
+      const description = ord.isInvoice
+        ? `Factura: ${ord.invoice.invoiceNumber}\\nCliente: ${ord.invoice.customerName}\\nMonto: $${ord.invoice.totalUsd}\\nSoporte: 04241983648`
+        : `Cliente: ${ord.order.customerName} - Tel: ${ord.order.customerPhone} - Servicio: ${ord.order.productName}\\nSoporte: 04241983648`;
+
       icsContent += "BEGIN:VEVENT\n";
-      icsContent += `SUMMARY:Vencimiento: ${ord.order.productName} (${ord.order.customerName})\n`;
-      icsContent += `DESCRIPTION:Cliente: ${ord.order.customerName} - Tel: ${ord.order.customerPhone} - Servicio: ${ord.order.productName}\\nSoporte: 04241983648\n`;
+      icsContent += `SUMMARY:${summary}\n`;
+      icsContent += `DESCRIPTION:${description}\n`;
       icsContent += `DTSTART;VALUE=DATE:${dateStr}\n`;
       icsContent += `DTEND;VALUE=DATE:${dateStr}\n`;
       icsContent += "END:VEVENT\n";
@@ -598,11 +652,11 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
           </div>
 
           <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
-            <span className="text-[11px] text-slate-400 block font-medium">Proyección Renovación ($)</span>
+            <span className="text-[11px] text-slate-400 block font-medium">Proyección Renovación/Cobros ($)</span>
             <div className="text-xl font-extrabold text-emerald-400 font-mono mt-0.5">
               ${monthTotalUsd.toFixed(2)} USD
             </div>
-            <span className="text-[10px] text-slate-400">Total a facturar</span>
+            <span className="text-[10px] text-slate-400">Total a facturar/cobrar</span>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
@@ -1000,6 +1054,73 @@ export const AdminCalendarManager: React.FC<AdminCalendarManagerProps> = ({
                               <ExternalLink className="w-2.5 h-2.5" />
                             </a>
                           )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (item.isInvoice) {
+                  const invoice = item.invoice as Invoice;
+                  const bsEquiv = (invoice.totalUsd * bcvRate).toFixed(2);
+                  return (
+                    <div
+                      key={invoice.id}
+                      className={`p-4 rounded-2xl border transition-all ${
+                        item.isOverdue
+                          ? 'bg-rose-50/50 border-rose-200 hover:border-rose-300'
+                          : item.isToday
+                          ? 'bg-amber-50/60 border-amber-200 hover:border-amber-300 ring-1 ring-amber-300/40'
+                          : 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-xs'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <strong className="text-slate-900 text-sm font-extrabold">
+                              {invoice.customerName}
+                            </strong>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-600 text-white font-black border border-indigo-700 flex items-center gap-1 shadow-2xs">
+                              <DollarSign className="w-3 h-3 text-white" />
+                              <span>Cobro de Factura</span>
+                            </span>
+                          </div>
+                          <div className="text-slate-500 font-mono text-[11px] flex items-center gap-1 mt-0.5">
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            <span>{invoice.customerPhone}</span>
+                          </div>
+                          <div className="mt-1 space-y-0.5">
+                            <div className="text-[11px] font-bold text-slate-700">
+                              Factura: {invoice.invoiceNumber}
+                            </div>
+                            <div className="text-[10px] text-slate-500 italic">
+                              Concepto: {invoice.items[0]?.description || 'Servicio'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div className="font-mono font-extrabold text-amber-700 text-xs">
+                            ${invoice.totalUsd.toFixed(2)} USD
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-mono">
+                            Bs. {bsEquiv}
+                          </div>
+                          <div className="mt-2">
+                            {item.isOverdue ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                Vencido
+                              </span>
+                            ) : item.isToday ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950">
+                                Hoy
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                Pendiente
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

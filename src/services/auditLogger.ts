@@ -1,4 +1,6 @@
 import { AuditLogEntry, AuditLogSeverity, AuditActorRole } from '../types';
+import { syncAuditLogToFirestore } from './firestoreService';
+import { useAppStore } from '../store/useAppStore';
 
 const AUDIT_STORAGE_KEY = 'gregory_audit_logs_v1';
 
@@ -100,28 +102,7 @@ function getInitialSeedLogs(): AuditLogEntry[] {
  */
 export function getAuditLogs(): AuditLogEntry[] {
   if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(AUDIT_STORAGE_KEY);
-    if (!raw) {
-      return [];
-    }
-    const parsed: AuditLogEntry[] = JSON.parse(raw);
-    const sanitized = parsed.filter(
-      (log) =>
-        !log.actor.includes('Maria Fernanda') &&
-        !log.actor.includes('StreamPlus') &&
-        !log.actor.includes('Pablo (Ventas') &&
-        !log.description.includes('carlos.mendoza') &&
-        !log.description.includes('StreamPlus')
-    );
-    if (sanitized.length !== parsed.length) {
-      localStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify(sanitized));
-    }
-    return sanitized;
-  } catch (e) {
-    console.error('Error reading audit logs:', e);
-    return [];
-  }
+  return useAppStore.getState().auditLogs;
 }
 
 // Subscribers list
@@ -186,10 +167,14 @@ export async function logAuditEvent(
 
   if (typeof window !== 'undefined') {
     try {
-      const existing = getAuditLogs();
-      const updated = [fullEntry, ...existing].slice(0, 500); // keep last 500 records
-      localStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify(updated));
-      notifySubscribers(updated);
+      // Sync to Firestore immediately for real registration
+      await syncAuditLogToFirestore(fullEntry);
+      
+      // Also update local store for immediate UI reflection
+      const store = useAppStore.getState();
+      store.setAuditLogs((prev) => [fullEntry, ...prev].slice(0, 1000));
+      
+      notifySubscribers(store.auditLogs);
     } catch (e) {
       console.error('Error saving audit log:', e);
     }

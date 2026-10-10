@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { 
   Product, Order, CustomerUser, FranchiseTenant, ExpenseItem, 
   PaymentMethod, SupplierPurchase, AccountingEntry, AppBrandingConfig, Invoice,
-  WalletTopup, IncidentReport, FaqItem
+  WalletTopup, IncidentReport, FaqItem, AuditLogEntry,
+  FranchiseApplication, FranchiseTicket
 } from '../types';
 import { 
   INITIAL_PRODUCTS, INITIAL_PAYMENT_METHODS, INITIAL_CUSTOMERS 
@@ -22,7 +23,10 @@ import {
   syncFaqToFirestore,
   syncExpenseToFirestore,
   syncFranchiseToFirestore,
-  syncPurchaseToFirestore
+  syncPurchaseToFirestore,
+  syncInvoiceToFirestore,
+  syncFranchiseApplicationToFirestore,
+  syncFranchiseTicketToFirestore
 } from '../services/firestoreService';
 
 const syncProductsList = (oldList: Product[], newList: Product[]) => {
@@ -127,6 +131,36 @@ const syncPurchasesList = (oldList: SupplierPurchase[], newList: SupplierPurchas
   });
 };
 
+const syncInvoicesList = (oldList: Invoice[], newList: Invoice[]) => {
+  if (isSyncingFromFirestore) return;
+  newList.forEach(i => {
+    const oldI = oldList.find(prev => prev.id === i.id);
+    if (!oldI || JSON.stringify(oldI) !== JSON.stringify(i)) {
+      syncInvoiceToFirestore(i);
+    }
+  });
+};
+
+const syncFranchiseApplicationsList = (oldList: FranchiseApplication[], newList: FranchiseApplication[]) => {
+  if (isSyncingFromFirestore) return;
+  newList.forEach(a => {
+    const oldA = oldList.find(prev => prev.id === a.id);
+    if (!oldA || JSON.stringify(oldA) !== JSON.stringify(a)) {
+      syncFranchiseApplicationToFirestore(a);
+    }
+  });
+};
+
+const syncFranchiseTicketsList = (oldList: FranchiseTicket[], newList: FranchiseTicket[]) => {
+  if (isSyncingFromFirestore) return;
+  newList.forEach(t => {
+    const oldT = oldList.find(prev => prev.id === t.id);
+    if (!oldT || JSON.stringify(oldT) !== JSON.stringify(t)) {
+      syncFranchiseTicketToFirestore(t);
+    }
+  });
+};
+
 
 
 interface AppState {
@@ -138,6 +172,8 @@ interface AppState {
   accountsPayable: any[];
   purchases: SupplierPurchase[];
   accountingEntries: AccountingEntry[];
+  expenses: ExpenseItem[];
+  franchises: FranchiseTenant[];
   
   // Core Entities
   products: Product[];
@@ -146,14 +182,15 @@ interface AppState {
   activeCustomer: CustomerUser | null;
   walletTopups: WalletTopup[];
   incidents: IncidentReport[];
-  franchises: FranchiseTenant[];
-  expenses: ExpenseItem[];
   paymentMethods: PaymentMethod[];
+  auditLogs: AuditLogEntry[];
   branding: AppBrandingConfig;
   invoices: Invoice[];
   faqItems: FaqItem[];
   bcvRate: number;
   supabaseSchemaError: string | null;
+  franchiseApplications: FranchiseApplication[];
+  franchiseTickets: FranchiseTicket[];
 
   // Global Firestore Connection & Sync State
   firestoreStatus: 'initializing' | 'connected' | 'reconnecting' | 'offline' | 'error';
@@ -184,11 +221,14 @@ interface AppState {
   setFranchises: (franchises: FranchiseTenant[] | ((prev: FranchiseTenant[]) => FranchiseTenant[])) => void;
   setExpenses: (expenses: ExpenseItem[] | ((prev: ExpenseItem[]) => ExpenseItem[])) => void;
   setPaymentMethods: (methods: PaymentMethod[] | ((prev: PaymentMethod[]) => PaymentMethod[])) => void;
+  setAuditLogs: (logs: AuditLogEntry[] | ((prev: AuditLogEntry[]) => AuditLogEntry[])) => void;
   setInvoices: (invoices: Invoice[] | ((prev: Invoice[]) => Invoice[])) => void;
   setFaqItems: (faqItems: FaqItem[] | ((prev: FaqItem[]) => FaqItem[])) => void;
   setBcvRate: (rate: number) => void;
   setPurchases: (purchases: SupplierPurchase[] | ((prev: SupplierPurchase[]) => SupplierPurchase[])) => void;
   setBranding: (branding: AppBrandingConfig | ((prev: AppBrandingConfig) => AppBrandingConfig)) => void;
+  setFranchiseApplications: (apps: FranchiseApplication[] | ((prev: FranchiseApplication[]) => FranchiseApplication[])) => void;
+  setFranchiseTickets: (tickets: FranchiseTicket[] | ((prev: FranchiseTicket[]) => FranchiseTicket[])) => void;
 
   
   // Atomic Action: Register Purchase
@@ -222,6 +262,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   incidents: load<IncidentReport[]>('streamsync_incidents_v2', []),
   franchises: load<FranchiseTenant[]>('streamsync_franchises_v1', []),
   expenses: load<ExpenseItem[]>('gi_expenses_list_2026', []),
+  franchiseApplications: [],
+  franchiseTickets: [],
+  auditLogs: [],
   paymentMethods: (() => {
     const loaded = load<PaymentMethod[]>('streamsync_methods_v2', INITIAL_PAYMENT_METHODS);
     if (!loaded || loaded.length === 0 || loaded.some((m) => m.id === 'pm-pichincha' || m.name?.includes('Pichincha') || m.id === 'pm-zelle')) {
@@ -257,6 +300,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     firestoreLatencyMs, 
     hasCriticalLatency: typeof firestoreLatencyMs === 'number' && firestoreLatencyMs > 3000 
   }),
+  setAuditLogs: (logs) => set((state) => ({ 
+    auditLogs: typeof logs === 'function' ? logs(state.auditLogs) : logs 
+  })),
   branding: load<AppBrandingConfig>('streamsync_branding_v1', {
       projectName: 'Gregory Izquierdo Streaming',
       rif: '',
@@ -393,6 +439,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const invoices = typeof val === 'function' ? (val as any)(state.invoices) : val;
       localStorage.setItem('streamsync_invoices_v1', JSON.stringify(invoices));
+      syncInvoicesList(state.invoices, invoices);
       return { invoices };
     });
   },
@@ -429,6 +476,20 @@ export const useAppStore = create<AppState>((set, get) => ({
         syncBrandingToFirestore(branding);
       }
       return { branding };
+    });
+  },
+  setFranchiseApplications: (val) => {
+    set((state) => {
+      const franchiseApplications = typeof val === 'function' ? (val as any)(state.franchiseApplications) : val;
+      syncFranchiseApplicationsList(state.franchiseApplications, franchiseApplications);
+      return { franchiseApplications };
+    });
+  },
+  setFranchiseTickets: (val) => {
+    set((state) => {
+      const franchiseTickets = typeof val === 'function' ? (val as any)(state.franchiseTickets) : val;
+      syncFranchiseTicketsList(state.franchiseTickets, franchiseTickets);
+      return { franchiseTickets };
     });
   },
 
@@ -493,3 +554,5 @@ export const useLastSyncTimestamp = () => useAppStore((state) => state.lastSyncT
 export const useConnectionError = () => useAppStore((state) => state.connectionError);
 export const useFirestoreLatencyMs = () => useAppStore((state) => state.firestoreLatencyMs);
 export const useHasCriticalLatency = () => useAppStore((state) => state.hasCriticalLatency);
+export const useFranchiseApplications = () => useAppStore((state) => state.franchiseApplications);
+export const useFranchiseTickets = () => useAppStore((state) => state.franchiseTickets);

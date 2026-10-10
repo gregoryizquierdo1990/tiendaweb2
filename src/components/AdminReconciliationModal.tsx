@@ -61,8 +61,13 @@ import { AdminRefundManager } from './AdminRefundManager';
 import { AdminTelegramBotManager } from './AdminTelegramBotManager';
 import { AdminBillingAndContractsManager } from './AdminBillingAndContractsManager';
 import { AdminExpensesManager } from './AdminExpensesManager';
-import { AdminIntegrationsCatalogModal } from './AdminIntegrationsCatalogModal';
+import { FranchiseSummaryChart } from './FranchiseSummaryChart';
+import { AdminFranchiseApplicationManager } from './AdminFranchiseApplicationManager';
+import { AdminFranchiseTicketManager } from './AdminFranchiseTicketManager';
+
 import { MarketingModule } from './MarketingModule';
+import { AdminSystemsManager } from './AdminSystemsManager';
+import { AdminSecuritySuite } from './AdminSecuritySuite';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminCategoryManager } from './AdminCategoryManager';
 import { INITIAL_PAYMENT_METHODS } from '../data/defaultCatalog';
@@ -86,6 +91,7 @@ import {
   PLATFORM_ACTION_DEFINITIONS,
   DEFAULT_ACTION_MAPPING
 } from '../utils/messageTemplates';
+import { ACTIVE_SYSTEM_ROUTES } from '../config/routesDirectory';
 import {
   downloadGoogleSheetsTemplate,
   downloadOrdersCsvTemplate
@@ -111,7 +117,10 @@ import {
   FranchiseTopupReport,
   SupplierPurchase,
   AppBrandingConfig,
-  ExpenseItem
+  ExpenseItem,
+  Invoice,
+  FranchiseApplication,
+  FranchiseTicket
 } from '../types';
 import {
   formatCurrency,
@@ -439,6 +448,12 @@ interface AdminReconciliationModalProps {
   supabaseSchemaError?: string | null;
   onOpenSheetsModal?: () => void;
   isCloudSyncing?: boolean;
+  invoices?: Invoice[];
+  onLogout?: () => void;
+  franchiseApplications?: FranchiseApplication[];
+  franchiseTickets?: FranchiseTicket[];
+  onUpdateFranchiseApplication?: (app: FranchiseApplication) => void;
+  onUpdateFranchiseTicket?: (ticket: FranchiseTicket) => void;
 }
 
 export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> = ({
@@ -517,7 +532,13 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
   onUpdateExpense = () => {},
   onDeleteExpense = () => {},
   onAddPaymentMethod,
-  onDeletePaymentMethod
+  onDeletePaymentMethod,
+  invoices = [],
+  onLogout,
+  franchiseApplications = [],
+  franchiseTickets = [],
+  onUpdateFranchiseApplication,
+  onUpdateFranchiseTicket
 }) => {
   const [activeTab, setActiveTab] = useState<
     | 'reconciliation'
@@ -547,7 +568,12 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
     | 'expenses'
     | 'integrations'
     | 'marketing'
+    | 'sistemas'
+    | 'seguridad_suite'
     | 'footer_config'
+    | 'franchise_kit'
+    | 'franchise_applications'
+    | 'franchise_tickets'
   >('reconciliation');
 
   // Global Firestore Monitoring & Latency States
@@ -1200,15 +1226,6 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
               <span className="hidden sm:inline">Descargar .ZIP</span>
             </a>
 
-            <button
-              type="button"
-              onClick={() => setIsHandoverModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 font-bold text-xs shadow-xs transition cursor-pointer"
-              title="Ver Kit de Venta, Franquicia y Requisitos para el Comprador"
-            >
-              <Building className="w-4 h-4 text-purple-300" />
-              <span className="hidden sm:inline">Kit Venta Franquicia</span>
-            </button>
 
             <button
               type="button"
@@ -1217,7 +1234,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
               title="Volver a la tienda pública"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Volver a la Tienda</span>
+              <span>Ir a la Tienda Web</span>
             </button>
           </div>
         </div>
@@ -1227,6 +1244,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
           <AdminSidebar
             activeTab={activeTab}
             onTabChange={(id) => setActiveTab(id as any)}
+            onLogout={onLogout}
             badges={{
               orders: pendingOrdersCount,
               topups: pendingTopupsCount,
@@ -1234,6 +1252,8 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
               credits: orders.filter((o) => o.paymentCondition === 'credito' && o.creditStatus !== 'paid').length,
               installments: orders.filter((o) => o.paymentCondition === 'cuotas' || Boolean(o.installmentPlan)).length,
               franchises: franchiseTopups.filter((r) => r.status === 'pending').length,
+              franchise_apps: (franchiseApplications || []).filter((a) => a.status === 'pending').length,
+              franchise_tickets: (franchiseTickets || []).filter((t) => t.status === 'open' || t.status === 'in_progress').length,
               sheets: sheetsState.isConnected
             }}
           />
@@ -1683,6 +1703,10 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
               onUpdateCredentials={onUpdateSupplierCredentials || (() => {})}
               orders={orders}
               customers={customerUsers}
+              walletTopups={walletTopups}
+              expenses={expenses}
+              branding={branding}
+              products={products}
             />
           </div>
         )}
@@ -2366,6 +2390,7 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
               onRenewOrder={(orderId, dur, newExp) => {
                 if (onRenewOrder) onRenewOrder(orderId, dur, newExp);
               }}
+              invoices={invoices}
             />
           </div>
         )}
@@ -3040,6 +3065,87 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
                     Inician sesión con su correo y clave creados en "Clientes &amp; Vendedores". Ven precios mayoristas y gestionan sus comisiones automáticamente.
                   </span>
                 </div>
+              </div>
+            </div>
+
+            {/* NUEVA SECCIÓN: MAPA DE TODAS LAS RUTAS ACTIVAS DEL DOMINIO OFICIAL */}
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+                    <Globe className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-slate-900 text-sm">
+                      Directorio de Rutas Activas en {DOMAIN_OFFICIAL.replace('https://', '')}
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      Rutas oficiales del sistema, para qué sirve cada una y enlaces directos de acceso:
+                    </p>
+                  </div>
+                </div>
+
+                <a
+                  href="/rutas"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 transition shrink-0"
+                >
+                  <span>Abrir Portal de Rutas /rutas</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                {ACTIVE_SYSTEM_ROUTES.map((route, idx) => {
+                  return (
+                    <div
+                      key={idx}
+                      className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-indigo-300 transition space-y-2"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold text-indigo-700 text-xs bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200">
+                            {DOMAIN_OFFICIAL.replace('https://', '')}{route.path}
+                          </span>
+                          <span className="text-xs font-bold text-slate-900">
+                            = {route.name}
+                          </span>
+                          <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                            {route.accessRole}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(route.fullUrl);
+                              setCopiedUrl(`route-${route.path}`);
+                              setTimeout(() => setCopiedUrl(null), 2000);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-slate-900 text-[11px] font-bold cursor-pointer transition shadow-2xs flex items-center gap-1"
+                          >
+                            <span>{copiedUrl === `route-${route.path}` ? '✓ Copiado' : 'Copiar URL'}</span>
+                          </button>
+                          <a
+                            href={route.path.includes(':') ? '/invoice/FACT-DEMO-01' : route.path}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 rounded-lg bg-white border border-slate-200 text-indigo-600 hover:bg-indigo-50 transition"
+                            title="Probar ruta"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        🎯 <strong>Función:</strong> {route.purpose} — {route.description}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -5822,6 +5928,35 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
           </div>
         )}
 
+        {/* Tab: Centro de Sistemas & DevOps (5 Módulos Críticos) */}
+        {activeTab === 'sistemas' && (
+          <div className="overflow-y-auto">
+            <AdminSystemsManager
+              bcvRate={bcvRate}
+              onUpdateBcvRate={onUpdateBcvRate}
+              orders={orders}
+              products={products}
+              customers={customerUsers}
+              franchises={franchises}
+              expenses={expenses}
+              onShowNotification={(type, msg) => {
+                console.log(`[${type.toUpperCase()}] ${msg}`);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Tab: Centro de Blindaje & Ciberseguridad (10 Módulos de Defensa) */}
+        {activeTab === 'seguridad_suite' && (
+          <div className="overflow-y-auto">
+            <AdminSecuritySuite
+              onShowNotification={(type, msg) => {
+                console.log(`[${type.toUpperCase()}] ${msg}`);
+              }}
+            />
+          </div>
+        )}
+
         {/* Tab FAQ: Preguntas Frecuentes & Google Sheets Sync */}
         {activeTab === 'faq' && (
           <div className="p-6 overflow-y-auto space-y-6">
@@ -6134,272 +6269,127 @@ export const AdminReconciliationModal: React.FC<AdminReconciliationModalProps> =
         )}
 
 
-        {/* Tab: Catálogo de Integraciones */}
-        {activeTab === 'integrations' && (
-          <div className="overflow-y-auto p-6">
-            <AdminIntegrationsCatalogModal
-              isOpen={true}
-              onClose={() => setActiveTab('finance')}
-              sheetsConnected={sheetsState.isConnected}
-              onOpenSheetsSetup={onOpenSheetsModal}
-              googleUser={user}
-              customers={customerUsers}
-              onImportCustomers={async (newCustomers) => {
-                for (const c of newCustomers) {
-                  try {
-                    await onAddUserFromAdmin({
-                      name: c.name,
-                      phone: c.phone,
-                      email: c.email,
-                      role: 'cliente',
-                      isSuspended: false,
-                      notes: 'Importado de Google Contacts'
-                    });
-                  } catch (e) {
-                    console.error('Error importing contact:', e);
-                  }
-                }
-              }}
+
+
+        {/* Tab: Módulo de Marketing Pro */}
+        {/* Tab: Mis Franquicias */}
+        {activeTab === 'franchises' && (
+          <div className="p-6 overflow-y-auto space-y-6">
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                    <Building className="w-5 h-5 text-indigo-600" />
+                    <span>Gestión de Franquicias Activas</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">Monitorea y gestiona tus socios comerciales y redes de reventa.</p>
+                </div>
+              </div>
+
+              {/* Statistics Section */}
+              <FranchiseSummaryChart 
+                franchises={franchises} 
+                topups={franchiseTopups} 
+              />
+
+              <div className="p-12 text-center space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                <Users className="w-12 h-12 text-slate-300 mx-auto" />
+                <h4 className="text-slate-900 font-bold">Módulo de Franquicias en Red</h4>
+                <p className="text-slate-500 text-xs max-w-md mx-auto">
+                  Aquí aparecerá la lista de tus franquiciados, sus consumos de saldo y el estado de sus suscripciones mensuales.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab: Kit Venta de Franquicia */}
+        {activeTab === 'franchise_kit' && (
+          <div className="p-0 overflow-y-auto h-full bg-white">
+            <AdminHandoverGuideModal 
+              isInline={true} 
+              onClose={() => setActiveTab('reconciliation')} 
+              bcvRate={bcvRate} 
             />
           </div>
         )}
 
-        {/* Tab: Módulo de Marketing Pro */}
         {activeTab === 'marketing' && (
           <div className="overflow-y-auto">
             <MarketingModule
               customers={customerUsers}
+              orders={orders}
+              products={products}
+              bcvRate={bcvRate}
+              franchises={franchises}
+              branding={branding}
               onShowNotification={(type, msg) => {
                 console.log(`[${type.toUpperCase()}] ${msg}`);
               }}
             />
           </div>
         )}
+        {activeTab === 'franchise_applications' && (
+          <div className="p-6 overflow-y-auto">
+            <AdminFranchiseApplicationManager
+              applications={franchiseApplications}
+              onApprove={(app) => {
+                if (onAddFranchise) {
+                  const newFranchise: FranchiseTenant = {
+                    id: `franq-${Date.now()}`,
+                    businessName: app.businessName,
+                    ownerName: app.ownerName,
+                    email: app.email,
+                    phone: app.phone,
+                    telegramUser: app.telegramUser,
+                    status: 'active',
+                    subscriptionStatus: 'pendiente',
+                    monthlyFeeUsd: 25,
+                    availableMasterBalanceUsd: 0,
+                    walletCustomName: 'Mi Wallet',
+                    createdAt: new Date().toISOString(),
+                    enabledModules: {
+                      calendar: true,
+                      credits: false,
+                      reminders: true,
+                      botAutomation: false,
+                      supplierPurchases: false,
+                      customDomain: false,
+                      branding: true,
+                      installments: false,
+                      resellers: false
+                    }
+                  };
+                  onAddFranchise(newFranchise);
+                  if (onUpdateFranchiseApplication) {
+                    onUpdateFranchiseApplication({ ...app, status: 'approved', reviewedAt: new Date().toISOString() });
+                  }
+                }
+              }}
+              onReject={(appId, reason) => {
+                const app = franchiseApplications.find(a => a.id === appId);
+                if (app && onUpdateFranchiseApplication) {
+                  onUpdateFranchiseApplication({ 
+                    ...app, 
+                    status: 'rejected', 
+                    rejectionReason: reason,
+                    reviewedAt: new Date().toISOString() 
+                  });
+                }
+              }}
+            />
+          </div>
+        )}
 
-        {/* Tab: Personalización del Pie de Página (Footer) */}
-        {activeTab === 'footer_config' && (() => {
-          const safeBranding: AppBrandingConfig = branding || {
-            projectName: 'Gregory Izquierdo Streaming',
-            primaryColor: '#6366f1',
-            secondaryColor: '#8b5cf6',
-            fontFamily: 'Plus Jakarta Sans'
-          };
-          return (
-            <div className="p-6 overflow-y-auto space-y-6 text-xs text-slate-700">
-              <div className="p-6 rounded-3xl bg-gradient-to-r from-pink-950 via-slate-900 to-indigo-950 text-white shadow-xl border border-pink-500/20 space-y-2">
-                <h3 className="text-xl font-black tracking-tight flex items-center gap-2">
-                  <Palette className="w-5 h-5 text-pink-400" />
-                  <span>Personalización del Pie de Página (Footer)</span>
-                </h3>
-                <p className="text-slate-300 max-w-2xl leading-relaxed">
-                  Controla en tiempo real todos los textos, plataformas, métodos de pago, garantías y enlaces de soporte mostrados en la parte inferior de tu tienda. Los cambios se guardan localmente de inmediato.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Formulario Principal de Configuración */}
-                <div className="space-y-4 bg-white p-5 rounded-3xl border border-slate-200">
-                  <h4 className="font-extrabold text-slate-900 text-sm border-b pb-2 mb-3">Información General del Footer</h4>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Descripción del Pie de Página</label>
-                      <textarea
-                        rows={3}
-                        value={safeBranding.footerDescription || ''}
-                        onChange={(e) => {
-                          if (onSaveBranding) {
-                            onSaveBranding({
-                              ...safeBranding,
-                              footerDescription: e.target.value
-                            });
-                          }
-                        }}
-                        className="w-full px-3 py-2 rounded-xl border bg-slate-50 text-xs text-slate-800 focus:outline-hidden"
-                        placeholder="Explica brevemente la misión o servicios de tu tienda..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Texto de Garantía Resaltado</label>
-                      <input
-                        type="text"
-                        value={safeBranding.footerGuaranteeText || ''}
-                        onChange={(e) => {
-                          if (onSaveBranding) {
-                            onSaveBranding({
-                              ...safeBranding,
-                              footerGuaranteeText: e.target.value
-                            });
-                          }
-                        }}
-                        className="w-full px-3 py-2 rounded-xl border bg-slate-50 text-xs text-slate-800 focus:outline-hidden"
-                        placeholder="ej. Garantía 100% de duración"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Enlace de Soporte por WhatsApp (URL Oficial)</label>
-                      <input
-                        type="text"
-                        value={safeBranding.footerWhatsAppUrl || ''}
-                        onChange={(e) => {
-                          if (onSaveBranding) {
-                            onSaveBranding({
-                              ...safeBranding,
-                              footerWhatsAppUrl: e.target.value
-                            });
-                          }
-                        }}
-                        className="w-full px-3 py-2 rounded-xl border bg-slate-50 text-xs text-slate-800 focus:outline-hidden"
-                        placeholder="https://wa.me/58..."
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Columnas del Footer (Plataformas y Métodos de Pago) */}
-                <div className="space-y-6">
-                  {/* Columna: Plataformas */}
-                  <div className="bg-white p-5 rounded-3xl border border-slate-200 space-y-3">
-                    <div className="flex items-center justify-between border-b pb-2">
-                      <h4 className="font-extrabold text-slate-900 text-sm">Columna: Plataformas</h4>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const current = safeBranding.footerPlatforms || [];
-                          const value = prompt('Ingresa el nombre de la nueva plataforma:');
-                          if (value && value.trim() && onSaveBranding) {
-                            onSaveBranding({
-                              ...safeBranding,
-                              footerPlatforms: [...current, value.trim()]
-                            });
-                          }
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-[10px] font-bold cursor-pointer transition-colors"
-                      >
-                        + Agregar Plataforma
-                      </button>
-                    </div>
-
-                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                      {(safeBranding.footerPlatforms || []).map((p, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
-                          <span className="font-semibold text-slate-800 text-[11px]">{p}</span>
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const value = prompt('Editar plataforma:', p);
-                                if (value && value.trim() && onSaveBranding) {
-                                  const current = [...(safeBranding.footerPlatforms || [])];
-                                  current[idx] = value.trim();
-                                  onSaveBranding({
-                                    ...safeBranding,
-                                    footerPlatforms: current
-                                  });
-                                }
-                              }}
-                              className="text-indigo-600 hover:text-indigo-800 font-bold text-[10px] cursor-pointer"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (onSaveBranding) {
-                                  const current = (safeBranding.footerPlatforms || []).filter((_, i) => i !== idx);
-                                  onSaveBranding({
-                                    ...safeBranding,
-                                    footerPlatforms: current
-                                  });
-                                }
-                              }}
-                              className="text-rose-500 hover:text-rose-700 font-bold text-[10px] cursor-pointer"
-                            >
-                              Eliminar
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      {(safeBranding.footerPlatforms || []).length === 0 && (
-                        <p className="text-slate-400 text-center py-4">No hay plataformas registradas en el footer.</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Columna: Pasarela de Pago Manual */}
-                  <div className="bg-white p-5 rounded-3xl border border-slate-200 space-y-3">
-                    <div className="flex items-center justify-between border-b pb-2">
-                      <h4 className="font-extrabold text-slate-900 text-sm">Columna: Métodos de Pago</h4>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const current = safeBranding.footerPaymentMethods || [];
-                          const value = prompt('Ingresa el nombre del nuevo método de pago:');
-                          if (value && value.trim() && onSaveBranding) {
-                            onSaveBranding({
-                              ...safeBranding,
-                              footerPaymentMethods: [...current, value.trim()]
-                            });
-                          }
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-[10px] font-bold cursor-pointer transition-colors"
-                      >
-                        + Agregar Método
-                      </button>
-                    </div>
-
-                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                      {(safeBranding.footerPaymentMethods || []).map((pm, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
-                          <span className="font-semibold text-slate-800 text-[11px]">{pm}</span>
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const value = prompt('Editar método de pago:', pm);
-                                if (value && value.trim() && onSaveBranding) {
-                                  const current = [...(safeBranding.footerPaymentMethods || [])];
-                                  current[idx] = value.trim();
-                                  onSaveBranding({
-                                    ...safeBranding,
-                                    footerPaymentMethods: current
-                                  });
-                                }
-                              }}
-                              className="text-indigo-600 hover:text-indigo-800 font-bold text-[10px] cursor-pointer"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (onSaveBranding) {
-                                  const current = (safeBranding.footerPaymentMethods || []).filter((_, i) => i !== idx);
-                                  onSaveBranding({
-                                    ...safeBranding,
-                                    footerPaymentMethods: current
-                                  });
-                                }
-                              }}
-                              className="text-rose-500 hover:text-rose-700 font-bold text-[10px] cursor-pointer"
-                            >
-                              Eliminar
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      {(safeBranding.footerPaymentMethods || []).length === 0 && (
-                        <p className="text-slate-400 text-center py-4">No hay métodos de pago registrados en el footer.</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+        {activeTab === 'franchise_tickets' && (
+          <div className="p-6 overflow-y-auto">
+            <AdminFranchiseTicketManager
+              tickets={franchiseTickets}
+              onUpdateTicket={onUpdateFranchiseTicket || (() => {})}
+              adminName={user?.displayName || 'Administrador'}
+            />
+          </div>
+        )}
 
 
         {/* Gift Modal Dialog */}

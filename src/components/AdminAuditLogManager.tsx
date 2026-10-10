@@ -5,7 +5,6 @@ import {
   AuditActorRole
 } from '../types';
 import {
-  getAuditLogs,
   subscribeAuditLogs,
   logAuditEvent,
   clearAuditLogs,
@@ -13,6 +12,7 @@ import {
   detectClientIp,
   getDeviceInfo
 } from '../services/auditLogger';
+import { useAppStore } from '../store/useAppStore';
 import {
   ShieldAlert,
   Search,
@@ -45,7 +45,7 @@ interface AdminAuditLogManagerProps {
 }
 
 export const AdminAuditLogManager: React.FC<AdminAuditLogManagerProps> = () => {
-  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const auditLogs = useAppStore((state) => state.auditLogs);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('ALL');
   const [selectedRole, setSelectedRole] = useState<string>('ALL');
@@ -55,18 +55,10 @@ export const AdminAuditLogManager: React.FC<AdminAuditLogManagerProps> = () => {
   const [isSimulating, setIsSimulating] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'info'; message: string } | null>(null);
 
-  // Load logs and subscribe to real-time events
+  // Detect local environment info on mount
   useEffect(() => {
-    setLogs(getAuditLogs());
-    const unsubscribe = subscribeAuditLogs((updatedLogs) => {
-      setLogs(updatedLogs);
-    });
-
-    // Detect client IP
     detectClientIp().then((ip) => setCurrentIp(ip));
     setCurrentDevice(getDeviceInfo());
-
-    return () => unsubscribe();
   }, []);
 
   const showToast = (type: 'success' | 'info', message: string) => {
@@ -76,7 +68,7 @@ export const AdminAuditLogManager: React.FC<AdminAuditLogManagerProps> = () => {
 
   // Filtered logs
   const filteredLogs = useMemo(() => {
-    return logs.filter((log) => {
+    return auditLogs.filter((log) => {
       const matchesSearch =
         searchTerm.trim() === '' ||
         log.actor.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -92,14 +84,14 @@ export const AdminAuditLogManager: React.FC<AdminAuditLogManagerProps> = () => {
 
       return matchesSearch && matchesSeverity && matchesRole;
     });
-  }, [logs, searchTerm, selectedSeverity, selectedRole]);
+  }, [auditLogs, searchTerm, selectedSeverity, selectedRole]);
 
   // Metric counts
-  const totalLogs = logs.length;
-  const errorLogsCount = logs.filter((l) => l.severity === 'error').length;
-  const warningLogsCount = logs.filter((l) => l.severity === 'warning').length;
-  const successLogsCount = logs.filter((l) => l.severity === 'success').length;
-  const uniqueIpsCount = new Set(logs.map((l) => l.ipAddress)).size;
+  const totalLogs = auditLogs.length;
+  const errorLogsCount = auditLogs.filter((l) => l.severity === 'error').length;
+  const warningLogsCount = auditLogs.filter((l) => l.severity === 'warning').length;
+  const successLogsCount = auditLogs.filter((l) => l.severity === 'success').length;
+  const uniqueIpsCount = new Set(auditLogs.map((l) => l.ipAddress)).size;
 
   // Simulate a new test event with current IP
   const handleSimulateTestLog = async (role: AuditActorRole, severity: AuditLogSeverity) => {
@@ -288,8 +280,7 @@ export const AdminAuditLogManager: React.FC<AdminAuditLogManagerProps> = () => {
             <button
               type="button"
               onClick={() => {
-                setLogs(getAuditLogs());
-                showToast('info', 'Registros actualizados');
+                showToast('info', 'Registros sincronizados con la nube');
               }}
               className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
             >

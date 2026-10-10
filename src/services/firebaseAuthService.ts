@@ -45,7 +45,9 @@ export function isMasterCodeValid(code: string): boolean {
 /**
  * Maps an AppUserDoc and FirebaseUser to a CustomerUser entity for app-wide compatibility.
  */
-export function mapUserDocToCustomer(userDoc: AppUserDoc): CustomerUser {
+export function mapUserDocToCustomer(userDoc: AppUserDoc, existingBalance?: { zenyBalance?: number; grpayBalance?: number }): CustomerUser {
+  const zBal = existingBalance?.zenyBalance !== undefined ? existingBalance.zenyBalance : 0;
+  const gBal = existingBalance?.grpayBalance !== undefined ? existingBalance.grpayBalance : zBal;
   return {
     id: userDoc.uid,
     internalId: `CLI-2026-${userDoc.uid.slice(0, 5).toUpperCase()}`,
@@ -53,7 +55,8 @@ export function mapUserDocToCustomer(userDoc: AppUserDoc): CustomerUser {
     email: userDoc.email,
     phone: userDoc.phone || '',
     role: userDoc.role === 'admin' ? 'administrador' : userDoc.role,
-    zenyBalance: 0,
+    zenyBalance: zBal,
+    grpayBalance: gBal,
     createdAt: userDoc.createdAt
   };
 }
@@ -148,7 +151,12 @@ export async function loginWithGooglePopup(): Promise<CustomerUser> {
     userDoc = userSnap.data() as AppUserDoc;
   }
 
-  return mapUserDocToCustomer(userDoc);
+  // Also fetch customer doc to get balance if it exists
+  const custRef = doc(db, 'customers', fbUser.uid);
+  const custSnap = await getDoc(custRef);
+  const existingBal = custSnap.exists() ? (custSnap.data() as CustomerUser) : undefined;
+
+  return mapUserDocToCustomer(userDoc, existingBal);
 }
 
 /**
@@ -180,7 +188,12 @@ export async function loginWithEmailPassword(email: string, password: string): P
     userDoc = userSnap.data() as AppUserDoc;
   }
 
-  return mapUserDocToCustomer(userDoc);
+  // Also fetch customer doc to get balance if it exists
+  const custRef = doc(db, 'customers', fbUser.uid);
+  const custSnap = await getDoc(custRef);
+  const existingBal = custSnap.exists() ? (custSnap.data() as CustomerUser) : undefined;
+
+  return mapUserDocToCustomer(userDoc, existingBal);
 }
 
 /**

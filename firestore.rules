@@ -100,5 +100,17 @@ service cloud.firestore {
     match /admins/{adminId} {
       allow read, write: if true;
     }
+
+    // --- Franchise Applications (Public Form) ---
+    match /franchise_applications/{applicationId} {
+      allow read: if isAdmin();
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // --- Franchise Tickets (Support) ---
+    match /franchise_tickets/{ticketId} {
+      allow read, write: if true; // Keeping it simple for now as per project style
+    }
   }
 }

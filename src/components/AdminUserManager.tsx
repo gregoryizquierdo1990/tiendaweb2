@@ -138,7 +138,7 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
   } | null>(null);
 
   // Sub-franchises across franchises
-  const allSubFranchises = franchises.flatMap((f) =>
+  const allSubFranchises = franchises.flatMap((f: FranchiseTenant) =>
     (f.subFranchises || []).map((sub: any) => ({
       ...sub,
       parentFranchiseId: f.id,
@@ -314,8 +314,21 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
         return c;
       });
       setStoreCustomers(updated);
+
+      logAuditEvent({
+        actor: 'Administrador',
+        actorRole: 'admin',
+        action: 'MODIFICAR_CLIENTE',
+        description: `Modificó datos de ${editingFicha.roleType} "${editingFicha.name}" (${editingFicha.email}).`,
+        severity: 'info',
+        metadata: { 
+          targetId: editingFicha.id, 
+          role: editingFicha.role, 
+          balance: editingFicha.grpayBalance 
+        }
+      });
     } else if (editingFicha.roleType === 'franchise') {
-      const updated = franchises.map((f) => {
+      const updated = franchises.map((f: FranchiseTenant) => {
         if (f.id === editingFicha.id) {
           return {
             ...f,
@@ -332,7 +345,7 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
       });
       setStoreFranchises(updated);
     } else if (editingFicha.roleType === 'subfranchise') {
-      const updated = franchises.map((f) => {
+      const updated = franchises.map((f: FranchiseTenant) => {
         const subList = (f.subFranchises || []).map((sub: any) => {
           if (sub.id === editingFicha.id) {
             return {
@@ -529,12 +542,12 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {franchises
               .filter(
-                (f) =>
+                (f: FranchiseTenant) =>
                   f.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                   f.ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                   f.email.toLowerCase().includes(searchTerm.toLowerCase())
               )
-              .map((fran) => (
+              .map((fran: FranchiseTenant) => (
                 <div key={fran.id} className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
                   <div className="flex items-center justify-between">
                     <strong className="text-white text-xs font-extrabold">{fran.businessName}</strong>
@@ -602,7 +615,7 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {allSubFranchises
               .filter(
-                (sub) =>
+                (sub: any) =>
                   sub.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                   sub.ownerName.toLowerCase().includes(searchTerm.toLowerCase())
               )

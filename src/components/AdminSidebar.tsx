@@ -3,9 +3,9 @@ import {
   Receipt, Package, RotateCcw, BarChart3, CreditCard, Wallet,
   Clock, Tv, Users, HeartHandshake, Layers, CalendarDays, Bell, Building, AlertTriangle,
   Palette, Bot, FileText, TrendingUp, TrendingDown, BookOpen,
-  ClipboardList, ShieldCheck,
-  FileSpreadsheet, Globe, HelpCircle, Megaphone,
-  ChevronDown, ChevronRight, Search
+  ClipboardList, ShieldCheck, ShieldAlert,
+  FileSpreadsheet, Globe, HelpCircle, Megaphone, Server,
+  ChevronDown, ChevronRight, Search, LogOut
 } from 'lucide-react';
 import { useToggleGeminiPanel } from '../store/useAppStore';
 
@@ -58,20 +58,30 @@ export const MENU_STRUCTURE: MenuCategoryDef[] = [
       { id: 'telegram_bot', label: 'Bot de Telegram', icon: Bot, color: 'text-sky-400' },
       { id: 'templates', label: 'Plantillas de Mensajes', icon: FileText, color: 'text-indigo-400' },
       { id: 'bcv', label: 'Tasa BCV', icon: TrendingUp, color: 'text-amber-400' },
-      { id: 'footer_config', label: 'Pie de Página (Footer)', icon: Palette, color: 'text-pink-400' },
+    ]
+  },
+  {
+    category: 'Franquiciados',
+    description: 'Gestión de franquicias y kit de venta comercial',
+    items: [
+      { id: 'franchises', label: 'Mis Franquicias', icon: Building, color: 'text-indigo-400' },
+      { id: 'franchise_applications', label: 'Solicitudes Nuevas', icon: ClipboardList, badgeKey: 'franchise_apps', color: 'text-amber-400' },
+      { id: 'franchise_tickets', label: 'Soporte Franquiciados', icon: HeartHandshake, badgeKey: 'franchise_tickets', color: 'text-rose-400' },
+      { id: 'franchise_kit', label: 'Kit Venta de Franquicia', icon: Layers, color: 'text-sky-400' },
     ]
   },
   {
     category: 'Marketing',
-    description: 'Campañas, redes sociales y comunidades',
+    description: 'Campañas, referidos, fidelización y conversión',
     items: [
-      { id: 'marketing', label: 'Módulo de Marketing Pro', icon: Megaphone, color: 'text-indigo-400' }
+      { id: 'marketing', label: 'Marketing Pro & Conversión (10 Módulos)', icon: Megaphone, color: 'text-indigo-400' }
     ]
   },
   {
     category: 'Seguridad',
     description: 'Auditoría, bitácora y usuarios',
     items: [
+      { id: 'seguridad_suite', label: 'Blindaje & Ciberseguridad (10 Módulos)', icon: ShieldAlert, color: 'text-rose-500' },
       { id: 'bitacora', label: 'Bitácora de Auditoría', icon: ClipboardList, color: 'text-rose-400' },
       { id: 'users', label: 'Usuarios Administradores', icon: ShieldCheck, color: 'text-purple-400' },
     ]
@@ -80,8 +90,8 @@ export const MENU_STRUCTURE: MenuCategoryDef[] = [
     category: 'Sistemas',
     description: 'Bases de datos, nube, integraciones y dominio',
     items: [
-      { id: 'integrations', label: 'Catálogo de Integraciones', icon: Layers, color: 'text-purple-400' },
-      { id: 'domain', label: 'Dominio Oficial', icon: Globe, color: 'text-emerald-400' },
+      { id: 'domain', label: 'Dominio Oficial & Rutas', icon: Globe, color: 'text-emerald-400' },
+      { id: 'sistemas', label: 'Centro de Sistemas & DevOps (10 Módulos)', icon: Server, color: 'text-cyan-400' },
       { id: 'faq', label: 'Preguntas Frecuentes', icon: HelpCircle, color: 'text-slate-400' },
     ]
   }
@@ -90,15 +100,17 @@ export const MENU_STRUCTURE: MenuCategoryDef[] = [
 interface AdminSidebarProps {
   activeTab: string;
   onTabChange: (id: string) => void;
+  onLogout?: () => void;
   badges?: Record<string, number | boolean>;
 }
 
-export const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, onTabChange, badges = {} }) => {
+export const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, onTabChange, onLogout, badges = {} }) => {
   const toggleGemini = useToggleGeminiPanel();
   const [expandedCategories, setExpandedCategories] = useState<string[]>([
     'Finanzas',
     'Gestión',
     'Configuración',
+    'Franquiciados',
     'Marketing',
     'Seguridad',
     'Sistemas'
@@ -237,6 +249,19 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, onTabChan
           );
         })}
       </div>
+
+      {/* Logout Action */}
+      {onLogout && (
+        <div className="px-3 py-3 border-t border-slate-800/60 bg-slate-900/20">
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-400 hover:text-white hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-500/50 transition-all cursor-pointer shadow-sm"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Cerrar Sesión Admin</span>
+          </button>
+        </div>
+      )}
 
       {/* Footer Branding */}
       <div className="p-3 border-t border-slate-800/80 bg-slate-950/80 text-[11px] text-slate-500 flex items-center justify-between">

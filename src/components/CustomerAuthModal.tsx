@@ -6,6 +6,7 @@ import {
   loginWithEmailPassword, 
   loginWithGooglePopup 
 } from '../services/firebaseAuthService';
+import { logAuditEvent } from '../services/auditLogger';
 
 interface CustomerAuthModalProps {
   onClose: () => void;
@@ -33,6 +34,18 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setIsGoogleLoading(true);
     try {
       const user = await loginWithGooglePopup();
+      
+      logAuditEvent({
+        actor: user.name,
+        actorRole: 'customer',
+        actorEmail: user.email,
+        actorPhone: user.phone,
+        action: 'LOGIN_GOOGLE',
+        description: `Inicio de sesión exitoso con Google.`,
+        severity: 'success',
+        metadata: { method: 'google_popup' }
+      });
+
       onLoginSuccess(user);
       onClose();
     } catch (err: any) {
@@ -79,6 +92,18 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
           name.trim(),
           phone.trim()
         );
+
+        logAuditEvent({
+          actor: registeredUser.name,
+          actorRole: 'customer',
+          actorEmail: registeredUser.email,
+          actorPhone: registeredUser.phone,
+          action: 'REGISTRO_NUEVO',
+          description: `Nueva cuenta de cliente registrada exitosamente.`,
+          severity: 'success',
+          metadata: { name, email, phone }
+        });
+
         onLoginSuccess(registeredUser);
         onClose();
       } catch (err: any) {
@@ -112,6 +137,17 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
           : `${(cleanEmail || '').replace(/\D/g, '')}@cliente.gregoryizquierdo.xyz`;
 
         const loggedUser = await loginWithEmailPassword(emailToLogin, password);
+
+        logAuditEvent({
+          actor: loggedUser.name,
+          actorRole: 'customer',
+          actorEmail: loggedUser.email,
+          actorPhone: loggedUser.phone,
+          action: 'LOGIN_EMAIL',
+          description: `Inicio de sesión exitoso con correo electrónico.`,
+          severity: 'success'
+        });
+
         onLoginSuccess(loggedUser);
         onClose();
       } catch (err: any) {

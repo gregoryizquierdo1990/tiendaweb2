@@ -74,6 +74,7 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
   const [formIsStockManual, setFormIsStockManual] = useState<boolean>(false);
   const [formManualStock, setFormManualStock] = useState<number>(10);
   const [formColor, setFormColor] = useState('#4f46e5');
+  const [formCostPrice, setFormCostPrice] = useState<number>(0);
   const [formFeatures, setFormFeatures] = useState<string[]>([]);
   const [featureInput, setFeatureInput] = useState('');
   
@@ -102,6 +103,7 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
     setFormBadgeText(prod.badgeText || '');
     setFormScreens(prod.screens || 1);
     setFormWarrantyMonths(prod.warrantyMonths || 1);
+    setFormCostPrice(prod.costPriceUsd || 0);
     setFormInStock(prod.inStock);
     setFormPopular(Boolean(prod.popular));
     setFormIsStockManual(Boolean(prod.isStockManual));
@@ -129,6 +131,7 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
     setFormBadgeText('');
     setFormScreens(1);
     setFormWarrantyMonths(1);
+    setFormCostPrice(0);
     setFormInStock(true);
     setFormPopular(false);
     setFormIsStockManual(false);
@@ -166,6 +169,7 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
       accountType: formAccountType,
       screens: formScreens,
       warrantyMonths: formWarrantyMonths,
+      costPriceUsd: formCostPrice,
       inStock: formInStock,
       popular: formPopular,
       isStockManual: formIsStockManual,
@@ -482,6 +486,23 @@ export const AdminProductManager: React.FC<AdminProductManagerProps> = ({
                   placeholder="Ej. Calidad Ultra HD 4K + HDR con entrega inmediata"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs"
                 />
+              </div>
+
+              {/* Cost Price */}
+              <div>
+                <label className="block font-bold text-slate-800 mb-1">Costo de Compra (USD) - Para cálculo de Margen</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formCostPrice}
+                    onChange={(e) => setFormCostPrice(parseFloat(e.target.value) || 0)}
+                    className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1 italic">Este valor se utiliza para calcular automáticamente tu rentabilidad en el panel de finanzas.</p>
               </div>
 
               {/* Account Type */}

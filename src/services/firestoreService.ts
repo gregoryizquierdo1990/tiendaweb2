@@ -15,7 +15,8 @@ import { useAppStore } from '../store/useAppStore';
 import { 
   Product, Order, CustomerUser, WalletTopup, 
   IncidentReport, PaymentMethod, ExpenseItem, 
-  FranchiseTenant, SupplierPurchase, AppBrandingConfig, FaqItem 
+  FranchiseTenant, SupplierPurchase, AppBrandingConfig, FaqItem, AuditLogEntry, Invoice,
+  FranchiseApplication, FranchiseTicket
 } from '../types';
 import { 
   INITIAL_PRODUCTS, INITIAL_PAYMENT_METHODS, INITIAL_CUSTOMERS 
@@ -299,7 +300,7 @@ export function sanitizeForFirestore<T>(data: T): T {
 }
 
 // --- Resilient Writer Wrapper ---
-async function safeFirestoreWrite(collectionName: string, docId: string, type: 'set' | 'delete', data?: any) {
+async function safeFirestoreWrite(collectionName: string, docId: string, type: 'set' | 'delete', data?: any, merge: boolean = false) {
   if (isSyncingFromFirestore) return;
 
   const store = useAppStore.getState();
@@ -317,7 +318,7 @@ async function safeFirestoreWrite(collectionName: string, docId: string, type: '
       await deleteDoc(docRef);
     } else {
       const sanitized = data !== undefined ? sanitizeForFirestore(data) : data;
-      await setDoc(docRef, sanitized);
+      await setDoc(docRef, sanitized, { merge });
     }
     store.setLastSyncTimestamp(new Date().toLocaleTimeString());
     store.setConnectionError(null);
@@ -391,6 +392,26 @@ export async function syncFranchiseToFirestore(f: FranchiseTenant) {
 
 export async function syncPurchaseToFirestore(p: SupplierPurchase) {
   return safeFirestoreWrite('purchases', p.id, 'set', p);
+}
+
+export async function syncAuditLogToFirestore(l: AuditLogEntry) {
+  return safeFirestoreWrite('audit_logs', l.id, 'set', l);
+}
+
+export async function syncInvoiceToFirestore(i: Invoice) {
+  return safeFirestoreWrite('invoices', i.id, 'set', i);
+}
+
+export async function syncFcmTokenToFirestore(userId: string, fcmToken: string) {
+  return safeFirestoreWrite('users', userId, 'set', { uid: userId, fcmToken, updatedAt: new Date().toISOString() }, true);
+}
+
+export async function syncFranchiseApplicationToFirestore(a: FranchiseApplication) {
+  return safeFirestoreWrite('franchise_applications', a.id, 'set', a);
+}
+
+export async function syncFranchiseTicketToFirestore(t: FranchiseTicket) {
+  return safeFirestoreWrite('franchise_tickets', t.id, 'set', t);
 }
 
 // --- Real-time Listeners and Subscriptions ---
@@ -722,6 +743,67 @@ export function initRealtimeFirestoreSync() {
     console.warn('Notice listening to purchases snapshot:', err);
   });
   activeUnsubscribers.push(unsubPurchases);
+
+  // 16. Audit Logs Listener
+  const unsubAudit = onSnapshot(collection(db, 'audit_logs'), (snapshot) => {
+    setIsSyncingFromFirestore(true);
+    const list: AuditLogEntry[] = [];
+    snapshot.forEach(docSnap => {
+      list.push(docSnap.data() as AuditLogEntry);
+    });
+    list.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    // We only update the store if there are logs, or if it's explicitly cleared
+    store.setAuditLogs(list);
+    setIsSyncingFromFirestore(false);
+  }, (err) => {
+    console.warn('Notice listening to audit logs snapshot:', err);
+  });
+  activeUnsubscribers.push(unsubAudit);
+
+  // 17. Invoices Listener
+  const unsubInvoices = onSnapshot(collection(db, 'invoices'), (snapshot) => {
+    setIsSyncingFromFirestore(true);
+    const list: Invoice[] = [];
+    snapshot.forEach(docSnap => {
+      list.push(docSnap.data() as Invoice);
+    });
+    list.sort((a, b) => b.issueDate.localeCompare(a.issueDate));
+    store.setInvoices(list);
+    setIsSyncingFromFirestore(false);
+  }, (err) => {
+    console.warn('Notice listening to invoices snapshot:', err);
+  });
+  activeUnsubscribers.push(unsubInvoices);
+
+  // 18. Franchise Applications Listener
+  const unsubApplications = onSnapshot(collection(db, 'franchise_applications'), (snapshot) => {
+    setIsSyncingFromFirestore(true);
+    const list: FranchiseApplication[] = [];
+    snapshot.forEach(docSnap => {
+      list.push(docSnap.data() as FranchiseApplication);
+    });
+    list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    useAppStore.getState().setFranchiseApplications(list);
+    setIsSyncingFromFirestore(false);
+  }, (err) => {
+    console.warn('Notice listening to franchise applications snapshot:', err);
+  });
+  activeUnsubscribers.push(unsubApplications);
+
+  // 19. Franchise Tickets Listener
+  const unsubTickets = onSnapshot(collection(db, 'franchise_tickets'), (snapshot) => {
+    setIsSyncingFromFirestore(true);
+    const list: FranchiseTicket[] = [];
+    snapshot.forEach(docSnap => {
+      list.push(docSnap.data() as FranchiseTicket);
+    });
+    list.sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
+    useAppStore.getState().setFranchiseTickets(list);
+    setIsSyncingFromFirestore(false);
+  }, (err) => {
+    console.warn('Notice listening to franchise tickets snapshot:', err);
+  });
+  activeUnsubscribers.push(unsubTickets);
 
   return clearAllFirestoreSubscriptions;
 }

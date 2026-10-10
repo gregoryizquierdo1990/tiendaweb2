@@ -15,6 +15,7 @@ import {
   Wallet
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { logAuditEvent } from '../services/auditLogger';
 import {
   Product,
   PlanDuration,
@@ -243,6 +244,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       }
 
       await onSubmitOrder(newOrder, payWithGrpay);
+
+      // Audit Logging
+      logAuditEvent({
+        actor: newOrder.customerName,
+        actorRole: 'customer',
+        actorEmail: newOrder.customerEmail,
+        actorPhone: newOrder.customerPhone,
+        action: payWithGrpay ? 'COMPRA_ZENY' : 'CREAR_PEDIDO',
+        description: payWithGrpay 
+          ? `Compra inmediata de ${product.name} (${duration}) usando saldo Zeny.`
+          : `Nuevo pedido de ${product.name} (${duration}) registrado para conciliación manual.`,
+        severity: 'success',
+        metadata: {
+          orderId: newOrder.id,
+          total: newOrder.total,
+          method: newOrder.paymentMethodName,
+          walletApplied: walletAmountApplied
+        }
+      });
 
       try {
         confetti({
@@ -546,8 +566,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 type="checkbox"
                 checked={payWithGrpay}
                 disabled={!canUseWallet}
-                onChange={() => {}}
-                className="w-5 h-5 text-indigo-600 rounded-md focus:ring-indigo-500 shrink-0"
+                onChange={(e) => {
+                  e.stopPropagation();
+                  if (canUseWallet) setPayWithGrpay(e.target.checked);
+                }}
+                className="w-5 h-5 text-indigo-600 rounded-md focus:ring-indigo-500 shrink-0 cursor-pointer"
               />
             </div>
           ) : (

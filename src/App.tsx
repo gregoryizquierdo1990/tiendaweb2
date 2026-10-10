@@ -21,6 +21,7 @@ import { FloatingIncidentButton } from './components/FloatingIncidentButton';
 import { IncidentReportModal } from './components/IncidentReportModal';
 import { PlatformBotWidget } from './components/PlatformBotWidget';
 import { AddManualCustomerModal } from './components/AddManualCustomerModal';
+import { PublicFranchiseApplication } from './components/PublicFranchiseApplication';
 import { GeminiPanel } from './components/GeminiPanel';
 import { DEFAULT_MESSAGE_TEMPLATES, DOMAIN_OFFICIAL, DEFAULT_ACTION_MAPPING } from './utils/messageTemplates';
 import { logAuditEvent } from './services/auditLogger';
@@ -40,7 +41,8 @@ import {
 } from './services/firestoreService';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { InvoiceViewer } from './components/InvoiceViewer';
-import { registerServiceWorker, sendPushNotification } from './utils/pushNotifications';
+import { OfficialRoutesDirectory } from './components/OfficialRoutesDirectory';
+import { registerServiceWorker, sendPushNotification, initFcm, sendFcmNotification } from './utils/pushNotifications';
 import { whatsappLink, BUSINESS } from './config/business';
 import {
   Product,
@@ -65,7 +67,9 @@ import {
   SupplierPurchase,
   AppBrandingConfig,
   ExpenseItem,
-  Invoice
+  Invoice,
+  FranchiseApplication,
+  FranchiseTicket
 } from './types';
 
 import {
@@ -161,6 +165,8 @@ export default function App() {
 
   // BCV Rate state
   const { bcvRate, setBcvRate } = useAppStore();
+  const { franchiseApplications, setFranchiseApplications } = useAppStore();
+  const { franchiseTickets, setFranchiseTickets } = useAppStore();
   const [isBcvLoading, setIsBcvLoading] = useState(false);
   const [isIOSGuideOpen, setIsIOSGuideOpen] = useState(false);
 
@@ -197,6 +203,23 @@ export default function App() {
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+  const [isRoutesDirectoryOpen, setIsRoutesDirectoryOpen] = useState(false);
+
+
+
+  // Initialize FCM for active customer
+  useEffect(() => {
+    if (activeCustomer?.id) {
+      const initializeMessaging = async () => {
+        await registerServiceWorker();
+        const token = await initFcm(activeCustomer.id);
+        if (token) {
+          console.log('FCM initialized for customer:', activeCustomer.email);
+        }
+      };
+      initializeMessaging();
+    }
+  }, [activeCustomer?.id]);
 
   // Bidirectional real-time cloud synchronization via Firebase Firestore
   useEffect(() => {
@@ -1054,6 +1077,14 @@ export default function App() {
       return next;
     });
     showNotification('success', `Tarjeta "${updatedProduct.name}" actualizada con éxito.`);
+    logAuditEvent({
+      actor: 'Administrador',
+      actorRole: 'admin',
+      action: 'ACTUALIZAR_PRODUCTO',
+      description: `Actualizó el servicio: ${updatedProduct.name}.`,
+      severity: 'info',
+      metadata: { productId: updatedProduct.id, name: updatedProduct.name }
+    });
   };
 
   const handleAddProduct = (newProduct: Product) => {
@@ -1063,6 +1094,14 @@ export default function App() {
       return next;
     });
     showNotification('success', `Servicio "${newProduct.name}" añadido al catálogo.`);
+    logAuditEvent({
+      actor: 'Administrador',
+      actorRole: 'admin',
+      action: 'AGREGAR_PRODUCTO',
+      description: `Agregó un nuevo servicio al catálogo: ${newProduct.name}.`,
+      severity: 'success',
+      metadata: { productId: newProduct.id, name: newProduct.name }
+    });
   };
 
   const handleDeleteProduct = (productId: string) => {
@@ -1072,6 +1111,14 @@ export default function App() {
       return next;
     });
     showNotification('info', 'Servicio eliminado del catálogo.');
+    logAuditEvent({
+      actor: 'Administrador',
+      actorRole: 'admin',
+      action: 'ELIMINAR_PRODUCTO',
+      description: `Eliminó el servicio ID: ${productId} del catálogo.`,
+      severity: 'warning',
+      metadata: { productId }
+    });
   };
 
   const handleToggleSuspendCustomer = (customerId: string) => {
@@ -1088,6 +1135,15 @@ export default function App() {
         return u;
       })
     );
+
+    logAuditEvent({
+      actor: 'Administrador',
+      actorRole: 'admin',
+      action: 'SUSPENDER_REACTIVAR_CLIENTE',
+      description: `Cambió estado de suspensión para el cliente ID: ${customerId}.`,
+      severity: 'warning',
+      metadata: { customerId }
+    });
   };
 
   const handleSendGiftToCustomer = async (
@@ -1108,6 +1164,14 @@ export default function App() {
         setActiveCustomer((prev) => (prev ? { ...prev, zenyBalance: (prev.zenyBalance || 0) + amount } : null));
       }
       showNotification('success', `¡Regalo enviado! Se acreditaron $${amount} USD en Zeny a ${customer.name}.`);
+      logAuditEvent({
+        actor: 'Administrador',
+        actorRole: 'admin',
+        action: 'ENVIAR_REGALO_ZENY',
+        description: `Envió un regalo de $${amount} Zeny al cliente ${customer.name}.`,
+        severity: 'success',
+        metadata: { customerId, amount }
+      });
     } else if (giftType === 'membership') {
       const prod = products.find((p) => p.id === amountOrProductId);
       if (!prod) return;
@@ -1145,6 +1209,14 @@ export default function App() {
 
       setOrders((prev) => [newGiftOrder, ...prev]);
       showNotification('success', `¡Membresía de ${prod.name} (${planDur}) regalada a ${customer.name} con éxito!`);
+      logAuditEvent({
+        actor: 'Administrador',
+        actorRole: 'admin',
+        action: 'ENVIAR_REGALO_MEMBRESIA',
+        description: `Envió cortesía de ${prod.name} (${planDur}) al cliente ${customer.name}.`,
+        severity: 'success',
+        metadata: { customerId, productId: prod.id, productName: prod.name, duration: planDur }
+      });
     }
   };
 
@@ -1397,14 +1469,22 @@ export default function App() {
     }
 
     if (newStatus === 'confirmed' || newStatus === 'delivered') {
-      sendPushNotification(
-        newStatus === 'confirmed' ? '¡Pago Confirmado!' : '¡Credenciales Entregadas!',
-        `Tu pedido #${orderId} ha sido procesado con éxito. Ya puedes disfrutar de tu servicio.`
-      );
+      const title = newStatus === 'confirmed' ? '¡Pago Confirmado!' : '¡Credenciales Entregadas!';
+      const body = `Tu pedido #${orderId} ha sido procesado con éxito. Ya puedes disfrutar de tu servicio.`;
 
-      // Sincronizar en tiempo real hacia Google Calendar
+      sendPushNotification(title, body);
+
+      // Trigger FCM Push Notification if customer has a token
       const targetOrder = orders.find((o) => o.id === orderId);
       if (targetOrder) {
+        const customer = customerUsers.find(
+          (c) => c.id === targetOrder.customerId || c.email.toLowerCase() === targetOrder.customerEmail.toLowerCase()
+        );
+        if (customer?.fcmToken) {
+          sendFcmNotification(customer.fcmToken, title, body, '/?tracker=' + orderId);
+        }
+
+        // Sincronizar en tiempo real hacia Google Calendar
         const orderToSync = {
           ...targetOrder,
           status: newStatus,
@@ -1528,9 +1608,17 @@ export default function App() {
       await syncCustomerToFirestore(updatedUser);
     }
 
-    // Actualizar el pedido asociado en la lista de pedidos si existe
     const recId = topupId.startsWith('WAL-') ? topupId.replace('WAL-', 'REC-') : `REC-${topupId}`;
     handleUpdateOrderStatus(recId, 'confirmed');
+
+    logAuditEvent({
+      actor: 'Administrador',
+      actorRole: 'admin',
+      action: 'APROBAR_RECARGA',
+      description: `Aprobó recarga #${topupId} para ${targetTopup.customerName}. +${targetTopup.amountZeny || targetTopup.amount || 0} Zeny acreditados.`,
+      severity: 'success',
+      metadata: { topupId, customerEmail: targetTopup.customerEmail, amount: targetTopup.amount }
+    });
 
     showNotification(
       'success',
@@ -1558,6 +1646,16 @@ export default function App() {
 
     const recId = topupId.startsWith('WAL-') ? topupId.replace('WAL-', 'REC-') : `REC-${topupId}`;
     handleUpdateOrderStatus(recId, 'rejected', undefined, reason);
+    
+    logAuditEvent({
+      actor: 'Administrador',
+      actorRole: 'admin',
+      action: 'RECHAZAR_RECARGA',
+      description: `Rechazó recarga #${topupId} de ${targetTopup?.customerName}. Motivo: ${reason || 'No especificado'}.`,
+      severity: 'warning',
+      metadata: { topupId, reason }
+    });
+
     showNotification('info', `Recarga #${topupId} rechazada.`);
   };
 
@@ -1607,8 +1705,24 @@ export default function App() {
 
     if (delta >= 0) {
       showNotification('success', `Acreditados +${delta} Zeny a ${targetEmail}. Saldo: ${finalBalance} Zeny.`);
+      logAuditEvent({
+        actor: 'Administrador',
+        actorRole: 'admin',
+        action: 'ACREDITAR_SALDO_MANUAL',
+        description: `Acreditó ${delta} Zeny al cliente ${targetEmail}. Nuevo saldo: ${finalBalance}.`,
+        severity: 'success',
+        metadata: { customerEmail: targetEmail, amount: delta, finalBalance }
+      });
     } else {
       showNotification('info', `Debitado saldo de ${Math.abs(delta)} Zeny a ${targetEmail}. Saldo actual: ${finalBalance} Zeny.`);
+      logAuditEvent({
+        actor: 'Administrador',
+        actorRole: 'admin',
+        action: 'DEBITAR_SALDO_MANUAL',
+        description: `Debitó ${Math.abs(delta)} Zeny al cliente ${targetEmail}. Saldo actual: ${finalBalance}.`,
+        severity: 'warning',
+        metadata: { customerEmail: targetEmail, amount: Math.abs(delta), finalBalance }
+      });
     }
   };
 
@@ -1622,6 +1736,14 @@ export default function App() {
       return [...prev, updated];
     });
     showNotification('success', `Método de pago ${updated.name} guardado con éxito.`);
+    logAuditEvent({
+      actor: 'Administrador',
+      actorRole: 'admin',
+      action: 'ACTUALIZAR_METODO_PAGO',
+      description: `Actualizó configuración del método de pago: ${updated.name}.`,
+      severity: 'info',
+      metadata: { methodId: updated.id, methodName: updated.name }
+    });
   };
 
   // Admin saves credit order (manual assignment for senior citizens & trusted clients)
@@ -1631,6 +1753,53 @@ export default function App() {
       setCustomerUsers((prev) => [newCustomer, ...prev]);
     }
 
+    // --- NUEVO: Crear factura automáticamente ---
+    const invoiceId = `FAC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newInvoice: Invoice = {
+      id: invoiceId,
+      orderId: newOrder.id,
+      customerId: newOrder.customerId,
+      invoiceNumber: invoiceId,
+      controlNumber: `CTRL-${Math.floor(100000 + Math.random() * 900000)}`,
+      issueDate: new Date().toISOString(),
+      dueDate: newOrder.creditDueDate,
+      customerName: newOrder.customerName,
+      customerDocId: 'S/D', // Sin Documento por defecto
+      customerEmail: newOrder.customerEmail,
+      customerPhone: newOrder.customerPhone,
+      items: [
+        {
+          id: `ITEM-${Date.now()}`,
+          description: `${newOrder.productName} (${newOrder.duration})`,
+          quantity: 1,
+          unitPriceUsd: newOrder.total,
+          totalUsd: newOrder.total
+        }
+      ],
+      subtotalUsd: newOrder.total,
+      taxPercent: 0,
+      taxAmountUsd: 0,
+      totalUsd: newOrder.total,
+      bcvRate: bcvRate,
+      totalBs: newOrder.total * bcvRate,
+      paymentMethod: newOrder.paymentMethodName,
+      paymentStatus: 'pending', // Porque es un crédito
+      notes: `Factura generada automáticamente por asignación de crédito. ${newOrder.creditNotes || ''}`
+    };
+
+    setInvoices((prev) => [newInvoice, ...prev]);
+    // ------------------------------------------
+
+    // AUDITORÍA: Registrar asignación de crédito y creación de factura
+    logAuditEvent({
+      actor: adminSession?.username || 'admin',
+      actorRole: 'admin',
+      action: 'ASIGNAR_CREDITO',
+      description: `Asignó servicio a crédito (${newOrder.productName}) a ${newOrder.customerName}. Vence el ${newOrder.creditDueDate}. Factura ${invoiceId} generada.`,
+      severity: 'success',
+      metadata: { orderId: newOrder.id, customerName: newOrder.customerName, invoiceId }
+    });
+
     // Sincronizar en tiempo real hacia Google Calendar
     triggerAutomaticSync(newOrder, sheetsState.spreadsheetId).catch((err) => {
       console.warn('Error al sincronizar crédito con Google Calendar:', err);
@@ -1638,8 +1807,18 @@ export default function App() {
 
     showNotification(
       'success',
-      `¡Servicio a crédito asignado con éxito a ${newOrder.customerName}!`
+      `¡Servicio a crédito asignado con éxito a ${newOrder.customerName}! Factura ${invoiceId} generada.`
     );
+
+    // Enviar notificación push si el cliente tiene token
+    const customer = customerUsers.find(
+      (c) => c.id === newOrder.customerId || c.email.toLowerCase() === newOrder.customerEmail.toLowerCase()
+    );
+    if (customer?.fcmToken) {
+      const title = '¡Servicio Asignado!';
+      const body = `Se ha asignado tu servicio ${newOrder.productName} a crédito. Vence el ${newOrder.creditDueDate}.`;
+      sendFcmNotification(customer.fcmToken, title, body, '/?tracker=' + newOrder.id);
+    }
   };
 
   // Admin updates credit status (liquidated / paid / overdue)
@@ -1799,6 +1978,14 @@ export default function App() {
       )
     );
     showNotification('success', `¡Abono de $${report.amountUsd.toFixed(2)} USD aprobado y acreditado a ${report.franchiseName}!`);
+    logAuditEvent({
+      actor: 'Administrador',
+      actorRole: 'admin',
+      action: 'APROBAR_ABONO_FRANQUICIA',
+      description: `Aprobó abono de $${report.amountUsd} para franquicia ${report.franchiseName}.`,
+      severity: 'success',
+      metadata: { reportId, franchiseName: report.franchiseName, amountUsd: report.amountUsd }
+    });
   };
 
   const handleRejectFranchiseTopup = (reportId: string, reason: string) => {
@@ -1815,6 +2002,14 @@ export default function App() {
       )
     );
     showNotification('info', 'Reporte de abono rechazado.');
+    logAuditEvent({
+      actor: 'Administrador',
+      actorRole: 'admin',
+      action: 'RECHAZAR_ABONO_FRANQUICIA',
+      description: `Rechazó abono para reporte #${reportId}. Razón: ${reason}`,
+      severity: 'warning',
+      metadata: { reportId, reason }
+    });
   };
 
   const handleCreateFranchiseTopupReport = (newReport: FranchiseTopupReport) => {
@@ -1834,6 +2029,14 @@ export default function App() {
       )
     );
     showNotification('success', `¡$${amountUsd.toFixed(2)} USD asignados a la billetera del cliente!`);
+    logAuditEvent({
+      actor: `Franquicia (ID: ${franchiseId})`,
+      actorRole: 'franchise',
+      action: 'ASIGNAR_SALDO_FRANQUICIA',
+      description: `Asignó $${amountUsd} USD al cliente ID: ${customerId}.`,
+      severity: 'info',
+      metadata: { franchiseId, customerId, amountUsd }
+    });
   };
 
   // Navegación segura hacia el panel administrativo
@@ -1867,6 +2070,8 @@ export default function App() {
     clearAdminSession();
     setAdminSessionState(null);
     setIsAdminOpen(false);
+    localStorage.removeItem('streamsync_active_logged_staff_id');
+    sessionStorage.removeItem('streamsync_my_staff_session');
     showNotification('info', 'Sesión de administrador cerrada correctamente.');
     navigateToStore();
   };
@@ -1883,6 +2088,14 @@ export default function App() {
     return matchesCategory && matchesSearch;
   });
 
+  const handleUpdateFranchiseApplication = (app: FranchiseApplication) => {
+    setFranchiseApplications((prev) => prev.map((a) => (a.id === app.id ? app : a)));
+  };
+
+  const handleUpdateFranchiseTicket = (ticket: FranchiseTicket) => {
+    setFranchiseTickets((prev) => prev.map((t) => (t.id === ticket.id ? ticket : t)));
+  };
+
   const pendingOrdersCount = orders.filter((o) => o.status === 'pending_reconciliation').length;
   const pendingTopupsCount = walletTopups.filter((t) => t.status === 'pending').length;
 
@@ -1890,6 +2103,10 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/invoice/:invoiceId" element={<InvoiceViewer />} />
+        <Route path="/solicitud-franquicia" element={<PublicFranchiseApplication onClose={navigateToStore} />} />
+        <Route path="/rutas" element={<OfficialRoutesDirectory onBackToStore={navigateToStore} />} />
+        <Route path="/directorio" element={<OfficialRoutesDirectory onBackToStore={navigateToStore} />} />
+        <Route path="/mapa-sitio" element={<OfficialRoutesDirectory onBackToStore={navigateToStore} />} />
 
         {/* RUTA PROTEGIDA DEDICADA DEL PANEL DE ADMINISTRACIÓN: /admin */}
         <Route
@@ -1931,6 +2148,7 @@ export default function App() {
                 supabaseSchemaError={supabaseSchemaError}
                 onOpenSheetsModal={() => setIsSheetsModalOpen(true)}
                 isCloudSyncing={isCloudSyncing}
+                invoices={invoices}
                 onSyncCustomersToSheet={handleSyncCustomersToSheet}
                 onSyncReportsToSheet={handleSyncReportsToSheet}
                 onSyncIncidentsToSheet={handleSyncIncidentsToSheet}
@@ -1989,6 +2207,10 @@ export default function App() {
                 onRejectFranchiseTopup={handleRejectFranchiseTopup}
                 onCreateFranchiseTopupReport={handleCreateFranchiseTopupReport}
                 onAssignBalanceToCustomer={handleAssignBalanceToCustomer}
+                franchiseApplications={franchiseApplications}
+                franchiseTickets={franchiseTickets}
+                onUpdateFranchiseApplication={handleUpdateFranchiseApplication}
+                onUpdateFranchiseTicket={handleUpdateFranchiseTicket}
                 supplierPurchases={supplierPurchases}
                 onAddSupplierPurchase={(newPurchase) => {
                   const added: SupplierPurchase = {
@@ -2026,6 +2248,7 @@ export default function App() {
                 expenses={expenses}
                 onAddExpense={handleAddExpense}
                 onUpdateExpense={handleUpdateExpense}
+                onLogout={handleAdminLogout}
               />
             ) : (
               <AdminLoginPage
@@ -2235,19 +2458,22 @@ export default function App() {
 
         {/* FAQ Section */}
         <FAQSection />
+
+        {/* Footer Oficial con Enlaces del Dominio y Rutas Activas */}
+        <Footer
+          onOpenTracker={() => {
+            setTrackingOrderId('');
+            setIsTrackerOpen(true);
+          }}
+          onOpenAdmin={navigateToAdmin}
+          onOpenSheets={() => setIsSheetsModalOpen(true)}
+          onOpenRoutes={() => setIsRoutesDirectoryOpen(true)}
+          projectName={branding?.projectName}
+          branding={branding}
+        />
       </main>
 
-      {/* Footer */}
-      <Footer
-        onOpenTracker={() => {
-          setTrackingOrderId('');
-          setIsTrackerOpen(true);
-        }}
-        onOpenAdmin={() => setIsLoginModalOpen(true)}
-        onOpenSheets={() => setIsSheetsModalOpen(true)}
-        projectName={branding.projectName}
-        branding={branding}
-      />
+
 
       {/* Floating Incident Report Button (Midpoint of right screen) */}
       <FloatingIncidentButton
@@ -2380,7 +2606,7 @@ export default function App() {
           }}
           sheetsState={sheetsState}
           user={googleUser}
-          onClose={() => setIsAdminOpen(false)}
+          onClose={navigateToStore}
           onSignInGoogle={handleSignInGoogle}
           onSignOutGoogle={handleSignOutGoogle}
           onCreateNewSheet={handleCreateNewSheet}
@@ -2486,6 +2712,7 @@ export default function App() {
           onAddExpense={handleAddExpense}
           onUpdateExpense={handleUpdateExpense}
           onDeleteExpense={handleDeleteExpense}
+          onLogout={handleAdminLogout}
         />
       )}
 
@@ -2565,6 +2792,20 @@ export default function App() {
         onOpenCustomerPortal={() => setIsCustomerPortalOpen(true)}
       />
 
+      {/* 11. Modal de Directorio de Rutas Activas */}
+      {isRoutesDirectoryOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center">
+          <div className="w-full min-h-screen bg-slate-50">
+            <OfficialRoutesDirectory
+              onBackToStore={() => setIsRoutesDirectoryOpen(false)}
+              onNavigateToRoute={(p) => {
+                setIsRoutesDirectoryOpen(false);
+                window.location.pathname = p;
+              }}
+            />
+          </div>
+        </div>
+      )}
 
           </div>
         } />

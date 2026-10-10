@@ -32,6 +32,8 @@ import {
   CurrencyCode,
   Invoice
 } from '../types';
+import { initFcm, registerServiceWorker } from '../utils/pushNotifications';
+import { Bell, BellOff } from 'lucide-react';
 import {
   formatCurrency,
   formatGrpay,
@@ -92,6 +94,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
   const [isSubmittingTopup, setIsSubmittingTopup] = useState(false);
   const [topupSuccess, setTopupSuccess] = useState<WalletTopup | null>(null);
   const [copiedAccount, setCopiedAccount] = useState(false);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(typeof Notification !== 'undefined' ? Notification.permission : 'default');
 
   // Filter orders for this customer (by customerId or customerEmail)
   const myOrders = orders.filter(
@@ -198,8 +201,30 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
               <p className="text-xs text-slate-500">{user.email} • {user.phone}</p>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
+            <button 
+              onClick={async () => {
+                await registerServiceWorker();
+                await initFcm(user.id);
+                setNotifPermission(Notification.permission);
+              }}
+              className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${
+                notifPermission === 'granted' 
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                  : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
+              }`}
+              title={notifPermission === 'granted' ? 'Notificaciones Activas' : 'Activar Notificaciones'}
+            >
+              {notifPermission === 'granted' ? (
+                <Bell className="w-4 h-4" />
+              ) : (
+                <BellOff className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline text-[10px] font-bold">
+                {notifPermission === 'granted' ? 'ACTIVO' : 'ACTIVAR PUSH'}
+              </span>
+            </button>
+
             <button
               onClick={onLogout}
               className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"

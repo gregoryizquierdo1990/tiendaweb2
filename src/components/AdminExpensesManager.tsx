@@ -91,6 +91,8 @@ export const AdminExpensesManager: React.FC<AdminExpensesManagerProps> = ({
   const [formReference, setFormReference] = useState('');
   const [formVendor, setFormVendor] = useState('');
   const [formNotes, setFormNotes] = useState('');
+  const [formIsFixed, setFormIsFixed] = useState(false);
+  const [formRecurrence, setFormRecurrence] = useState<'once' | 'monthly' | 'yearly'>('once');
 
   // Quick add category inline modal
   const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false);
@@ -115,6 +117,8 @@ export const AdminExpensesManager: React.FC<AdminExpensesManagerProps> = ({
     setFormReference('');
     setFormVendor('');
     setFormNotes('');
+    setFormIsFixed(false);
+    setFormRecurrence('once');
     setIsModalOpen(true);
   };
 
@@ -131,6 +135,8 @@ export const AdminExpensesManager: React.FC<AdminExpensesManagerProps> = ({
     setFormReference(item.referenceNumber || '');
     setFormVendor(item.supplierOrVendor || '');
     setFormNotes(item.notes || '');
+    setFormIsFixed(item.isFixed || false);
+    setFormRecurrence(item.recurrence || 'once');
     setIsModalOpen(true);
   };
 
@@ -169,7 +175,9 @@ export const AdminExpensesManager: React.FC<AdminExpensesManagerProps> = ({
         paymentMethodName: pmName,
         referenceNumber: formReference.trim() || undefined,
         supplierOrVendor: formVendor.trim() || undefined,
-        notes: formNotes.trim() || undefined
+        notes: formNotes.trim() || undefined,
+        isFixed: formIsFixed,
+        recurrence: formRecurrence
       };
       onUpdateExpense(updated);
     } else {
@@ -186,7 +194,9 @@ export const AdminExpensesManager: React.FC<AdminExpensesManagerProps> = ({
         paymentMethodName: pmName,
         referenceNumber: formReference.trim() || undefined,
         supplierOrVendor: formVendor.trim() || undefined,
-        notes: formNotes.trim() || undefined
+        notes: formNotes.trim() || undefined,
+        isFixed: formIsFixed,
+        recurrence: formRecurrence
       });
     }
 
@@ -459,6 +469,11 @@ export const AdminExpensesManager: React.FC<AdminExpensesManagerProps> = ({
                       <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200 inline-block max-w-[180px] truncate">
                         {exp.category}
                       </span>
+                      {exp.isFixed && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[9px] font-black uppercase border border-indigo-200">
+                          Fijo ({exp.recurrence === 'monthly' ? 'Mensual' : exp.recurrence === 'yearly' ? 'Anual' : 'Fijo'})
+                        </span>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -717,6 +732,34 @@ export const AdminExpensesManager: React.FC<AdminExpensesManagerProps> = ({
                   onChange={(e) => setFormNotes(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-300"
                 />
+              </div>
+
+              {/* Fixed Expense Toggle */}
+              <div className="flex items-center gap-6 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={formIsFixed} 
+                    onChange={(e) => setFormIsFixed(e.target.checked)}
+                    className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500"
+                  />
+                  <span className="font-bold text-slate-700">¿Es un Gasto Fijo?</span>
+                </label>
+
+                {formIsFixed && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500">Recurrencia:</span>
+                    <select 
+                      value={formRecurrence} 
+                      onChange={(e) => setFormRecurrence(e.target.value as any)}
+                      className="bg-white border border-slate-300 rounded-lg px-2 py-1 text-[10px] font-bold outline-none"
+                    >
+                      <option value="once">Una vez (Fijo manual)</option>
+                      <option value="monthly">Mensual</option>
+                      <option value="yearly">Anual</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">

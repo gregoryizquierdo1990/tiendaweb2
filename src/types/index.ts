@@ -43,6 +43,7 @@ export interface Product {
   stock?: number;
   isStockManual?: boolean;
   manualStock?: number;
+  costPriceUsd?: number; // Added for margin calculation
 }
 
 export interface AnnouncementBannerConfig {
@@ -98,6 +99,13 @@ export interface AppBrandingConfig {
   footerPlatforms?: string[];
   footerPaymentMethods?: string[];
   footerWhatsAppUrl?: string;
+  // Finance Configuration
+  reservePercentage?: number; // e.g. 5 for 5%
+  financeSettings?: {
+    autoCalculateMargins: boolean;
+    enableCashFlowDashboard: boolean;
+    alertOverdueDays: number;
+  };
 }
 
 export type PaymentMethodCategory = 
@@ -172,6 +180,8 @@ export interface Order {
   creditDueDate?: string;
   creditStatus?: 'pending_payment' | 'paid' | 'overdue';
   creditNotes?: string;
+  commissionUsd?: number; // New: for seller commissions
+  isHybrid?: boolean; // New: for hybrid account tracking
   installmentPlan?: {
     totalAmountUsd: number;
     downPaymentUsd: number;
@@ -224,6 +234,18 @@ export interface CustomerUser {
   grpayBalance?: number; // Compatibility alias
   createdAt: string;
   lastLogin?: string;
+  fcmToken?: string;
+  ltvUsd?: number; // New: Lifetime Value
+}
+
+export interface CreditEvent {
+  id: string;
+  customerId: string;
+  type: 'order' | 'topup' | 'adjustment' | 'refund';
+  amountUsd: number;
+  balanceAfterUsd: number;
+  description: string;
+  createdAt: string;
 }
 
 export interface WalletTopup {
@@ -417,6 +439,7 @@ export interface Supplier {
   contactPhone?: string;
   telegramUser?: string;
   preferredCurrency: PurchaseCurrency;
+  currentBalanceUsd: number; // For Supplier Wallet/Balance
   notes?: string;
   createdAt: string;
 }
@@ -452,6 +475,7 @@ export interface SupplierPurchase {
   profiles: AccountProfileSlot[]; // Slots de perfiles y PINes
   status: 'active' | 'expiring_soon' | 'expired';
   notes?: string;
+  isHybrid?: boolean; // New: mixed providers/platforms
   createdAt: string;
   lastCredentialsUpdate?: string;
 }
@@ -557,7 +581,17 @@ export interface ExpenseItem {
   referenceNumber?: string;
   supplierOrVendor?: string;
   notes?: string;
+  isFixed?: boolean; // New: for fixed expenses
+  recurrence?: 'once' | 'monthly' | 'yearly'; // New
   createdAt: string;
+}
+
+export interface SalesTarget {
+  id: string;
+  month: string; // YYYY-MM
+  targetAmountUsd: number;
+  achievedAmountUsd: number;
+  category?: ServiceCategory | 'total';
 }
 
 export interface AccountingEntry {
@@ -571,4 +605,48 @@ export interface AccountingEntry {
   creditAmount: number;
   sourceType: 'sale' | 'purchase' | 'expense' | 'topup' | 'adjustment';
   referenceId?: string;
+}
+// --- FRANCHISE APPLICATIONS ---
+export interface FranchiseApplication {
+  id: string;
+  businessName: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  telegramUser?: string;
+  notes?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  reviewedAt?: string;
+  rejectionReason?: string;
+}
+
+// --- FRANCHISE TICKETS (SUPPORT) ---
+export type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type TicketCategory = 'topup' | 'account_issue' | 'technical' | 'billing' | 'other';
+
+export interface TicketMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: UserRole | 'franchise';
+  content: string;
+  createdAt: string;
+  attachments?: string[];
+}
+
+export interface FranchiseTicket {
+  id: string;
+  franchiseId: string;
+  franchiseName: string;
+  subject: string;
+  description: string;
+  category: TicketCategory;
+  status: TicketStatus;
+  priority: TicketPriority;
+  createdAt: string;
+  updatedAt: string;
+  lastMessageAt: string;
+  messages: TicketMessage[];
 }

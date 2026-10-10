@@ -123,10 +123,40 @@
         "displayName": { "type": "string" },
         "phone": { "type": "string" },
         "role": { "type": "string", "enum": ["cliente", "vendedor", "admin"] },
+        "fcmToken": { "type": "string" },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
       "required": ["uid", "email", "role"]
+    },
+    "FranchiseApplication": {
+      "title": "FranchiseApplication",
+      "description": "Solicitudes publicas para ser franquiciado",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessName": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "businessName", "ownerName", "email", "status"]
+    },
+    "FranchiseTicket": {
+      "title": "FranchiseTicket",
+      "description": "Tickets de soporte técnico y administrativo para franquiciados",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "franchiseId": { "type": "string" },
+        "subject": { "type": "string" },
+        "status": { "type": "string" },
+        "priority": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "franchiseId", "subject", "status"]
     }
   },
   "firestore": {
@@ -161,6 +191,14 @@
     "config/branding": {
       "schema": { "$ref": "#/entities/Branding" },
       "description": "Ajustes de marca de la aplicacion"
+    },
+    "franchise_applications/{applicationId}": {
+      "schema": { "$ref": "#/entities/FranchiseApplication" },
+      "description": "Solicitudes de nuevas franquicias"
+    },
+    "franchise_tickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/FranchiseTicket" },
+      "description": "Tickets de soporte para franquicias"
     }
   }
 }

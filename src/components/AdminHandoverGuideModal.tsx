@@ -26,6 +26,7 @@ import {
   Save
 } from 'lucide-react';
 import { DOMAIN_OFFICIAL } from '../utils/messageTemplates';
+import { ACTIVE_SYSTEM_ROUTES } from '../config/routesDirectory';
 import {
   DEFAULT_FRANCHISE_CONTRACT_TEMPLATE,
   DEFAULT_FRANCHISE_MONTHLY_FEE,
@@ -35,13 +36,15 @@ import {
 interface AdminHandoverGuideModalProps {
   onClose: () => void;
   bcvRate?: number;
+  isInline?: boolean;
 }
 
 const STORAGE_CONTRACT_KEY = 'streamsync_franchise_contract_custom_v1';
 
-export const AdminHandoverGuideModal: React.FC<AdminHandoverGuideModalProps> = ({ onClose, bcvRate = 36.5 }) => {
-  const [activeSection, setActiveSection] = useState<'requisitos' | 'programas' | 'entrega' | 'contrato'>('requisitos');
+export const AdminHandoverGuideModal: React.FC<AdminHandoverGuideModalProps> = ({ onClose, bcvRate = 36.5, isInline = false }) => {
+  const [activeSection, setActiveSection] = useState<'requisitos' | 'programas' | 'entrega' | 'contrato' | 'rutas'>('requisitos');
   const [copiedAgreement, setCopiedAgreement] = useState(false);
+  const [copiedRouteUrl, setCopiedRouteUrl] = useState<string | null>(null);
   const [isEditingContract, setIsEditingContract] = useState(false);
   const [contractSavedNotice, setContractSavedNotice] = useState(false);
 
@@ -111,9 +114,8 @@ export const AdminHandoverGuideModal: React.FC<AdminHandoverGuideModalProps> = (
     window.print();
   };
 
-  return (
-    <div className="fixed inset-0 z-70 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden my-auto">
+  const content = (
+    <div className={`bg-white ${isInline ? '' : 'rounded-3xl shadow-2xl border border-slate-200'} w-full ${isInline ? '' : 'max-w-4xl max-h-[92vh]'} flex flex-col overflow-hidden my-auto`}>
         {/* Modal Header */}
         <div className="p-5 sm:p-6 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -145,13 +147,15 @@ export const AdminHandoverGuideModal: React.FC<AdminHandoverGuideModalProps> = (
               <Printer className="w-4 h-4 text-amber-400" />
               <span className="hidden sm:inline">Imprimir / Guardar PDF</span>
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            {!isInline && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -207,6 +211,19 @@ export const AdminHandoverGuideModal: React.FC<AdminHandoverGuideModalProps> = (
           >
             <FileText className="w-3.5 h-3.5 text-indigo-600" />
             <span>4. Acuerdo de Suscripción Sugerido</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSection('rutas')}
+            className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+              activeSection === 'rutas'
+                ? 'bg-white text-indigo-700 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5 text-indigo-600" />
+            <span>5. Rutas Activas ({DOMAIN_OFFICIAL.replace('https://', '')})</span>
           </button>
         </div>
 
@@ -656,6 +673,132 @@ export const AdminHandoverGuideModal: React.FC<AdminHandoverGuideModalProps> = (
               </div>
             </div>
           )}
+
+          {/* SECTION 5: RUTAS ACTIVAS DEL DOMINIO OFICIAL */}
+          {activeSection === 'rutas' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-extrabold text-indigo-950 text-sm flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-indigo-600" />
+                      <span>Directorio Oficial de Rutas del Negocio</span>
+                    </h4>
+                    <p className="text-slate-600 text-xs mt-1 leading-relaxed">
+                      Todas las rutas activas configuradas en <strong>{DOMAIN_OFFICIAL}</strong> y la función específica de cada una para tu cliente, equipo y franquicias:
+                    </p>
+                  </div>
+
+                  <a
+                    href="/rutas"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 transition shadow-xs"
+                  >
+                    <span>Abrir Portal de Rutas</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Grid de Rutas */}
+              <div className="space-y-3.5">
+                {ACTIVE_SYSTEM_ROUTES.map((route, rIdx) => {
+                  const isCopied = copiedRouteUrl === route.path;
+
+                  return (
+                    <div
+                      key={rIdx}
+                      className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs hover:border-indigo-300 transition space-y-3"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-black text-slate-900 text-sm">
+                            {route.name}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                            {route.accessRole}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(route.fullUrl);
+                              setCopiedRouteUrl(route.path);
+                              setTimeout(() => setCopiedRouteUrl(null), 2000);
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition cursor-pointer flex items-center gap-1 ${
+                              isCopied
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            {isCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-slate-500" />}
+                            <span>{isCopied ? 'Copiado' : 'Copiar'}</span>
+                          </button>
+
+                          <a
+                            href={route.path.includes(':') ? '/invoice/FACT-DEMO-01' : route.path}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition"
+                            title="Probar ruta"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* URL Box */}
+                      <div className="p-2.5 rounded-xl bg-slate-900 text-slate-100 font-mono text-xs flex items-center justify-between gap-2 overflow-x-auto">
+                        <span className="text-indigo-400 font-bold select-all">
+                          {route.fullUrl}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-semibold shrink-0">
+                          {route.path}
+                        </span>
+                      </div>
+
+                      {/* Explicación y Propósito */}
+                      <div className="space-y-1 text-xs">
+                        <p className="text-slate-800 font-semibold">
+                          🎯 <strong>Propósito:</strong> {route.purpose}
+                        </p>
+                        <p className="text-slate-600 leading-relaxed text-[11px]">
+                          {route.description}
+                        </p>
+                      </div>
+
+                      {/* Lista de características */}
+                      <div className="pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] text-slate-600">
+                        {route.features.slice(0, 4).map((f, fIdx) => (
+                          <div key={fIdx} className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                            <span>{f}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Guía Rápida de Enlaces */}
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2">
+                <span className="font-bold block text-amber-950">
+                  📌 Resumen de Uso Diario:
+                </span>
+                <p className="leading-relaxed">
+                  • <code>{DOMAIN_OFFICIAL.replace('https://', '')}/admin</code> = Panel Administrativo exclusivo del dueño (contraseñas de streaming, conciliador, caja).<br />
+                  • <code>{DOMAIN_OFFICIAL.replace('https://', '')}/solicitud-franquicia</code> = Enlace para enviar a prospectos y nuevos franquiciados.<br />
+                  • <code>{DOMAIN_OFFICIAL.replace('https://', '')}/rutas</code> = Directorio navegable con todas las URLs activas.<br />
+                  • <code>{DOMAIN_OFFICIAL.replace('https://', '')}/invoice/:id</code> = Consulta de recibos oficiales de pago.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Modal Footer */}
@@ -673,6 +816,13 @@ export const AdminHandoverGuideModal: React.FC<AdminHandoverGuideModalProps> = (
           </button>
         </div>
       </div>
+    );
+
+  if (isInline) return content;
+
+  return (
+    <div className="fixed inset-0 z-70 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in">
+      {content}
     </div>
   );
 };
