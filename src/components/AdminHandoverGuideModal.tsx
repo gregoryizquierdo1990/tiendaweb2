@@ -53,11 +53,11 @@ export const AdminHandoverGuideModal: React.FC<AdminHandoverGuideModalProps> = (
     const saved = localStorage.getItem('gi_default_franchise_fee');
     return saved ? Number(saved) : DEFAULT_FRANCHISE_MONTHLY_FEE;
   });
-  const [franchiseName, setFranchiseName] = useState('StreamPlus Venezuela');
-  const [franchiseOwner, setFranchiseOwner] = useState('Carlos Mendoza');
-  const [franchiseIdDoc, setFranchiseIdDoc] = useState('V-20.123.456');
-  const [franchisePhone, setFranchisePhone] = useState('+58 414 123 4567');
-  const [franchiseWallet, setFranchiseWallet] = useState('StreamPay');
+  const [franchiseName, setFranchiseName] = useState('Franquicia Autorizada');
+  const [franchiseOwner, setFranchiseOwner] = useState('Nombre del Titular');
+  const [franchiseIdDoc, setFranchiseIdDoc] = useState('V-00.000.000');
+  const [franchisePhone, setFranchisePhone] = useState('+58 424 000 0000');
+  const [franchiseWallet, setFranchiseWallet] = useState('Wallet Zeny');
 
   // Contract raw clauses template
   const [contractTemplate, setContractTemplate] = useState<string>(() => {

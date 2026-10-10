@@ -129,9 +129,15 @@ export async function validateFirestoreConnection(options?: { timeoutMs?: number
   } catch (err: any) {
     const errorMsg = err?.message || String(err);
     const isOffline = errorMsg.includes('offline') || errorMsg.includes('network') || errorMsg.includes('Tiempo de espera');
+    const isQuotaExceeded = err?.code === 'resource-exhausted' || errorMsg.includes('Quota exceeded') || errorMsg.includes('Quota limit exceeded');
     
-    store.setFirestoreStatus(isOffline ? 'offline' : 'error');
-    store.setConnectionError(isOffline ? 'Modo sin conexión: los cambios se sincronizarán al reconectar' : errorMsg);
+    if (isQuotaExceeded) {
+      store.setFirestoreStatus('error');
+      store.setConnectionError('Cuota gratuita diaria de lectura en Firestore alcanzada. La app sigue operativa con almacenamiento local y se sincronizará al reiniciar el ciclo de cuota en Firebase.');
+    } else {
+      store.setFirestoreStatus(isOffline ? 'offline' : 'error');
+      store.setConnectionError(isOffline ? 'Modo sin conexión: los cambios se sincronizarán al reconectar' : errorMsg);
+    }
     
     validationInProgress = false;
     return false;
@@ -180,10 +186,15 @@ export async function measureFirestoreLatency(): Promise<number | null> {
   } catch (err: any) {
     const errorMsg = err?.message || String(err);
     const isOffline = errorMsg.includes('offline') || errorMsg.includes('network') || errorMsg.includes('Tiempo de espera');
+    const isQuotaExceeded = err?.code === 'resource-exhausted' || errorMsg.includes('Quota exceeded') || errorMsg.includes('Quota limit exceeded');
     
     store.setFirestoreLatency(null);
     store.setFirestoreStatus(isOffline ? 'offline' : 'error');
-    store.setConnectionError(isOffline ? 'Desconexión crítica o red no disponible' : errorMsg);
+    if (isQuotaExceeded) {
+      store.setConnectionError('Cuota gratuita diaria de lectura en Firestore alcanzada. La app sigue operativa con almacenamiento local.');
+    } else {
+      store.setConnectionError(isOffline ? 'Desconexión crítica o red no disponible' : errorMsg);
+    }
     return null;
   } finally {
     store.setIsCloudSyncing(false);

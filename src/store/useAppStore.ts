@@ -254,7 +254,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   accountsPayable: load('maxter_accounts_payable', []),
   purchases: load<SupplierPurchase[]>('gi_purchases_v2', []),
   accountingEntries: [],
-  products: load<Product[]>('gi_products_v2', []),
+  products: load<Product[]>('gi_products_v2', INITIAL_PRODUCTS),
   orders: load<Order[]>('gi_orders_v2', []),
   customers: load<CustomerUser[]>('gi_customers_v2', []),
   activeCustomer: load<CustomerUser | null>('gi_current_customer_v2', null),
@@ -273,14 +273,33 @@ export const useAppStore = create<AppState>((set, get) => ({
     return loaded;
   })(),
   invoices: load<Invoice[]>('gi_invoices_v1', []),
-  faqItems: load<FaqItem[]>('gi_faq_v1', [
-    { id: 'faq-1', category: 'Pagos', question: '¿Cómo funciona la pasarela de pago con conciliación manual?', answer: 'Seleccionas tu plataforma y plan (1, 3, 6 o 12 meses). Puedes pagar en Dólares ($ USD) o en Bolívares (Bs.) calculados a la tasa oficial del BCV. Contamos con 9 métodos de pago a tu elección: Pago Móvil BNC, Binance, Transferencia Internacional (Banco Guayaquil), ApoloPay, Zinli, Wally, Uglycash, Transferencia EEUU (Lead Bank) y Pago Móvil Jurídico (Venezolano de Crédito), además de la Wallet Privada Zeny. Realizas la transferencia, envías tu comprobante de pago para conciliación y nuestro equipo valida el ingreso en minutos para activar tu suscripción.', order: 1 },
-    { id: 'faq-2', category: 'Zeny', question: '¿Qué es la Wallet Zeny y cómo funciona?', answer: 'Zeny es la moneda y billetera interna de la plataforma (1 Zeny = 1 USD, equivalente en Bs. a tasa BCV). Puedes solicitar recargas de saldo abonando por cualquiera de nuestros métodos de pago. Una vez que el administrador acredita tu saldo en tu cuenta, puedes adquirir o renovar suscripciones con 1 solo clic y activación inmediata sin esperas. Importante: este saldo es exclusivo para compras y renovaciones en la plataforma, no es retirable ni canjeable por efectivo.', order: 2 },
-    { id: 'faq-3', category: 'Tasa BCV', question: '¿Cómo se actualiza la tasa oficial del Banco Central de Venezuela (BCV)?', answer: 'Nuestra plataforma se conecta diariamente y de forma automática a los servicios oficiales del BCV para actualizar el valor en Bolívares. Además, el administrador tiene la facultad de ajustar o fijar la tasa manualmente desde el panel de control si fuera necesario.', order: 3 },
-    { id: 'faq-4', category: 'Clientes', question: '¿Dónde veo mis cuentas activas y su fecha de vencimiento?', answer: 'Al registrarte en el Área de Clientes con tu correo y contraseña, dispones de una pestaña llamada "Mis Suscripciones & Vencimientos". Allí verás cada servicio contratado, tus credenciales de acceso (usuario, clave, perfil y PIN) y una cuenta regresiva con los días exactos que restan para el vencimiento de cada pantalla.', order: 4 },
-    { id: 'faq-5', category: 'Google Sheets', question: '¿Cómo se guardan los datos en Google Sheets?', answer: 'La plataforma integra Google Sheets oficial de tu Google Drive. Cada pedido, usuario y recarga se refleja en tiempo real en tu hoja de cálculo, permitiéndote llevar el control administrativo de tu negocio sin depender de bases de datos externas.', order: 5 },
-    { id: 'faq-6', category: 'Garantía', question: '¿Qué garantía tienen las cuentas de streaming?', answer: 'Todas nuestras cuentas y pantallas cuentan con garantía total durante el 100% de la duración contratada (30, 90, 180 o 365 días). Si alguna plataforma presenta caída o bloqueo por actualización, nuestro equipo de soporte te restituye el perfil o cuenta en menos de 30 minutos sin costo adicional.', order: 6 }
-  ]),
+  faqItems: (() => {
+    const defaultFaqs: FaqItem[] = [
+      { id: 'faq-1', category: 'Pagos', question: '¿Cómo funciona la pasarela de pago con conciliación manual?', answer: 'Seleccionas tu plataforma y plan (1, 3, 6 o 12 meses). Puedes pagar en Dólares ($ USD) o en Bolívares (Bs.) calculados a la tasa oficial del BCV. Contamos con 9 métodos de pago a tu elección: Pago Móvil BNC, Binance, Transferencia Internacional (Banco Guayaquil), ApoloPay, Zinli, Wally, Uglycash, Transferencia EEUU (Lead Bank) y Pago Móvil Jurídico (Venezolano de Crédito), además de la Wallet Privada Zeny. Realizas la transferencia, envías tu comprobante de pago para conciliación y nuestro equipo valida el ingreso en minutos para activar tu suscripción.', order: 1 },
+      { id: 'faq-2', category: 'Zeny', question: '¿Qué es la Wallet Zeny y cómo funciona?', answer: 'Zeny es la moneda y billetera interna de la plataforma (1 Zeny = 1 USD, equivalente en Bs. a tasa BCV). Puedes solicitar recargas de saldo abonando por cualquiera de nuestros métodos de pago. Una vez que el administrador acredita tu saldo en tu cuenta, puedes adquirir o renovar suscripciones con 1 solo clic y activación inmediata sin esperas. Importante: este saldo es exclusivo para compras y renovaciones en la plataforma, no es retirable ni canjeable por efectivo.', order: 2 },
+      { id: 'faq-3', category: 'Tasa BCV', question: '¿Cómo se actualiza la tasa oficial del Banco Central de Venezuela (BCV)?', answer: 'Nuestra plataforma se conecta diariamente y de forma automática a los servicios oficiales del BCV para actualizar el valor en Bolívares.', order: 3 },
+      { id: 'faq-4', category: 'Clientes', question: '¿Dónde veo mis cuentas activas y su fecha de vencimiento?', answer: 'Al registrarte en el Área de Clientes con tu correo y contraseña, dispones de una pestaña llamada "Mis Suscripciones & Vencimientos". Allí verás cada servicio contratado, tus credenciales de acceso (usuario, clave, perfil y PIN) y una cuenta regresiva con los días exactos que restan para el vencimiento de cada pantalla.', order: 4 },
+      { id: 'faq-6', category: 'Garantía', question: '¿Qué garantía tienen las cuentas de streaming?', answer: 'Todas nuestras cuentas y pantallas cuentan con garantía total durante el 100% de la duración contratada (30, 90, 180 o 365 días). Si alguna plataforma presenta caída o bloqueo por actualización, nuestro equipo de soporte te restituye el perfil o cuenta.', order: 5 }
+    ];
+    const loaded = load<FaqItem[]>('gi_faq_v1', defaultFaqs);
+    if (loaded && loaded.length > 0) {
+      const sanitized = loaded
+        .filter((f) => !f.question?.includes('Google Sheets') && f.id !== 'faq-5')
+        .map((f, index) => {
+          let ans = f.answer || '';
+          ans = ans.replace(' Además, el administrador tiene la facultad de ajustar o fijar la tasa manualmente desde el panel de control si fuera necesario.', '');
+          ans = ans.replace(' en menos de 30 minutos sin costo adicional.', '.');
+          return { ...f, answer: ans, order: index + 1 };
+        });
+      try {
+        localStorage.setItem('gi_faq_v1', JSON.stringify(sanitized));
+      } catch {
+        // ignore
+      }
+      return sanitized;
+    }
+    return defaultFaqs;
+  })(),
   bcvRate: load<number>('gi_bcv_rate_v2', 36.85),
   supabaseSchemaError: null,
   setSupabaseSchemaError: (supabaseSchemaError) => set({ supabaseSchemaError }),

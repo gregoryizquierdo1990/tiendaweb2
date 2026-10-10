@@ -344,7 +344,6 @@ export default function App() {
   useEffect(() => {
     try {
       const allKeysToClean = [
-        'gi_products_v2',
         'gi_orders_v2',
         'gi_customers_v2',
         'gi_purchases_v2',
@@ -369,8 +368,6 @@ export default function App() {
                 return (
                   !str.includes('demo') &&
                   !str.includes('prueba') &&
-                  !str.includes('netflix') &&
-                  !str.includes('disney') &&
                   !str.includes('sample') &&
                   !str.includes('test') &&
                   !str.includes('cliente@demo.com')
@@ -2459,7 +2456,7 @@ export default function App() {
         {/* FAQ Section */}
         <FAQSection />
 
-        {/* Footer Oficial con Enlaces del Dominio y Rutas Activas */}
+        {/* Footer Oficial */}
         <Footer
           onOpenTracker={() => {
             setTrackingOrderId('');

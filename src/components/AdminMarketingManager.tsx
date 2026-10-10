@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Send,
   Mail,
@@ -145,50 +145,22 @@ export const AdminMarketingManager: React.FC<AdminMarketingManagerProps> = ({
   // ==========================================
   // 1. MOTOR DE RECUPERACIÓN DE CARRITOS & COTIZACIONES
   // ==========================================
-  const [abandonedCarts, setAbandonedCarts] = useState<AbandonedCartItem[]>([
-    {
-      id: 'cart-1',
-      customerName: 'Carlos Mendoza',
-      phone: '584124567890',
-      email: 'carlos.mendoza@gmail.com',
-      itemsSummary: 'Netflix 4K Ultra HD (1 Mes) + Disney+ Premium',
-      totalUsd: 6.0,
-      totalBs: Number((6.0 * bcvRate).toFixed(2)),
-      hoursAgo: 3,
-      date: 'Hoy, hace 3 horas',
-      status: 'pending',
-      discountCode: 'RECUPERA5',
-      notes: 'Llegó hasta la pantalla de pago móvil pero no adjuntó captura'
-    },
-    {
-      id: 'cart-2',
-      customerName: 'Valeria Rivas',
-      phone: '584249876543',
-      email: 'valeria.rivas@gmail.com',
-      itemsSummary: 'Combo HBO Max + Spotify Familiar',
-      totalUsd: 5.5,
-      totalBs: Number((5.5 * bcvRate).toFixed(2)),
-      hoursAgo: 14,
-      date: 'Ayer por la tarde',
-      status: 'contacted',
-      discountCode: 'VUELVE10',
-      notes: 'Se le envió mensaje por WhatsApp ayer a las 6pm'
-    },
-    {
-      id: 'cart-3',
-      customerName: 'Alejandro Colmenares',
-      phone: '584161122334',
-      email: 'alejandro.c@hotmail.com',
-      itemsSummary: 'Cuenta Completa Netflix (5 Pantallas)',
-      totalUsd: 11.0,
-      totalBs: Number((11.0 * bcvRate).toFixed(2)),
-      hoursAgo: 26,
-      date: 'Hace 1 día',
-      status: 'recovered',
-      discountCode: 'FLASHPROMO',
-      notes: 'Completó pago vía Zeny tras recordatorio de garantía'
+  const [abandonedCarts, setAbandonedCarts] = useState<AbandonedCartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('gi_abandoned_carts_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
     }
-  ]);
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('gi_abandoned_carts_v1', JSON.stringify(abandonedCarts));
+    } catch {
+      // ignore
+    }
+  }, [abandonedCarts]);
 
   const [cartFilterStatus, setCartFilterStatus] = useState<string>('todos');
 
@@ -225,47 +197,22 @@ ${DOMAIN_OFFICIAL}
   // ==========================================
   // 2. PROGRAMA DE REFERIDOS CON RECOMPENSAS EN WALLET
   // ==========================================
-  const [referralsList, setReferralsList] = useState<ReferralAffiliate[]>([
-    {
-      id: 'ref-1',
-      referrerName: 'Gregory Izquierdo (Master)',
-      referrerPhone: '584241983648',
-      code: 'GREGORYVIP',
-      link: `${DOMAIN_OFFICIAL}/?ref=GREGORYVIP`,
-      clicks: 142,
-      convertedOrders: 18,
-      totalVolumeUsd: 108.0,
-      earnedRewardUsd: 18.0,
-      paidRewardUsd: 10.0,
-      status: 'active'
-    },
-    {
-      id: 'ref-2',
-      referrerName: 'María Gómez (Revendedora)',
-      referrerPhone: '584145558899',
-      code: 'MARIAPROMO',
-      link: `${DOMAIN_OFFICIAL}/?ref=MARIAPROMO`,
-      clicks: 86,
-      convertedOrders: 11,
-      totalVolumeUsd: 66.0,
-      earnedRewardUsd: 11.0,
-      paidRewardUsd: 5.0,
-      status: 'active'
-    },
-    {
-      id: 'ref-3',
-      referrerName: 'Pedro Infante',
-      referrerPhone: '584129990011',
-      code: 'PEDROSTREAM',
-      link: `${DOMAIN_OFFICIAL}/?ref=PEDROSTREAM`,
-      clicks: 34,
-      convertedOrders: 4,
-      totalVolumeUsd: 24.0,
-      earnedRewardUsd: 4.0,
-      paidRewardUsd: 0.0,
-      status: 'active'
+  const [referralsList, setReferralsList] = useState<ReferralAffiliate[]>(() => {
+    try {
+      const saved = localStorage.getItem('gi_referrals_list_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
     }
-  ]);
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('gi_referrals_list_v1', JSON.stringify(referralsList));
+    } catch {
+      // ignore
+    }
+  }, [referralsList]);
 
   const [rewardRuleUsd, setRewardRuleUsd] = useState<number>(1.0); // $1 USD por cada referido que compre
   const [newReferrerName, setNewReferrerName] = useState('');
@@ -313,47 +260,22 @@ ${DOMAIN_OFFICIAL}
   // ==========================================
   // 3. CAMPAÑAS FLASH Y BANNERS PROGRAMABLES POR TEMPORADA
   // ==========================================
-  const [flashCampaigns, setFlashCampaigns] = useState<FlashCampaign[]>([
-    {
-      id: 'camp-1',
-      title: '🔥 Fin de Mes: Combo 4K Netflix + Disney+ con 20% OFF',
-      badge: '⚡ FLASH SALE 24H',
-      discountPercent: 20,
-      couponCode: 'FINDEMES20',
-      startsAt: 'Hoy 00:00',
-      endsAt: 'Mañana 23:59',
-      countdownHours: 18,
-      active: true,
-      themeColor: 'purple',
-      targetServices: 'Netflix 4K, Disney+ y Combos Ultra'
-    },
-    {
-      id: 'camp-2',
-      title: '🏆 Especial Champions League: Max HBO & Deportes en Vivo',
-      badge: '⚽ SUPER PROMO',
-      discountPercent: 15,
-      couponCode: 'CHAMPIONS15',
-      startsAt: 'Viernes',
-      endsAt: 'Domingo',
-      countdownHours: 48,
-      active: false,
-      themeColor: 'emerald',
-      targetServices: 'Max (HBO) y Star+'
-    },
-    {
-      id: 'camp-3',
-      title: '🎄 Temporada Navideña & Black Streaming Friday',
-      badge: '🎁 EDICIÓN ESPECIAL',
-      discountPercent: 25,
-      couponCode: 'NAVIDAD25',
-      startsAt: 'Programada',
-      endsAt: '31 de Diciembre',
-      countdownHours: 72,
-      active: false,
-      themeColor: 'amber',
-      targetServices: 'Todo el catálogo'
+  const [flashCampaigns, setFlashCampaigns] = useState<FlashCampaign[]>(() => {
+    try {
+      const saved = localStorage.getItem('gi_flash_campaigns_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
     }
-  ]);
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('gi_flash_campaigns_v1', JSON.stringify(flashCampaigns));
+    } catch {
+      // ignore
+    }
+  }, [flashCampaigns]);
 
   const [newCampaignTitle, setNewCampaignTitle] = useState('');
   const [newCampaignDiscount, setNewCampaignDiscount] = useState('15');
@@ -542,47 +464,34 @@ ${DOMAIN_OFFICIAL}`;
   // ==========================================
   // 7. LANDING PAGES DINÁMICAS PARA AFILIADOS Y FRANQUICIAS
   // ==========================================
-  const [affiliateLandings, setAffiliateLandings] = useState([
-    {
-      id: 'land-1',
-      slug: 'valencia-vip',
-      name: 'Franquicia Carabobo VIP',
-      owner: 'Carlos Mendoza',
-      whatsapp: '584124567890',
-      tagline: 'Tu distribuidor autorizado de streaming en Valencia con entregas al instante.',
-      customMarginPercent: 15,
-      fullUrl: `${DOMAIN_OFFICIAL}/?f=valencia-vip`,
-      clicks: 312,
-      conversions: 42,
-      active: true
-    },
-    {
-      id: 'land-2',
-      slug: 'maracaibo-streaming',
-      name: 'GI Streaming Maracaibo',
-      owner: 'Mariana Silva',
-      whatsapp: '584246123456',
-      tagline: 'Cuentas 4K Ultra HD garantizadas con pago móvil Banesco y Mercantil.',
-      customMarginPercent: 10,
-      fullUrl: `${DOMAIN_OFFICIAL}/?f=maracaibo-streaming`,
-      clicks: 195,
-      conversions: 28,
-      active: true
-    },
-    {
-      id: 'land-3',
-      slug: 'caracas-central',
-      name: 'Franquicia Caracas Centro',
-      owner: 'Alejandro Colmenares',
-      whatsapp: '584161122334',
-      tagline: 'Soporte 24/7 y activación al instante en toda la Gran Caracas.',
-      customMarginPercent: 20,
-      fullUrl: `${DOMAIN_OFFICIAL}/?f=caracas-central`,
-      clicks: 450,
-      conversions: 67,
-      active: true
+  const [affiliateLandings, setAffiliateLandings] = useState<Array<{
+    id: string;
+    slug: string;
+    name: string;
+    owner: string;
+    whatsapp: string;
+    tagline: string;
+    customMarginPercent: number;
+    fullUrl: string;
+    clicks: number;
+    conversions: number;
+    active: boolean;
+  }>>(() => {
+    try {
+      const saved = localStorage.getItem('gi_affiliate_landings_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
     }
-  ]);
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('gi_affiliate_landings_v1', JSON.stringify(affiliateLandings));
+    } catch {
+      // ignore
+    }
+  }, [affiliateLandings]);
 
   const [newLandingSlug, setNewLandingSlug] = useState('');
   const [newLandingName, setNewLandingName] = useState('');

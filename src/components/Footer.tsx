@@ -60,7 +60,7 @@ export const Footer: React.FC<FooterProps> = ({
   return (
     <footer className="bg-white border-t border-slate-200/80 text-slate-600 text-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           {/* Brand */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -85,69 +85,6 @@ export const Footer: React.FC<FooterProps> = ({
                 Dominio: {DOMAIN_OFFICIAL.replace('https://', '')}
               </span>
             </div>
-          </div>
-
-          {/* Rutas Oficiales del Dominio */}
-          <div>
-            <h4 className="font-bold text-slate-900 mb-3 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-              <span>🌐 Enlaces del Dominio</span>
-            </h4>
-            <ul className="space-y-2 text-slate-600">
-              <li>
-                <a 
-                  href="/" 
-                  className="hover:text-indigo-600 transition-colors flex items-center justify-between"
-                >
-                  <span>/ = Tienda Principal</span>
-                  <span className="text-[10px] text-emerald-600 font-semibold">Público</span>
-                </a>
-              </li>
-              <li>
-                <a 
-                  href="/admin" 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onOpenAdmin();
-                  }}
-                  className="hover:text-indigo-600 transition-colors flex items-center justify-between cursor-pointer"
-                >
-                  <span>/admin = Panel Admin</span>
-                  <span className="text-[10px] text-purple-600 font-semibold">Staff</span>
-                </a>
-              </li>
-              <li>
-                <a 
-                  href="/solicitud-franquicia" 
-                  className="hover:text-indigo-600 transition-colors flex items-center justify-between"
-                >
-                  <span>/solicitud-franquicia</span>
-                  <span className="text-[10px] text-amber-600 font-semibold">Postulación</span>
-                </a>
-              </li>
-              <li>
-                <a 
-                  href="/rutas" 
-                  onClick={(e) => {
-                    if (onOpenRoutes) {
-                      e.preventDefault();
-                      onOpenRoutes();
-                    }
-                  }}
-                  className="hover:text-indigo-600 transition-colors flex items-center justify-between font-bold text-indigo-600"
-                >
-                  <span>/rutas = Directorio Completo</span>
-                  <span className="text-[10px] text-indigo-600 font-bold">Ver Todas</span>
-                </a>
-              </li>
-              <li>
-                <button 
-                  onClick={onOpenTracker} 
-                  className="hover:text-indigo-600 transition-colors text-left cursor-pointer text-slate-500"
-                >
-                  • Rastreador de Pedidos
-                </button>
-              </li>
-            </ul>
           </div>
 
           {/* Servicios Populares */}
@@ -194,18 +131,7 @@ export const Footer: React.FC<FooterProps> = ({
               <span>Transacciones Seguras</span>
             </span>
             <span>•</span>
-            <a 
-              href="/rutas" 
-              onClick={(e) => {
-                if (onOpenRoutes) {
-                  e.preventDefault();
-                  onOpenRoutes();
-                }
-              }}
-              className="text-indigo-600 hover:underline font-bold"
-            >
-              Directorio de Rutas Activas
-            </a>
+            <span>Atención & Soporte 24/7</span>
             <span>•</span>
             <span>Entrega Garantizada</span>
           </div>
