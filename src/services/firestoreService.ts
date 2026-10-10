@@ -36,7 +36,7 @@ export function setIsSyncingFromFirestore(val: boolean) {
 }
 
 // --- Offline Queue & Resilience Types ---
-const QUEUE_STORAGE_KEY = 'streamsync_pending_firestore_queue';
+const QUEUE_STORAGE_KEY = 'gi_pending_firestore_queue';
 
 export interface QueuedOperation {
   id: string;

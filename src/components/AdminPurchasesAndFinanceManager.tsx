@@ -81,7 +81,7 @@ interface AdminPurchasesAndFinanceManagerProps {
   products?: Product[];
 }
 
-const STORAGE_SUPPLIERS_KEY = 'streamsync_suppliers_directory_v1';
+const STORAGE_SUPPLIERS_KEY = 'gi_suppliers_directory_v1';
 const INITIAL_SUPPLIERS: Supplier[] = [];
 
 const DEFAULT_PLATFORMS = ['TODAS', 'NETFLIX', 'MAX', 'DISNEY+', 'PRIME VIDEO', 'SPOTIFY', 'IPTV', 'OTRAS'];

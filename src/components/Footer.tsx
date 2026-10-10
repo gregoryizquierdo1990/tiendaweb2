@@ -64,8 +64,8 @@ export const Footer: React.FC<FooterProps> = ({
           {/* Brand */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-sky-500 flex items-center justify-center text-white shadow-xs">
-                <Sparkles className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center shadow-xs p-0.5 shrink-0">
+                <img src="/favicon-32x32.png" alt="Logo" className="w-full h-full object-contain" />
               </div>
               <span className="text-base font-bold text-slate-900 truncate max-w-[180px]">
                 {branding?.projectName || projectName}

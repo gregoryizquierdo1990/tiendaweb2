@@ -1,4 +1,4 @@
-// Push notifications utility for StreamSync Pro with FCM support
+// Push notifications utility with FCM support for Gregory Izquierdo Streaming
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import firebaseConfig from '../../firebase-applet-config.json';

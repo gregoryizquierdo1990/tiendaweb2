@@ -65,7 +65,7 @@ export async function listUserSpreadsheets(accessToken: string): Promise<DriveSp
 /**
  * Creates a brand new Google Sheet in the user's Drive configured specifically for Gregory Izquierdo Streaming
  */
-export async function createStreamSyncSpreadsheet(
+export async function createStreamingSpreadsheet(
   accessToken: string,
   title: string = 'Gregory Izquierdo Streaming - Control Maestro'
 ): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> {

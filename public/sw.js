@@ -1,4 +1,4 @@
-// StreamSync Pro Service Worker for Push Notifications
+// Service Worker for Push Notifications - Gregory Izquierdo Streaming
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
@@ -8,7 +8,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'StreamSync Pro', body: 'Nueva notificación en la plataforma', url: '/' };
+  let data = { title: 'GI Streaming', body: 'Nueva notificación en la plataforma', url: '/' };
   try {
     if (event.data) {
       data = event.data.json();

@@ -246,7 +246,7 @@ export const AdminSystemsManager: React.FC<AdminSystemsManagerProps> = ({
   const handleExportFullJsonBackup = () => {
     const backupData = {
       version: '2026.1',
-      appName: 'StreamSync Pro - Emprendimiento Gregory Izquierdo',
+      appName: 'Emprendimiento Gregory Izquierdo - Plataformas de Servicios',
       domain: DOMAIN_OFFICIAL,
       createdAt: new Date().toISOString(),
       bcvRate,
@@ -383,7 +383,7 @@ export const AdminSystemsManager: React.FC<AdminSystemsManagerProps> = ({
   const handleTestPushNotification = () => {
     if ('Notification' in window) {
       if (Notification.permission === 'granted') {
-        new Notification('StreamSync Pro - Prueba del Sistema', {
+        new Notification('GI Streaming - Prueba del Sistema', {
           body: 'Notificación PWA local exitosa. La sincronización en segundo plano está operativa.',
           icon: '/icon.svg'
         });
@@ -391,7 +391,7 @@ export const AdminSystemsManager: React.FC<AdminSystemsManagerProps> = ({
       } else {
         Notification.requestPermission().then(perm => {
           if (perm === 'granted') {
-            new Notification('StreamSync Pro', { body: 'Permiso concedido para alertas del sistema.' });
+            new Notification('GI Streaming', { body: 'Permiso concedido para alertas del sistema.' });
           } else {
             onShowNotification('warning', 'El navegador tiene las notificaciones bloqueadas.');
           }

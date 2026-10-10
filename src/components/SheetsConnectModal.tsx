@@ -260,7 +260,7 @@ export const SheetsConnectModal: React.FC<SheetsConnectModalProps> = ({
                   className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Crear Nueva Hoja "StreamSync - Base de Datos" en mi Drive</span>
+                  <span>Crear Nueva Hoja "Base de Datos Streaming" en mi Drive</span>
                 </button>
 
                 <div className="relative py-1 flex items-center justify-center">

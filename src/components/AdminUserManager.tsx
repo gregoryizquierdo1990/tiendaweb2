@@ -85,7 +85,7 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
   // Perfil del Administrador Único de Google (Persistido)
   const [adminProfile, setAdminProfile] = useState<AdminUserData>(() => {
     try {
-      const saved = localStorage.getItem('streamsync_primary_google_admin_v2');
+      const saved = localStorage.getItem('gi_primary_google_admin_v2');
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.error(e);
@@ -104,11 +104,11 @@ export const AdminUserManager: React.FC<AdminUserManagerProps> = ({
   useEffect(() => {
     try {
       localStorage.removeItem('portal_staff_members');
-      localStorage.removeItem('streamsync_staff_members');
+      localStorage.removeItem('gi_staff_members');
       // Guardar perfil limpio consolidado
-      localStorage.setItem('streamsync_primary_google_admin_v2', JSON.stringify(adminProfile));
+      localStorage.setItem('gi_primary_google_admin_v2', JSON.stringify(adminProfile));
       // Mantener sincronizado el email en la lista para validación de googleAuth
-      localStorage.setItem('streamsync_master_admins_v1', JSON.stringify([{
+      localStorage.setItem('gi_master_admins_v1', JSON.stringify([{
         id: adminProfile.id,
         name: adminProfile.name,
         email: adminProfile.email,

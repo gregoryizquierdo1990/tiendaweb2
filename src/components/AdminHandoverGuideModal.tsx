@@ -39,7 +39,7 @@ interface AdminHandoverGuideModalProps {
   isInline?: boolean;
 }
 
-const STORAGE_CONTRACT_KEY = 'streamsync_franchise_contract_custom_v1';
+const STORAGE_CONTRACT_KEY = 'gi_franchise_contract_custom_v1';
 
 export const AdminHandoverGuideModal: React.FC<AdminHandoverGuideModalProps> = ({ onClose, bcvRate = 36.5, isInline = false }) => {
   const [activeSection, setActiveSection] = useState<'requisitos' | 'programas' | 'entrega' | 'contrato' | 'rutas'>('requisitos');
@@ -50,7 +50,7 @@ export const AdminHandoverGuideModal: React.FC<AdminHandoverGuideModalProps> = (
 
   // Contract variables
   const [monthlyFee, setMonthlyFee] = useState<number>(() => {
-    const saved = localStorage.getItem('streamsync_default_franchise_fee');
+    const saved = localStorage.getItem('gi_default_franchise_fee');
     return saved ? Number(saved) : DEFAULT_FRANCHISE_MONTHLY_FEE;
   });
   const [franchiseName, setFranchiseName] = useState('StreamPlus Venezuela');
@@ -83,7 +83,7 @@ export const AdminHandoverGuideModal: React.FC<AdminHandoverGuideModalProps> = (
   const handleSaveContractTemplate = () => {
     try {
       localStorage.setItem(STORAGE_CONTRACT_KEY, contractTemplate);
-      localStorage.setItem('streamsync_default_franchise_fee', String(monthlyFee));
+      localStorage.setItem('gi_default_franchise_fee', String(monthlyFee));
     } catch (e) {
       console.warn('Could not save contract template');
     }

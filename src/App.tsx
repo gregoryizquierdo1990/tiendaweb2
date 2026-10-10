@@ -93,7 +93,7 @@ import {
 } from './services/googleAuth';
 
 import {
-  createStreamSyncSpreadsheet,
+  createStreamingSpreadsheet,
   listUserSpreadsheets,
   appendOrderToSheet,
   updateOrderStatusInSheet,
@@ -126,20 +126,20 @@ import {
 import { calculateExpirationDate } from './utils/formatters';
 import { PWAInstallBanner, IOSInstallModal } from './components/PWAInstallBanner';
 
-const STORAGE_PRODUCTS_KEY = 'streamsync_products_v2';
-const STORAGE_ORDERS_KEY = 'streamsync_orders_v2';
-const STORAGE_SHEET_KEY = 'streamsync_sheet_config_v2';
-const STORAGE_CUSTOMERS_KEY = 'streamsync_customers_v2';
-const STORAGE_CURRENT_CUSTOMER_KEY = 'streamsync_current_customer_v2';
-const STORAGE_TOPUPS_KEY = 'streamsync_topups_v2';
-const STORAGE_METHODS_KEY = 'streamsync_methods_v2';
-const STORAGE_BCV_KEY = 'streamsync_bcv_rate_v2';
-const STORAGE_INCIDENTS_KEY = 'streamsync_incidents_v2';
-const STORAGE_TEMPLATES_KEY = 'streamsync_message_templates_v2';
-const STORAGE_ACTION_MAPPING_KEY = 'streamsync_action_mapping_v2';
-const STORAGE_FRANCHISES_KEY = 'streamsync_franchises_v1';
-const STORAGE_FRANCHISE_TOPUPS_KEY = 'streamsync_franchise_topups_v1';
-const STORAGE_BRANDING_KEY = 'streamsync_branding_v1';
+const STORAGE_PRODUCTS_KEY = 'gi_products_v2';
+const STORAGE_ORDERS_KEY = 'gi_orders_v2';
+const STORAGE_SHEET_KEY = 'gi_sheet_config_v2';
+const STORAGE_CUSTOMERS_KEY = 'gi_customers_v2';
+const STORAGE_CURRENT_CUSTOMER_KEY = 'gi_current_customer_v2';
+const STORAGE_TOPUPS_KEY = 'gi_topups_v2';
+const STORAGE_METHODS_KEY = 'gi_methods_v2';
+const STORAGE_BCV_KEY = 'gi_bcv_rate_v2';
+const STORAGE_INCIDENTS_KEY = 'gi_incidents_v2';
+const STORAGE_TEMPLATES_KEY = 'gi_message_templates_v2';
+const STORAGE_ACTION_MAPPING_KEY = 'gi_action_mapping_v2';
+const STORAGE_FRANCHISES_KEY = 'gi_franchises_v1';
+const STORAGE_FRANCHISE_TOPUPS_KEY = 'gi_franchise_topups_v1';
+const STORAGE_BRANDING_KEY = 'gi_branding_v1';
 const STORAGE_EXPENSES_KEY = 'gi_expenses_list_2026';
 
 export default function App() {
@@ -248,7 +248,7 @@ export default function App() {
     window.addEventListener('popstate', handleLocationChange);
     return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
-  const STORAGE_SUPPLIER_PURCHASES_KEY = 'streamsync_supplier_purchases_v1';
+  const STORAGE_SUPPLIER_PURCHASES_KEY = 'gi_supplier_purchases_v1';
   // Purchases & Expenses
   const { purchases: supplierPurchases, setPurchases: setSupplierPurchases } = useAppStore();
   const { expenses, setExpenses } = useAppStore();
@@ -318,18 +318,18 @@ export default function App() {
   useEffect(() => {
     const interval = setInterval(() => {
       if (isAdminOpen) {
-        const activeStaffId = localStorage.getItem('streamsync_active_logged_staff_id') || 'admin-maxter';
-        const activeToken = localStorage.getItem(`streamsync_staff_session_token_${activeStaffId}`);
-        const myToken = sessionStorage.getItem('streamsync_my_staff_session');
+        const activeStaffId = localStorage.getItem('gi_active_logged_staff_id') || 'admin-maxter';
+        const activeToken = localStorage.getItem(`gi_staff_session_token_${activeStaffId}`);
+        const myToken = sessionStorage.getItem('gi_my_staff_session');
         if (activeToken && myToken && activeToken !== myToken) {
           setIsAdminOpen(false);
-          localStorage.removeItem('streamsync_active_logged_staff_id');
+          localStorage.removeItem('gi_active_logged_staff_id');
           showNotification('error', 'Sesión cerrada: Se ha iniciado sesión en otro dispositivo o pestaña de forma simultánea.');
         }
       }
       if (isCustomerPortalOpen && activeCustomer) {
-        const activeToken = localStorage.getItem(`streamsync_customer_session_token_${activeCustomer.id}`);
-        const myToken = sessionStorage.getItem('streamsync_my_customer_session');
+        const activeToken = localStorage.getItem(`gi_customer_session_token_${activeCustomer.id}`);
+        const myToken = sessionStorage.getItem('gi_my_customer_session');
         if (activeToken && myToken && activeToken !== myToken) {
           setIsCustomerPortalOpen(false);
           setActiveCustomer(null);
@@ -344,17 +344,17 @@ export default function App() {
   useEffect(() => {
     try {
       const allKeysToClean = [
-        'streamsync_products_v2',
-        'streamsync_orders_v2',
-        'streamsync_customers_v2',
-        'streamsync_purchases_v2',
-        'streamsync_invoices_v1',
+        'gi_products_v2',
+        'gi_orders_v2',
+        'gi_customers_v2',
+        'gi_purchases_v2',
+        'gi_invoices_v1',
         'gi_expenses_list_2026',
-        'streamsync_topups_v2',
-        'streamsync_incidents_v2',
+        'gi_topups_v2',
+        'gi_incidents_v2',
         'gregory_audit_logs_v1',
-        'streamsync_franchises_v1',
-        'streamsync_franchise_topups_v1',
+        'gi_franchises_v1',
+        'gi_franchise_topups_v1',
         'maxter_accounts_receivable',
         'maxter_accounts_payable'
       ];
@@ -724,14 +724,14 @@ export default function App() {
     }
     try {
       setSheetsState((prev) => ({ ...prev, syncStatus: 'syncing' }));
-      const { spreadsheetId, spreadsheetUrl } = await createStreamSyncSpreadsheet(
+      const { spreadsheetId, spreadsheetUrl } = await createStreamingSpreadsheet(
         token,
-        'StreamSync - Base de Datos Streaming'
+        'Base de Datos Streaming'
       );
       setSheetsState({
         isConnected: true,
         spreadsheetId,
-        spreadsheetName: 'StreamSync - Base de Datos Streaming',
+        spreadsheetName: 'Base de Datos Streaming',
         spreadsheetUrl,
         lastSyncedAt: new Date().toISOString(),
         syncStatus: 'success'
@@ -809,7 +809,7 @@ export default function App() {
         fetchDriveSheets(token);
       } else {
         showNotification('info', `No se encontró "${fileName}". Creando automáticamente en tu Google Drive...`);
-        const { spreadsheetId, spreadsheetUrl } = await createStreamSyncSpreadsheet(token, fileName);
+        const { spreadsheetId, spreadsheetUrl } = await createStreamingSpreadsheet(token, fileName);
         setSheetsState({
           isConnected: true,
           spreadsheetId,
@@ -2070,8 +2070,8 @@ export default function App() {
     clearAdminSession();
     setAdminSessionState(null);
     setIsAdminOpen(false);
-    localStorage.removeItem('streamsync_active_logged_staff_id');
-    sessionStorage.removeItem('streamsync_my_staff_session');
+    localStorage.removeItem('gi_active_logged_staff_id');
+    sessionStorage.removeItem('gi_my_staff_session');
     showNotification('info', 'Sesión de administrador cerrada correctamente.');
     navigateToStore();
   };
@@ -2534,8 +2534,8 @@ export default function App() {
             setActiveCustomer(user);
             setIsCustomerAuthOpen(false);
             const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-            localStorage.setItem(`streamsync_customer_session_token_${user.id}`, token);
-            sessionStorage.setItem('streamsync_my_customer_session', token);
+            localStorage.setItem(`gi_customer_session_token_${user.id}`, token);
+            sessionStorage.setItem('gi_my_customer_session', token);
             setIsCustomerPortalOpen(true);
             showNotification('success', `¡Bienvenido de nuevo, ${user.name}!`);
           }}
@@ -2574,9 +2574,9 @@ export default function App() {
           onLoginSuccess={(adminProfile) => {
             setIsLoginModalOpen(false);
             const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-            localStorage.setItem(`streamsync_staff_session_token_${adminProfile.id}`, token);
-            sessionStorage.setItem('streamsync_my_staff_session', token);
-            localStorage.setItem('streamsync_active_logged_staff_id', adminProfile.id);
+            localStorage.setItem(`gi_staff_session_token_${adminProfile.id}`, token);
+            sessionStorage.setItem('gi_my_staff_session', token);
+            localStorage.setItem('gi_active_logged_staff_id', adminProfile.id);
             navigateToAdmin();
           }}
         />

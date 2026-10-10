@@ -157,7 +157,7 @@ export const INITIAL_PAYMENT_METHODS: PaymentMethod[] = [
     name: 'Wallet Privada Zeny',
     shortName: 'Wallet Privada Zeny',
     category: 'billetera_digital',
-    holderName: 'Saldo Virtual StreamSync',
+    holderName: 'Saldo Virtual GI Streaming',
     accountNumber: 'Saldo Interno de la Cuenta',
     accountTypeLabel: '1 Zeny = 1.00 USD',
     instructions: 'enviar comprobante de pago para conciliacion',

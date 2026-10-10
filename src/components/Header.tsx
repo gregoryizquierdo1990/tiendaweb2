@@ -254,9 +254,8 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Logo & Brand Name */}
           <div className="flex items-center gap-2 sm:gap-3">
             <a href="#" className="flex items-center gap-2 group">
-              {/* Logo Image with Focused Circular Crop and Sutil Elegant Border - Mayor tamaño para lectura de detalle */}
-              <div className="w-22 h-22 sm:w-28 sm:h-28 shrink-0 flex items-center justify-center rounded-full overflow-hidden border-2 border-indigo-600/30 shadow-md bg-white p-0.5 transition-transform duration-300 group-hover:scale-105">
-                <img src="/logo.png" alt="Logo" className="w-full h-full object-cover object-center rounded-full scale-[1.15]" />
+              <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 flex items-center justify-center rounded-full overflow-hidden border-2 border-indigo-600/30 shadow-md bg-white p-1 transition-transform duration-300 group-hover:scale-105">
+                <img src="/pwa-512x512.png" alt="Emprendimiento Gregory Izquierdo" className="w-full h-full object-contain rounded-full" />
               </div>
 
               <div className="flex flex-col truncate">

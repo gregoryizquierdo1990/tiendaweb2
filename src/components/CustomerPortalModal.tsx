@@ -248,7 +248,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
             <div>
               <div className="flex items-center gap-2 text-indigo-200 text-xs font-semibold uppercase tracking-wider mb-1">
                 <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Billetera Privada StreamSync</span>
+                <span>Billetera Privada Zeny</span>
                 <span className="px-1.5 py-0.2 rounded bg-indigo-500/40 text-[10px] text-indigo-100 font-mono">
                   1 Zeny = 1 USD
                 </span>

@@ -559,7 +559,7 @@ ${DOMAIN_OFFICIAL}`;
     {
       id: 'land-2',
       slug: 'maracaibo-streaming',
-      name: 'StreamSync Maracaibo',
+      name: 'GI Streaming Maracaibo',
       owner: 'Mariana Silva',
       whatsapp: '584246123456',
       tagline: 'Cuentas 4K Ultra HD garantizadas con pago móvil Banesco y Mercantil.',

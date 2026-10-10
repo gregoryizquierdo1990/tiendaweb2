@@ -16,7 +16,7 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = () => {
     if (isInstalled) return;
 
     // Check if dismissed in this session
-    const dismissed = sessionStorage.getItem('streamsync_pwa_dismissed');
+    const dismissed = sessionStorage.getItem('gi_pwa_dismissed');
     if (!dismissed) {
       // Delay presentation slightly so user can see page first
       const timer = setTimeout(() => {
@@ -28,7 +28,7 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = () => {
 
   const handleDismiss = () => {
     setShowBanner(false);
-    sessionStorage.setItem('streamsync_pwa_dismissed', 'true');
+    sessionStorage.setItem('gi_pwa_dismissed', 'true');
   };
 
   const handleInstallClick = async () => {
@@ -64,10 +64,8 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = () => {
       <div className="fixed bottom-4 left-3 right-3 sm:left-auto sm:right-6 sm:max-w-md z-50 animate-bounce-subtle">
         <div className="bg-slate-950/95 backdrop-blur-md text-white p-3.5 sm:p-4 rounded-2xl shadow-2xl border border-indigo-500/40 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 p-0.5 shadow-md flex items-center justify-center shrink-0">
-              <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center font-black text-indigo-300 text-xs">
-                GI
-              </div>
+            <div className="relative w-10 h-10 rounded-xl bg-white p-0.5 shadow-md flex items-center justify-center shrink-0 border border-indigo-500/40 overflow-hidden">
+              <img src="/pwa-192x192.png" alt="Logo de la Aplicación" className="w-full h-full object-contain rounded-lg" />
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-950" />
             </div>
 
@@ -121,8 +119,8 @@ export const IOSInstallModal: React.FC<{ onClose: () => void }> = ({ onClose }) 
       <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden p-6 text-slate-800">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-              <Smartphone className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-white p-0.5 border border-slate-200 flex items-center justify-center shadow-xs overflow-hidden shrink-0">
+              <img src="/pwa-192x192.png" alt="Logo de la Aplicación" className="w-full h-full object-contain rounded-lg" />
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm">Instalar en tu iPhone o Android</h3>

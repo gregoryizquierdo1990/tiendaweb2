@@ -235,7 +235,7 @@ interface AppState {
   addPurchase: (purchase: SupplierPurchase, paymentAccountId?: string) => void;
 }
 
-// Lectura segura desde localStorage (sin registros de ejemplo)
+// Lectura segura desde localStorage
 const load = <T,>(key: string, fallback: T): T => {
   try {
     const raw = localStorage.getItem(key);
@@ -252,36 +252,36 @@ export const useAppStore = create<AppState>((set, get) => ({
   bankBalances: load('maxter_initial_bank_balances', {}),
   accountsReceivable: load('maxter_accounts_receivable', []),
   accountsPayable: load('maxter_accounts_payable', []),
-  purchases: load<SupplierPurchase[]>('streamsync_purchases_v2', []),
+  purchases: load<SupplierPurchase[]>('gi_purchases_v2', []),
   accountingEntries: [],
-  products: load<Product[]>('streamsync_products_v2', []),
-  orders: load<Order[]>('streamsync_orders_v2', []),
-  customers: load<CustomerUser[]>('streamsync_customers_v2', []),
-  activeCustomer: load<CustomerUser | null>('streamsync_current_customer_v2', null),
-  walletTopups: load<WalletTopup[]>('streamsync_topups_v2', []),
-  incidents: load<IncidentReport[]>('streamsync_incidents_v2', []),
-  franchises: load<FranchiseTenant[]>('streamsync_franchises_v1', []),
+  products: load<Product[]>('gi_products_v2', []),
+  orders: load<Order[]>('gi_orders_v2', []),
+  customers: load<CustomerUser[]>('gi_customers_v2', []),
+  activeCustomer: load<CustomerUser | null>('gi_current_customer_v2', null),
+  walletTopups: load<WalletTopup[]>('gi_topups_v2', []),
+  incidents: load<IncidentReport[]>('gi_incidents_v2', []),
+  franchises: load<FranchiseTenant[]>('gi_franchises_v1', []),
   expenses: load<ExpenseItem[]>('gi_expenses_list_2026', []),
   franchiseApplications: [],
   franchiseTickets: [],
   auditLogs: [],
   paymentMethods: (() => {
-    const loaded = load<PaymentMethod[]>('streamsync_methods_v2', INITIAL_PAYMENT_METHODS);
+    const loaded = load<PaymentMethod[]>('gi_methods_v2', INITIAL_PAYMENT_METHODS);
     if (!loaded || loaded.length === 0 || loaded.some((m) => m.id === 'pm-pichincha' || m.name?.includes('Pichincha') || m.id === 'pm-zelle')) {
       return INITIAL_PAYMENT_METHODS;
     }
     return loaded;
   })(),
-  invoices: load<Invoice[]>('streamsync_invoices_v1', []),
-  faqItems: load<FaqItem[]>('streamsync_faq_v1', [
+  invoices: load<Invoice[]>('gi_invoices_v1', []),
+  faqItems: load<FaqItem[]>('gi_faq_v1', [
     { id: 'faq-1', category: 'Pagos', question: '¿Cómo funciona la pasarela de pago con conciliación manual?', answer: 'Seleccionas tu plataforma y plan (1, 3, 6 o 12 meses). Puedes pagar en Dólares ($ USD) o en Bolívares (Bs.) calculados a la tasa oficial del BCV. Contamos con 9 métodos de pago a tu elección: Pago Móvil BNC, Binance, Transferencia Internacional (Banco Guayaquil), ApoloPay, Zinli, Wally, Uglycash, Transferencia EEUU (Lead Bank) y Pago Móvil Jurídico (Venezolano de Crédito), además de la Wallet Privada Zeny. Realizas la transferencia, envías tu comprobante de pago para conciliación y nuestro equipo valida el ingreso en minutos para activar tu suscripción.', order: 1 },
-    { id: 'faq-2', category: 'Zeny', question: '¿Qué es la Wallet Zeny y cómo funciona?', answer: 'Zeny es la moneda y billetera interna de StreamSync (1 Zeny = 1 USD, equivalente en Bs. a tasa BCV). Puedes solicitar recargas de saldo abonando por cualquiera de nuestros métodos de pago. Una vez que el administrador acredita tu saldo en tu cuenta, puedes adquirir o renovar suscripciones con 1 solo clic y activación inmediata sin esperas. Importante: este saldo es exclusivo para compras y renovaciones en la plataforma, no es retirable ni canjeable por efectivo.', order: 2 },
+    { id: 'faq-2', category: 'Zeny', question: '¿Qué es la Wallet Zeny y cómo funciona?', answer: 'Zeny es la moneda y billetera interna de la plataforma (1 Zeny = 1 USD, equivalente en Bs. a tasa BCV). Puedes solicitar recargas de saldo abonando por cualquiera de nuestros métodos de pago. Una vez que el administrador acredita tu saldo en tu cuenta, puedes adquirir o renovar suscripciones con 1 solo clic y activación inmediata sin esperas. Importante: este saldo es exclusivo para compras y renovaciones en la plataforma, no es retirable ni canjeable por efectivo.', order: 2 },
     { id: 'faq-3', category: 'Tasa BCV', question: '¿Cómo se actualiza la tasa oficial del Banco Central de Venezuela (BCV)?', answer: 'Nuestra plataforma se conecta diariamente y de forma automática a los servicios oficiales del BCV para actualizar el valor en Bolívares. Además, el administrador tiene la facultad de ajustar o fijar la tasa manualmente desde el panel de control si fuera necesario.', order: 3 },
     { id: 'faq-4', category: 'Clientes', question: '¿Dónde veo mis cuentas activas y su fecha de vencimiento?', answer: 'Al registrarte en el Área de Clientes con tu correo y contraseña, dispones de una pestaña llamada "Mis Suscripciones & Vencimientos". Allí verás cada servicio contratado, tus credenciales de acceso (usuario, clave, perfil y PIN) y una cuenta regresiva con los días exactos que restan para el vencimiento de cada pantalla.', order: 4 },
     { id: 'faq-5', category: 'Google Sheets', question: '¿Cómo se guardan los datos en Google Sheets?', answer: 'La plataforma integra Google Sheets oficial de tu Google Drive. Cada pedido, usuario y recarga se refleja en tiempo real en tu hoja de cálculo, permitiéndote llevar el control administrativo de tu negocio sin depender de bases de datos externas.', order: 5 },
     { id: 'faq-6', category: 'Garantía', question: '¿Qué garantía tienen las cuentas de streaming?', answer: 'Todas nuestras cuentas y pantallas cuentan con garantía total durante el 100% de la duración contratada (30, 90, 180 o 365 días). Si alguna plataforma presenta caída o bloqueo por actualización, nuestro equipo de soporte te restituye el perfil o cuenta en menos de 30 minutos sin costo adicional.', order: 6 }
   ]),
-  bcvRate: load<number>('streamsync_bcv_rate_v2', 36.85),
+  bcvRate: load<number>('gi_bcv_rate_v2', 36.85),
   supabaseSchemaError: null,
   setSupabaseSchemaError: (supabaseSchemaError) => set({ supabaseSchemaError }),
   firestoreStatus: 'initializing',
@@ -303,7 +303,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setAuditLogs: (logs) => set((state) => ({ 
     auditLogs: typeof logs === 'function' ? logs(state.auditLogs) : logs 
   })),
-  branding: load<AppBrandingConfig>('streamsync_branding_v1', {
+  branding: load<AppBrandingConfig>('gi_branding_v1', {
       projectName: 'Gregory Izquierdo Streaming',
       rif: '',
       slogan: 'Tu plataforma de streaming de alta gama 24/7',
@@ -364,7 +364,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setProducts: (val) => {
     set((state) => {
       const products = typeof val === 'function' ? (val as any)(state.products) : val;
-      localStorage.setItem('streamsync_products_v2', JSON.stringify(products));
+      localStorage.setItem('gi_products_v2', JSON.stringify(products));
       syncProductsList(state.products, products);
       return { products };
     });
@@ -372,7 +372,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setOrders: (val) => {
     set((state) => {
       const orders = typeof val === 'function' ? (val as any)(state.orders) : val;
-      localStorage.setItem('streamsync_orders_v2', JSON.stringify(orders));
+      localStorage.setItem('gi_orders_v2', JSON.stringify(orders));
       syncOrdersList(state.orders, orders);
       return { orders };
     });
@@ -380,7 +380,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCustomers: (val) => {
     set((state) => {
       const customers = typeof val === 'function' ? (val as any)(state.customers) : val;
-      localStorage.setItem('streamsync_customers_v2', JSON.stringify(customers));
+      localStorage.setItem('gi_customers_v2', JSON.stringify(customers));
       syncCustomersList(state.customers, customers);
       return { customers };
     });
@@ -388,7 +388,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setActiveCustomer: (val) => {
     set((state) => {
       const activeCustomer = typeof val === 'function' ? (val as any)(state.activeCustomer) : val;
-      localStorage.setItem('streamsync_current_customer_v2', JSON.stringify(activeCustomer));
+      localStorage.setItem('gi_current_customer_v2', JSON.stringify(activeCustomer));
       if (activeCustomer && !isSyncingFromFirestore) {
         syncCustomerToFirestore(activeCustomer);
       }
@@ -398,7 +398,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setWalletTopups: (val) => {
     set((state) => {
       const walletTopups = typeof val === 'function' ? (val as any)(state.walletTopups) : val;
-      localStorage.setItem('streamsync_topups_v2', JSON.stringify(walletTopups));
+      localStorage.setItem('gi_topups_v2', JSON.stringify(walletTopups));
       syncTopupsList(state.walletTopups, walletTopups);
       return { walletTopups };
     });
@@ -406,7 +406,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIncidents: (val) => {
     set((state) => {
       const incidents = typeof val === 'function' ? (val as any)(state.incidents) : val;
-      localStorage.setItem('streamsync_incidents_v2', JSON.stringify(incidents));
+      localStorage.setItem('gi_incidents_v2', JSON.stringify(incidents));
       syncIncidentsList(state.incidents, incidents);
       return { incidents };
     });
@@ -414,7 +414,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setFranchises: (val) => {
     set((state) => {
       const franchises = typeof val === 'function' ? (val as any)(state.franchises) : val;
-      localStorage.setItem('streamsync_franchises_v1', JSON.stringify(franchises));
+      localStorage.setItem('gi_franchises_v1', JSON.stringify(franchises));
       syncFranchisesList(state.franchises, franchises);
       return { franchises };
     });
@@ -430,7 +430,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setPaymentMethods: (val) => {
     set((state) => {
       const paymentMethods = typeof val === 'function' ? (val as any)(state.paymentMethods) : val;
-      localStorage.setItem('streamsync_methods_v2', JSON.stringify(paymentMethods));
+      localStorage.setItem('gi_methods_v2', JSON.stringify(paymentMethods));
       syncPaymentMethodsList(state.paymentMethods, paymentMethods);
       return { paymentMethods };
     });
@@ -438,7 +438,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setInvoices: (val) => {
     set((state) => {
       const invoices = typeof val === 'function' ? (val as any)(state.invoices) : val;
-      localStorage.setItem('streamsync_invoices_v1', JSON.stringify(invoices));
+      localStorage.setItem('gi_invoices_v1', JSON.stringify(invoices));
       syncInvoicesList(state.invoices, invoices);
       return { invoices };
     });
@@ -446,7 +446,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setFaqItems: (val) => {
     set((state) => {
       const faqItems = typeof val === 'function' ? (val as any)(state.faqItems) : val;
-      localStorage.setItem('streamsync_faq_v1', JSON.stringify(faqItems));
+      localStorage.setItem('gi_faq_v1', JSON.stringify(faqItems));
       if (!isSyncingFromFirestore) {
         syncFaqToFirestore(faqItems);
       }
@@ -454,7 +454,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
   setBcvRate: (bcvRate) => {
-    localStorage.setItem('streamsync_bcv_rate_v2', JSON.stringify(bcvRate));
+    localStorage.setItem('gi_bcv_rate_v2', JSON.stringify(bcvRate));
     if (!isSyncingFromFirestore) {
       syncBcvRateToFirestore(bcvRate);
     }
@@ -463,7 +463,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setPurchases: (val) => {
     set((state) => {
       const purchases = typeof val === 'function' ? (val as any)(state.purchases) : val;
-      localStorage.setItem('streamsync_purchases_v2', JSON.stringify(purchases));
+      localStorage.setItem('gi_purchases_v2', JSON.stringify(purchases));
       syncPurchasesList(state.purchases, purchases);
       return { purchases };
     });
@@ -471,7 +471,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setBranding: (val) => {
     set((state) => {
       const branding = typeof val === 'function' ? (val as any)(state.branding) : val;
-      localStorage.setItem('streamsync_branding_v1', JSON.stringify(branding));
+      localStorage.setItem('gi_branding_v1', JSON.stringify(branding));
       if (!isSyncingFromFirestore) {
         syncBrandingToFirestore(branding);
       }
@@ -497,7 +497,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   addPurchase: (purchase, paymentAccountId) => {
     const state = get();
     const updatedPurchases = [...state.purchases, purchase];
-    localStorage.setItem('streamsync_purchases_v2', JSON.stringify(updatedPurchases));
+    localStorage.setItem('gi_purchases_v2', JSON.stringify(updatedPurchases));
 
     const newEntry: AccountingEntry = {
       id: `ENT-${Date.now()}`,

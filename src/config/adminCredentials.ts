@@ -123,10 +123,10 @@ export function setAdminSession(session: Omit<AdminSession, 'token' | 'expiresAt
   sessionStorage.setItem(STORAGE_ADMIN_SESSION_KEY, JSON.stringify(fullSession));
   localStorage.setItem(STORAGE_ADMIN_SESSION_KEY, JSON.stringify(fullSession));
 
-  // Compatibilidad con tokens de concurrencia previos
-  localStorage.setItem(`streamsync_staff_session_token_${session.adminId}`, token);
-  sessionStorage.setItem('streamsync_my_staff_session', token);
-  localStorage.setItem('streamsync_active_logged_staff_id', session.adminId);
+  // Compatibilidad con tokens de concurrencia
+  localStorage.setItem(`gi_staff_session_token_${session.adminId}`, token);
+  sessionStorage.setItem('gi_my_staff_session', token);
+  localStorage.setItem('gi_active_logged_staff_id', session.adminId);
 
   return fullSession;
 }
@@ -137,6 +137,6 @@ export function setAdminSession(session: Omit<AdminSession, 'token' | 'expiresAt
 export function clearAdminSession(): void {
   sessionStorage.removeItem(STORAGE_ADMIN_SESSION_KEY);
   localStorage.removeItem(STORAGE_ADMIN_SESSION_KEY);
-  sessionStorage.removeItem('streamsync_my_staff_session');
-  localStorage.removeItem('streamsync_active_logged_staff_id');
+  sessionStorage.removeItem('gi_my_staff_session');
+  localStorage.removeItem('gi_active_logged_staff_id');
 }
